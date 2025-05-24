@@ -1,0 +1,58 @@
+# Node
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.local
+*.log
+
+# TypeScript
+*.js
+*.js.map
+
+# Ignore coverage
+coverage/
+
+# Ignore IDE settings
+.idea/
+*.swp
+
+# Ignore output from test runners
+*.lcov
+
+# Ignore next.js build output
+.next/
+
+# Ignore vercel
+.vercel/
+
+# Ignore netlify
+.netlify/
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore generated files
+*.generated.*
