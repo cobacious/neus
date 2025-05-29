@@ -2,6 +2,7 @@
 // Usage: pnpm tsx apps/engine/ingest.ts <rss-url>
 
 import { fetchArticlesFromRss } from './articleIngestion';
+import { processAndStoreArticles } from './pipeline';
 
 // If using TypeScript with "type": "module", explicitly import node types for process
 declare const process: any;
@@ -14,7 +15,7 @@ async function main() {
     process.exit(1);
   }
   const articles = await fetchArticlesFromRss(feedUrl);
-  console.log(JSON.stringify(articles, null, 2));
+  await processAndStoreArticles(articles);
 }
 
 main();
