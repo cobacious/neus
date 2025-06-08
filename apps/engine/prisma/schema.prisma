@@ -26,6 +26,8 @@ model Cluster {
   createdAt   DateTime @default(now())
   label       String?
   origin      String   // "gpt", "embedding", "manual", etc.
+  headline    String?  // AI-generated neutral headline
+  summary     String?  // AI-generated neutral summary
 
   articleAssignments ArticleClusterAssignment[]
 }
