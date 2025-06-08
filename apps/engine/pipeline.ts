@@ -7,6 +7,7 @@ import { FEED_URLS } from './feeds.config';
 import { storeArticles } from './storeArticles';
 import { fillMissingContent } from './fillMissingContent';
 import { embedAndClusterNewArticles } from './embedAndGroup';
+import { summarizeClusters } from './summarizeClusters';
 
 export async function runPipeline() {
   // 1. Ingest articles from all feeds
@@ -29,4 +30,7 @@ export async function runPipeline() {
 
   // 4. Cluster articles
   await embedAndClusterNewArticles();
+
+  // 5. Summarize clusters
+  await summarizeClusters();
 }

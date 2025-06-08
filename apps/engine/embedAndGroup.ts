@@ -6,6 +6,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const SIMILARITY_THRESHOLD = 0.85;
 const MAX_LOOKBACK_HOURS = 48;
+const MAX_EMBEDDING_CHARS = 8192;
 
 export async function embedAndClusterNewArticles() {
   const unembedded = await prisma.article.findMany({
@@ -17,7 +18,7 @@ export async function embedAndClusterNewArticles() {
   for (const article of unembedded) {
     // Only embed if content is present
     if (!article.content) continue;
-    const cleaned = article.content.slice(0, 8192);
+    const cleaned = article.content.slice(0, MAX_EMBEDDING_CHARS);
     const response = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
       input: cleaned,
