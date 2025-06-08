@@ -5,7 +5,8 @@ export interface Article {
   url: string;
   source: string;
   publishedAt: string; // ISO date string
-  content: string;
+  snippet?: string; // Short summary/snippet from RSS feed
+  content?: string; // Full article content (may be undefined until extracted)
   author?: string;
   // Add more fields as needed (e.g., image, tags, etc.)
 }

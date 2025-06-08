@@ -2,19 +2,31 @@
 // This is where clustering, summarization, and storage will be handled
 import './env'; // Loads .env and proxy support
 import { Article } from '../../packages/types/article';
-import { clusterArticlesLLM, StoryCluster } from './cluster';
+import { fetchArticlesFromRss } from './articleIngestion';
+import { FEED_URLS } from './feeds.config';
+import { storeArticles } from './storeArticles';
+import { fillMissingContent } from './fillMissingContent';
+import { embedAndClusterNewArticles } from './embedAndGroup';
 
-export async function processAndStoreArticles(articles: Article[]) {
-  // Cluster articles into stories using LLM (placeholder for now)
-  const clusters: StoryCluster[] = await clusterArticlesLLM(articles);
-  console.log(`[pipeline] Clustered into ${clusters.length} stories.`);
-  // TODO: Generate neutral summaries for each story
-  // TODO: Extract and normalize metadata
-  // TODO: Store results in persistent storage (file/db)
+export async function runPipeline() {
+  // 1. Ingest articles from all feeds
+  let allArticles: Article[] = [];
+  for (const url of FEED_URLS) {
+    try {
+      const articles = await fetchArticlesFromRss(url);
+      allArticles = allArticles.concat(articles);
+      console.log(`[pipeline] Ingested ${articles.length} articles from ${url}`);
+    } catch (err: any) {
+      console.warn(`[pipeline] Failed to ingest from ${url}:`, err);
+    }
+  }
 
-  // For now, just log the clusters (placeholder)
-  clusters.forEach((cluster, i) => {
-    console.log(`Story #${i + 1} (${cluster.articles.length} articles):`);
-    cluster.articles.forEach(a => console.log(`  - ${a.title}`));
-  });
+  // 2. Store articles in the database
+  await storeArticles(allArticles);
+
+  // 3. Fill missing content
+  await fillMissingContent();
+
+  // 4. Cluster articles
+  await embedAndClusterNewArticles();
 }

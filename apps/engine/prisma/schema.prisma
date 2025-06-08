@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  snippet     String?  // Short summary/snippet from RSS feed
+  content     String?  // Full article content (may be null until extracted)
+  source      String
+  publishedAt DateTime
+  rawHtml     String?
+  embedding   Json?
+  createdAt   DateTime @default(now())
+
+  clusterAssignments ArticleClusterAssignment[]
+}
+
+model Cluster {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  label       String?
+  origin      String   // "gpt", "embedding", "manual", etc.
+
+  articleAssignments ArticleClusterAssignment[]
+}
+
+model ArticleClusterAssignment {
+  id         String   @id @default(cuid())
+  article    Article  @relation(fields: [articleId], references: [id])
+  articleId  String
+  cluster    Cluster  @relation(fields: [clusterId], references: [id])
+  clusterId  String
+  similarity Float?
+  method     String   // "gpt" or "embedding"
+  createdAt  DateTime @default(now())
+}

@@ -14,12 +14,13 @@ export async function fetchArticlesFromRss(feedUrl: string): Promise<Article[]> 
   (globalThis as any).fetch = fetch;
   try {
     const feed = await parser.parseURL(feedUrl);
-    return (feed.items || []).map(item => ({
+    return (feed.items || []).map((item) => ({
       title: item.title || '',
       url: item.link || '',
       source: feed.title || '',
       publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-      content: item.contentSnippet || item.content || '',
+      snippet: item.contentSnippet || item.content || '', // Store RSS summary/snippet here
+      content: undefined, // Full content will be extracted later
       author: item.creator || item.author || undefined,
       // TODO: Add more fields as needed
     }));

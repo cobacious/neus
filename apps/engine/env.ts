@@ -7,4 +7,9 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-console.log('[debug] env.ts loaded, OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'set' : 'unset', 'PROXY_ADDRESS:', process.env.PROXY_ADDRESS);
+console.log(
+  '[debug] env.ts loaded, OPENAI_API_KEY:',
+  process.env.OPENAI_API_KEY ? 'set' : 'unset',
+  'PROXY_ADDRESS:',
+  process.env.PROXY_ADDRESS
+);
