@@ -2,7 +2,7 @@
 // For now, cluster by normalized title similarity (case-insensitive, basic deduplication)
 // TODO: Replace with LLM or embedding-based clustering for better accuracy
 
-import { Article } from "../../packages/types/article";
+import { Article } from '../../packages/types/article';
 import { fetch } from './fetcher';
 
 // --- LLM integration for clustering ---
@@ -21,7 +21,7 @@ function normalizeTitle(title: string): string {
   return title
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ");
+    .replace(/[^a-z0-9]+/g, ' ');
 }
 
 export function clusterArticles(articles: Article[]): StoryCluster[] {
@@ -42,45 +42,40 @@ export function clusterArticles(articles: Article[]): StoryCluster[] {
 // Use native fetch for OpenAI API calls to ensure proxying works with global-agent
 async function callOpenAI(messages: any[]): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+  if (!apiKey) throw new Error('OPENAI_API_KEY not set');
 
-  const response = await fetch(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages,
-        temperature: 0.2,
-      }),
-    }
-  );
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages,
+      temperature: 0.2,
+    }),
+  });
   const data = await response.json();
   // @ts-ignore
   return data.choices[0].message.content;
 }
 
-export async function clusterArticlesLLM(
-  articles: Article[]
-): Promise<StoryCluster[]> {
+export async function clusterArticlesLLM(articles: Article[]): Promise<StoryCluster[]> {
   // Prepare prompt for LLM
   const system = {
-    role: "system",
+    role: 'system',
     content:
       'You are a news clustering engine. Group related news articles into clusters (stories) based on topic, even if headlines differ. Be strict: only group articles if they are clearly about the same event or development. Use all available context (title, content, source, date). Return JSON: [{"cluster": <string>, "articles": [<index>, ...]}] where <index> is the index of the article in the input array.',
   };
   const user = {
-    role: "user",
+    role: 'user',
     content: JSON.stringify(
       articles.map((a) => ({
         title: a.title,
         content: a.content,
         source: a.source,
-        publishedAt: a.publishedAt
+        publishedAt: a.publishedAt,
       }))
     ),
   };
@@ -98,9 +93,10 @@ export async function clusterArticlesLLM(
     }));
   } catch (err) {
     console.error(
-      "[LLM clustering] Error or invalid response, falling back to simple clustering:",
+      '[LLM clustering] Error or invalid response, falling back to simple clustering:',
       err,
-      '\nRaw LLM response:', llmResponse
+      '\nRaw LLM response:',
+      llmResponse
     );
     return clusterArticles(articles);
   }

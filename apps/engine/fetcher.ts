@@ -13,10 +13,7 @@ if (process.env.PROXY_ADDRESS) {
   console.log(`[fetcher] Using proxy agent: ${process.env.PROXY_ADDRESS}`);
 }
 
-export async function fetch(
-  url: string,
-  options: RequestInit = {}
-): Promise<Response> {
+export async function fetch(url: string, options: RequestInit = {}): Promise<Response> {
   const opts = agent ? { ...options, agent } : options;
   return nodeFetch(url, opts);
 }
