@@ -11,7 +11,7 @@ if (process.env.PROXY_ADDRESS) {
   const { HttpsProxyAgent } = await import('https-proxy-agent');
   agent = new HttpsProxyAgent(process.env.PROXY_ADDRESS);
   // Optionally log for debugging
-  logger.info(`[fetcher] Using proxy agent: ${process.env.PROXY_ADDRESS}`);
+  logger.info(`[FETCHER] Using proxy agent: ${process.env.PROXY_ADDRESS}`);
 }
 
 export async function fetch(url: string, options: RequestInit = {}): Promise<Response> {

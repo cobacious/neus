@@ -1,16 +1,25 @@
 // storeArticles.ts
 // Store articles in the database, deduplicating by id (url)
 import { prisma } from '../../lib/prisma';
-import { logPipelineStep } from '../../lib/pipelineLogger';
+import {
+  logger,
+  logPipelineStep,
+  logPipelineSection,
+  PipelineStep,
+} from '../../lib/pipelineLogger';
 import { RssArticle } from '../ingestion/articleIngestion';
 
 export async function storeArticles(articles: RssArticle[]) {
-  logPipelineStep('Storing articles in the database...');
+  logPipelineStep(PipelineStep.Store, 'Storing articles in the database...');
   let stored = 0;
   for (const article of articles) {
     try {
       if (!article.url || !article.title) {
-        console.warn(`[db] Skipping article with missing url or title:`, article);
+        logPipelineSection(
+          PipelineStep.Store,
+          `Skipping article with missing url or title:`,
+          article
+        );
         continue;
       }
       // Build update/create objects, but do NOT set 'id' in update (cannot update PK)
@@ -41,11 +50,14 @@ export async function storeArticles(articles: RssArticle[]) {
         update: updateData,
         create: createData,
       });
-      console.log(`[db] Upserted article: ${article.title} (${article.url})`);
+      logger.debug(`[${PipelineStep.Store}] Upserted article: ${article.title} (${article.url})`);
       stored++;
     } catch (err) {
-      console.warn(`[db] Failed to upsert article: ${article.title} (${article.url})`, err);
+      logger.warn(
+        `[${PipelineStep.Store}] Failed to upsert article: ${article.title} (${article.url})`,
+        err
+      );
     }
   }
-  console.log(`[pipeline] Stored/updated ${stored} articles in the database.`);
+  logPipelineSection(PipelineStep.Store, `Stored/updated ${stored} articles in the database.`);
 }

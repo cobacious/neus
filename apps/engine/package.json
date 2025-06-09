@@ -10,6 +10,7 @@
     "node-fetch": "^3.3.2",
     "openai": "^5.0.1",
     "pino": "^9.7.0",
+    "pino-pretty": "^13.0.0",
     "rss-parser": "^3.13.0",
     "sqlite3": "^5.1.7"
   },
@@ -20,6 +21,6 @@
     "tsx": "^4.19.4"
   },
   "scripts": {
-    "pipeline": "tsx index.ts"
+    "pipeline": "NODE_ENV=development tsx index.ts"
   }
 }

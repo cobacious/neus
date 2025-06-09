@@ -2,12 +2,17 @@
 // For each cluster without a headline/summary, generate them using OpenAI and update the cluster
 import OpenAI from 'openai';
 import { prisma } from '../../lib/prisma';
-import { logPipelineStep } from '../../lib/pipelineLogger';
+import {
+  logger,
+  logPipelineStep,
+  logPipelineSection,
+  PipelineStep,
+} from '../../lib/pipelineLogger';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function summarizeClusters() {
-  logPipelineStep('Summarizing clusters...');
+  logPipelineStep(PipelineStep.Summarise, 'Summarizing clusters...');
   // Find clusters missing a headline or summary
   const clusters = await prisma.cluster.findMany({
     where: {
@@ -25,10 +30,21 @@ export async function summarizeClusters() {
     },
   });
 
+  if (clusters.length === 0) {
+    logPipelineSection(
+      PipelineStep.Summarise,
+      'No clusters found that need summarization. Skipping summarization step.'
+    );
+    return;
+  }
+
   for (const cluster of clusters) {
     const articles = cluster.articleAssignments.map((a) => a.article);
     if (articles.length === 0) continue;
-    // console.log(`[summarize] Summarizing cluster ${cluster.id} with ${articles.length} articles`);
+    logPipelineSection(
+      PipelineStep.Summarise,
+      `Summarising cluster ${cluster.id} with ${articles.length} articles`
+    );
     // Compose a prompt from article titles and snippets
     const prompt = `Given the following news articles, generate a neutral, concise headline and a 2-3 sentence summary that best represents the group.\n\nArticles:\n${articles
       .map((a) => `- ${a.title}${a.snippet ? `: ${a.snippet}` : ''}`)
@@ -66,13 +82,15 @@ export async function summarizeClusters() {
           where: { id: cluster.id },
           data: { headline, summary },
         });
-        // console.log(`[summarize] Updated cluster ${cluster.id}`);
+        logPipelineSection(PipelineStep.Summarise, `Updated cluster ${cluster.id}`);
       } else {
-        console.warn(`[summarize] Failed to parse headline/summary for cluster ${cluster.id}`);
+        logger.warn(
+          `[${PipelineStep.Summarise}]: Failed to parse headline/summary for cluster ${cluster.id}`
+        );
       }
     } catch (err) {
-      console.warn(`[summarize] OpenAI error for cluster ${cluster.id}:`, err);
+      logger.error(`[${PipelineStep.Summarise}]: OpenAI error for cluster ${cluster.id}:`, err);
     }
   }
-  console.log('[pipeline] Summarization step complete.');
+  logPipelineSection(PipelineStep.Summarise, 'Summarisation step complete.');
 }
