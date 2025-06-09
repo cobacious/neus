@@ -5,7 +5,8 @@ import { ingestArticles } from './ingestArticles';
 import { FEED_URLS } from '../../feeds.config';
 import { storeArticles } from './storeArticles';
 import { fillMissingContent } from './fillMissingContent';
-import { embedAndClusterNewArticles } from './embedAndGroup';
+import { embedNewArticles } from './embedArticles';
+import { clusterRecentArticles } from './clusterArticles';
 import { summarizeClusters } from './summarizeClusters';
 import { resetPipelineLogger, logger } from '../../lib/pipelineLogger';
 
@@ -14,6 +15,7 @@ export async function runPipeline() {
   const allArticles = await ingestArticles(FEED_URLS);
   await storeArticles(allArticles);
   await fillMissingContent();
-  await embedAndClusterNewArticles();
+  await embedNewArticles();
+  await clusterRecentArticles();
   await summarizeClusters();
 }
