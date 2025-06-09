@@ -16,7 +16,7 @@ const MAX_LOOKBACK_HOURS = 48;
 const MAX_EMBEDDING_CHARS = 8192;
 
 export async function embedAndClusterNewArticles() {
-  logPipelineStep(PipelineStep.Embed, 'Clustering articles...');
+  logPipelineStep(PipelineStep.Embed, 'Embedding and clustering articles...');
 
   const unembedded = await prisma.article.findMany({
     where: { embedding: { equals: Prisma.DbNull } },
@@ -25,7 +25,6 @@ export async function embedAndClusterNewArticles() {
   logPipelineSection(PipelineStep.Embed, `Found ${unembedded.length} unembedded articles`);
 
   for (const article of unembedded) {
-    // Only embed if content is present
     if (!article.content) {
       logPipelineSection(
         PipelineStep.Embed,
@@ -45,7 +44,10 @@ export async function embedAndClusterNewArticles() {
         data: { embedding },
       });
     } catch (err) {
-      logger.error(`[${PipelineStep.Embed}] Failed: ${article.title} (${article.url})`, err);
+      logger.error(
+        `[${PipelineStep.Embed}] Failed embedding: ${article.title} (${article.url})`,
+        err
+      );
     }
   }
 
@@ -58,90 +60,92 @@ export async function embedAndClusterNewArticles() {
     },
   });
 
-  const clusters: { [clusterId: string]: string[] } = {};
+  const edges: [string, string, number][] = [];
+  const articleMap = new Map<string, (typeof recent)[0]>();
+  for (const a of recent) articleMap.set(a.id, a);
+
+  for (let i = 0; i < recent.length; i++) {
+    const a = recent[i];
+    if (!Array.isArray(a.embedding)) continue;
+    for (let j = i + 1; j < recent.length; j++) {
+      const b = recent[j];
+      if (!Array.isArray(b.embedding)) continue;
+      const sim = cosineSimilarity(a.embedding as number[], b.embedding as number[]);
+      if (sim > SIMILARITY_THRESHOLD) {
+        edges.push([a.id as string, b.id as string, sim]);
+      }
+    }
+  }
+
+  const visited = new Set<string>();
+  // Fix: Explicitly type cluster and assignments arrays to avoid TS 'never' errors
+  const clusters: string[][] = [];
+
   for (const article of recent) {
-    if (!Array.isArray(article.embedding)) continue;
-    const aVec = article.embedding as number[];
-    let bestMatch: typeof article | null = null;
-    let bestScore = 0;
+    if (visited.has(article.id)) continue;
 
-    for (const other of recent) {
-      if (article.url === other.url) continue;
-      if (!Array.isArray(other.embedding)) continue;
-      const bVec = other.embedding as number[];
-      const score = cosineSimilarity(aVec, bVec);
-      if (score > SIMILARITY_THRESHOLD && score > bestScore) {
-        bestMatch = other;
-        bestScore = score;
+    const cluster: string[] = [];
+    const stack: string[] = [article.id];
+    while (stack.length) {
+      const current = stack.pop()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      cluster.push(current);
+      const neighbors = edges
+        .filter((e) => e[0] === current || e[1] === current)
+        .map((e) => (e[0] === current ? e[1] : e[0]));
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) stack.push(neighbor);
       }
     }
 
-    if (bestMatch) {
-      const existing = await prisma.articleClusterAssignment.findMany({
-        where: {
-          OR: [{ articleId: article.id }, { articleId: bestMatch.id }],
-        },
+    if (cluster.length > 0) clusters.push(cluster);
+  }
+
+  // Create a singleton for unclustered articles
+  for (const article of recent) {
+    if (!visited.has(article.id)) clusters.push([article.id]);
+  }
+
+  let createdClusters = 0;
+  for (const group of clusters) {
+    const cluster = await prisma.cluster.create({
+      data: { origin: 'embedding', label: null },
+    });
+
+    const assignments: {
+      articleId: string;
+      clusterId: string;
+      similarity: number;
+      method: string;
+    }[] = [];
+    for (const id of group) {
+      const article = articleMap.get(id);
+      if (!article || !Array.isArray(article.embedding)) continue;
+      const similarity =
+        group
+          .filter((otherId) => otherId !== id)
+          .map((otherId) => {
+            const other = articleMap.get(otherId);
+            return other && Array.isArray(other.embedding)
+              ? cosineSimilarity(article.embedding as number[], other.embedding as number[])
+              : 0;
+          })
+          .reduce((a, b) => a + b, 0) / Math.max(1, group.length - 1);
+      assignments.push({
+        articleId: id,
+        clusterId: cluster.id,
+        similarity,
+        method: 'embedding',
       });
-
-      let clusterId: string;
-      if (existing.length > 0) {
-        clusterId = existing[0].clusterId;
-      } else {
-        const cluster = await prisma.cluster.create({
-          data: {
-            origin: 'embedding',
-            label: null,
-          },
-        });
-        clusterId = cluster.id;
-      }
-
-      // Check if these assignments already exist to avoid unique constraint errors
-      const assignmentsToCreate: any[] = [];
-      const existingAssignments = await prisma.articleClusterAssignment.findMany({
-        where: {
-          OR: [
-            { articleId: article.id, clusterId },
-            { articleId: bestMatch.id, clusterId },
-          ],
-        },
-      });
-      const alreadyAssigned = new Set(existingAssignments.map((a) => a.articleId));
-      if (!alreadyAssigned.has(article.id)) {
-        assignmentsToCreate.push({
-          articleId: article.id,
-          clusterId,
-          similarity: bestScore,
-          method: 'embedding',
-        });
-      }
-      if (!alreadyAssigned.has(bestMatch.id)) {
-        assignmentsToCreate.push({
-          articleId: bestMatch.id,
-          clusterId,
-          similarity: bestScore,
-          method: 'embedding',
-        });
-      }
-      if (assignmentsToCreate.length > 0) {
-        await prisma.articleClusterAssignment.createMany({
-          data: assignmentsToCreate,
-        });
-      }
-
-      // Use url for reporting and deduplication
-      clusters[clusterId] = Array.from(
-        new Set([...(clusters[clusterId] || []), article.url, bestMatch.url])
-      );
     }
+
+    await prisma.articleClusterAssignment.createMany({ data: assignments });
+    createdClusters++;
   }
 
   logPipelineSection(
     PipelineStep.Embed,
-    `Created/updated ${Object.keys(clusters).length} clusters`
-  );
-  logPipelineSection(
-    PipelineStep.Embed,
-    `[pipeline] Clustering complete. ${Object.keys(clusters).length} clusters created/updated.`
+    `Clustering complete. ${createdClusters} clusters created.`
   );
 }
