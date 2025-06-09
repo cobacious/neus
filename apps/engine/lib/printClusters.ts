@@ -1,6 +1,6 @@
 // printClusters.ts
 // Print a human-readable report of clusters, their summaries, and their articles
-import { prisma } from './lib/prisma';
+import { prisma } from './prisma';
 
 async function main() {
   const clusters = await prisma.cluster.findMany({

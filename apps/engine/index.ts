@@ -1,5 +1,5 @@
 // runPipeline.ts
-import { runPipeline } from './pipeline';
+import { runPipeline } from './core/pipeline/pipeline';
 
 runPipeline()
   .then(() => {
