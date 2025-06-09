@@ -7,6 +7,7 @@ export enum PipelineStep {
   Store = 'STORE',
   Fetch = 'FETCH',
   Embed = 'EMBED',
+  Cluster = 'CLUSTER',
   Summarise = 'SUMMARISE',
 }
 
