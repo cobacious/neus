@@ -1,5 +1,3 @@
-// summarizeClusters.ts
-// For each cluster without a headline/summary, generate them using OpenAI and update the cluster
 import OpenAI from 'openai';
 import { prisma } from '../../lib/prisma';
 import {
@@ -10,10 +8,12 @@ import {
 } from '../../lib/pipelineLogger';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const TOKEN_CAP = 10000; // Adjust your token budget here
+let totalTokensUsed = 0;
 
 export async function summarizeClusters() {
   logPipelineStep(PipelineStep.Summarise, 'Summarizing clusters...');
-  // Find clusters missing a headline or summary
+
   const clusters = await prisma.cluster.findMany({
     where: {
       OR: [
@@ -41,14 +41,16 @@ export async function summarizeClusters() {
   for (const cluster of clusters) {
     const articles = cluster.articleAssignments.map((a) => a.article);
     if (articles.length === 0) continue;
+
     logPipelineSection(
       PipelineStep.Summarise,
-      `Summarising cluster ${cluster.id} with ${articles.length} articles`
+      `Summarising cluster ${cluster.id} with ${articles.length} article(s)`
     );
-    // Compose a prompt from article titles and snippets
+
     const prompt = `Given the following news articles, generate a neutral, concise headline and a 2-3 sentence summary that best represents the group.\n\nArticles:\n${articles
       .map((a) => `- ${a.title}${a.snippet ? `: ${a.snippet}` : ''}`)
       .join('\n')}\n\nRespond in JSON with keys 'headline' and 'summary'.`;
+
     try {
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
@@ -60,16 +62,26 @@ export async function summarizeClusters() {
         max_tokens: 256,
         temperature: 0.4,
       });
+
+      const usage = completion.usage?.total_tokens || 0;
+      totalTokensUsed += usage;
+      console.log(`Cluster ${cluster.id} used ${usage} tokens (total: ${totalTokensUsed})`);
+
+      if (totalTokensUsed > TOKEN_CAP) {
+        console.warn('Token cap reached. Aborting summarisation.');
+        break;
+      }
+
       const content = completion.choices[0].message.content;
       let headline: string | null = null;
       let summary: string | null = null;
+
       if (content) {
         try {
           const parsed = JSON.parse(content);
           headline = parsed.headline;
           summary = parsed.summary;
         } catch (e) {
-          // fallback: try to extract headline/summary from text
           const match = content.match(/"headline"\s*:\s*"([^"]+)"[\s,]+"summary"\s*:\s*"([^"]+)"/);
           if (match) {
             headline = match[1] || null;
@@ -77,6 +89,7 @@ export async function summarizeClusters() {
           }
         }
       }
+
       if (headline && summary) {
         await prisma.cluster.update({
           where: { id: cluster.id },
@@ -92,5 +105,9 @@ export async function summarizeClusters() {
       logger.error(`[${PipelineStep.Summarise}]: OpenAI error for cluster ${cluster.id}:`, err);
     }
   }
-  logPipelineSection(PipelineStep.Summarise, 'Summarisation step complete.');
+
+  logPipelineSection(
+    PipelineStep.Summarise,
+    `Summarisation step complete. Total tokens used: ${totalTokensUsed}`
+  );
 }
