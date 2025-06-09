@@ -2,7 +2,7 @@
 // Runs every 4 hours using setInterval (for dev/local); use a real scheduler in production
 
 import './env'; // Loads .env and proxy support
-import { runPipeline } from './pipeline/index';
+import { runPipeline } from './core/pipeline/pipeline';
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 

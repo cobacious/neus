@@ -3,6 +3,7 @@
 // Always use this for HTTP(S) requests in the backend engine.
 
 import nodeFetch, { RequestInit, Response } from 'node-fetch';
+import { logger } from './pipelineLogger';
 
 let agent: any = undefined;
 if (process.env.PROXY_ADDRESS) {
@@ -10,7 +11,7 @@ if (process.env.PROXY_ADDRESS) {
   const { HttpsProxyAgent } = await import('https-proxy-agent');
   agent = new HttpsProxyAgent(process.env.PROXY_ADDRESS);
   // Optionally log for debugging
-  console.log(`[fetcher] Using proxy agent: ${process.env.PROXY_ADDRESS}`);
+  logger.info(`[fetcher] Using proxy agent: ${process.env.PROXY_ADDRESS}`);
 }
 
 export async function fetch(url: string, options: RequestInit = {}): Promise<Response> {
