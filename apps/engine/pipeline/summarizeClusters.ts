@@ -1,11 +1,13 @@
 // summarizeClusters.ts
 // For each cluster without a headline/summary, generate them using OpenAI and update the cluster
 import OpenAI from 'openai';
-import { prisma } from './lib/prisma';
+import { prisma } from '../lib/prisma';
+import { logPipelineStep } from '../pipelineLogger';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function summarizeClusters() {
+  logPipelineStep('Summarizing clusters...');
   // Find clusters missing a headline or summary
   const clusters = await prisma.cluster.findMany({
     where: {
@@ -26,6 +28,7 @@ export async function summarizeClusters() {
   for (const cluster of clusters) {
     const articles = cluster.articleAssignments.map((a) => a.article);
     if (articles.length === 0) continue;
+    // console.log(`[summarize] Summarizing cluster ${cluster.id} with ${articles.length} articles`);
     // Compose a prompt from article titles and snippets
     const prompt = `Given the following news articles, generate a neutral, concise headline and a 2-3 sentence summary that best represents the group.\n\nArticles:\n${articles
       .map((a) => `- ${a.title}${a.snippet ? `: ${a.snippet}` : ''}`)
@@ -63,12 +66,13 @@ export async function summarizeClusters() {
           where: { id: cluster.id },
           data: { headline, summary },
         });
-        console.log(`[summarizeClusters] Updated cluster ${cluster.id}`);
+        // console.log(`[summarize] Updated cluster ${cluster.id}`);
       } else {
-        console.warn(`[summarizeClusters] Failed to parse headline/summary for cluster ${cluster.id}`);
+        console.warn(`[summarize] Failed to parse headline/summary for cluster ${cluster.id}`);
       }
     } catch (err) {
-      console.warn(`[summarizeClusters] OpenAI error for cluster ${cluster.id}:`, err);
+      console.warn(`[summarize] OpenAI error for cluster ${cluster.id}:`, err);
     }
   }
+  console.log('[pipeline] Summarization step complete.');
 }

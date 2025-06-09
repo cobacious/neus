@@ -1,7 +1,8 @@
 // fillMissingContent.ts
 // Fetch and update missing article content using @extractus/article-extractor
-import { prisma } from './lib/prisma';
+import { prisma } from '../lib/prisma';
 import { extract, setSanitizeHtmlOptions } from '@extractus/article-extractor';
+import { logPipelineStep } from '../pipelineLogger';
 
 setSanitizeHtmlOptions({
   allowedTags: [], // remove all tags
@@ -10,32 +11,34 @@ setSanitizeHtmlOptions({
 });
 
 export async function fillMissingContent() {
-  // Always treat RSS content as a summary and attempt to extract the full article
+  logPipelineStep('Filling missing content...');
   const articles = await prisma.article.findMany();
+  let updated = 0;
   console.log(
     `[content-extract] Attempting to extract full content for ${articles.length} articles.`
   );
   for (const article of articles) {
-    if (!article.id || !article.source || (article.content && article.content.trim().length > 0))
+    if (!article.url || !article.source || (article.content && article.content.trim().length > 0))
       continue;
     try {
-      const result = await extract(article.id, {});
+      const result = await extract(article.url, {});
       if (result?.content && result.content.trim().length > 0) {
         await prisma.article.update({
           where: { id: article.id },
           data: { content: result.content },
         });
-        console.log(`[content-extract] Updated article: ${article.title}`);
+        updated++;
       } else {
         console.warn(
-          `[content-extract] No full content extracted for: ${article.title} (${article.id})`
+          `[content-extract] No full content extracted for: ${article.title} (${article.url})`
         );
       }
     } catch (err) {
-      console.warn(
-        `[content-extract] Failed to extract content for: ${article.title} (${article.id})`,
+      console.error(
+        `[content-extract] Failed to extract content for: ${article.title} (${article.url})`,
         err
       );
     }
   }
+  console.log(`[pipeline] Filled content for ${updated} articles.`);
 }
