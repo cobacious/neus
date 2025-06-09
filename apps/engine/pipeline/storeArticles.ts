@@ -1,19 +1,27 @@
 // storeArticles.ts
 // Store articles in the database, deduplicating by id (url)
-import { Article } from '../../packages/types/article';
-import { prisma } from './lib/prisma';
+import { Article } from '@prisma/client';
+import { prisma } from '../lib/prisma';
+import { logPipelineStep } from '../pipelineLogger';
 
 export async function storeArticles(articles: Article[]) {
+  logPipelineStep('Storing articles in the database...');
+  let stored = 0;
   for (const article of articles) {
     try {
-      // Dynamically build update/create objects to avoid undefined fields
+      if (!article.url || !article.title) {
+        console.warn(`[db] Skipping article with missing url or title:`, article);
+        continue;
+      }
+      // Build update/create objects, but do NOT set 'id' in update (cannot update PK)
       const updateData: any = {
+        url: article.url,
         title: article.title,
         source: article.source,
         publishedAt: new Date(article.publishedAt),
       };
       const createData: any = {
-        id: article.url || undefined,
+        url: article.url,
         title: article.title,
         source: article.source,
         publishedAt: new Date(article.publishedAt),
@@ -28,13 +36,16 @@ export async function storeArticles(articles: Article[]) {
       }
       await prisma.article.upsert({
         where: {
-          id: article.url || undefined,
+          url: article.url, // Use url for deduplication
         },
         update: updateData,
         create: createData,
       });
+      console.log(`[db] Upserted article: ${article.title} (${article.url})`);
+      stored++;
     } catch (err) {
       console.warn(`[db] Failed to upsert article: ${article.title} (${article.url})`, err);
     }
   }
+  console.log(`[pipeline] Stored/updated ${stored} articles in the database.`);
 }
