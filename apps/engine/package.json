@@ -21,6 +21,7 @@
     "tsx": "^4.19.4"
   },
   "scripts": {
-    "pipeline": "NODE_ENV=development tsx index.ts"
+    "pipeline": "NODE_ENV=development tsx index.ts",
+    "print": "NODE_ENV=development tsx lib/printClusters.ts"
   }
 }
