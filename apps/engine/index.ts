@@ -1,12 +1,13 @@
 // runPipeline.ts
 import { runPipeline } from './core/pipeline/pipeline';
+import { logger } from './lib/pipelineLogger';
 
 runPipeline()
   .then(() => {
-    console.log('[runPipeline] Pipeline completed successfully.');
+    logger.info('Pipeline completed successfully.');
     process.exit(0);
   })
   .catch((err) => {
-    console.error('[runPipeline] Pipeline failed:', err);
+    logger.error('Pipeline failed:', err);
     process.exit(1);
   });

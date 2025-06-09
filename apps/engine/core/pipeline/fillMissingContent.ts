@@ -2,7 +2,12 @@
 // Fetch and update missing article content using @extractus/article-extractor
 import { prisma } from '../../lib/prisma';
 import { extract, setSanitizeHtmlOptions } from '@extractus/article-extractor';
-import { logPipelineStep } from '../../lib/pipelineLogger';
+import {
+  logPipelineStep,
+  logPipelineSection,
+  PipelineStep,
+  logger,
+} from '../../lib/pipelineLogger';
 
 setSanitizeHtmlOptions({
   allowedTags: [], // remove all tags
@@ -11,11 +16,21 @@ setSanitizeHtmlOptions({
 });
 
 export async function fillMissingContent() {
-  logPipelineStep('Filling missing content...');
-  const articles = await prisma.article.findMany();
+  logPipelineStep(PipelineStep.Fetch, 'Filling missing content...');
+  // Only fetch articles missing content
+  const articles = await prisma.article.findMany({
+    where: {
+      OR: [{ content: null }, { content: '' }],
+    },
+  });
+  if (articles.length === 0) {
+    logger.info(`[${PipelineStep.Fetch}] No articles missing content. Skipping extraction step.`);
+    return;
+  }
   let updated = 0;
-  console.log(
-    `[content-extract] Attempting to extract full content for ${articles.length} articles.`
+  logPipelineSection(
+    PipelineStep.Fetch,
+    `Attempting to extract full content for ${articles.length} articles.`
   );
   for (const article of articles) {
     if (!article.url || !article.source || (article.content && article.content.trim().length > 0))
@@ -29,16 +44,18 @@ export async function fillMissingContent() {
         });
         updated++;
       } else {
-        console.warn(
-          `[content-extract] No full content extracted for: ${article.title} (${article.url})`
+        logger.warn(
+          PipelineStep.Fetch,
+          `No full content extracted for: ${article.title} (${article.url})`
         );
       }
     } catch (err) {
-      console.error(
-        `[content-extract] Failed to extract content for: ${article.title} (${article.url})`,
+      logger.error(
+        PipelineStep.Fetch,
+        `Failed to extract content for: ${article.title} (${article.url})`,
         err
       );
     }
   }
-  console.log(`[pipeline] Filled content for ${updated} articles.`);
+  logger.info(`[${PipelineStep.Fetch}] Filled content for ${updated} articles.`);
 }

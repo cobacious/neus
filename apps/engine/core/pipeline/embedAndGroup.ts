@@ -1,7 +1,13 @@
 import OpenAI from 'openai';
 import { prisma } from '../../lib/prisma';
 import { cosineSimilarity } from './utils';
-import { logPipelineStep } from '../../lib/pipelineLogger';
+import {
+  logger,
+  logPipelineSection,
+  logPipelineStep,
+  PipelineStep,
+} from '../../lib/pipelineLogger';
+import { Prisma } from '@prisma/client';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EMBEDDING_MODEL = 'text-embedding-3-small';
@@ -10,18 +16,21 @@ const MAX_LOOKBACK_HOURS = 48;
 const MAX_EMBEDDING_CHARS = 8192;
 
 export async function embedAndClusterNewArticles() {
-  logPipelineStep('Clustering articles...');
+  logPipelineStep(PipelineStep.Embed, 'Clustering articles...');
 
   const unembedded = await prisma.article.findMany({
-    where: { embedding: { equals: undefined } },
+    where: { embedding: { equals: Prisma.DbNull } },
   });
 
-  console.log(`Found ${unembedded.length} unembedded articles`);
+  logPipelineSection(PipelineStep.Embed, `Found ${unembedded.length} unembedded articles`);
 
   for (const article of unembedded) {
     // Only embed if content is present
     if (!article.content) {
-      console.log(`[embed] Skipping (no content): ${article.title} (${article.url})`);
+      logPipelineSection(
+        PipelineStep.Embed,
+        `Skipping (no content): ${article.title} (${article.url})`
+      );
       continue;
     }
     try {
@@ -36,7 +45,7 @@ export async function embedAndClusterNewArticles() {
         data: { embedding },
       });
     } catch (err) {
-      console.error(`[embed] Failed: ${article.title} (${article.url})`, err);
+      logger.error(`[${PipelineStep.Embed}] Failed: ${article.title} (${article.url})`, err);
     }
   }
 
@@ -127,8 +136,12 @@ export async function embedAndClusterNewArticles() {
     }
   }
 
-  console.log(`Created/updated ${Object.keys(clusters).length} clusters`);
-  console.log(
+  logPipelineSection(
+    PipelineStep.Embed,
+    `Created/updated ${Object.keys(clusters).length} clusters`
+  );
+  logPipelineSection(
+    PipelineStep.Embed,
     `[pipeline] Clustering complete. ${Object.keys(clusters).length} clusters created/updated.`
   );
 }
