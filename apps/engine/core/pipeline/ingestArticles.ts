@@ -8,7 +8,6 @@ import {
   logPipelineSection,
   logger,
 } from '../../lib/pipelineLogger';
-import {} from '../../pipelineLogger';
 
 export async function ingestArticles(feedUrls: string[]): Promise<RssArticle[]> {
   logPipelineStep(PipelineStep.Ingest, 'Ingesting articles from all feeds...');
