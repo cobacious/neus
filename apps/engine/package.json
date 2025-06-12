@@ -18,10 +18,14 @@
     "@types/node": "^22.15.21",
     "@types/node-fetch": "^2.6.12",
     "prisma": "^6.9.0",
-    "tsx": "^4.19.4"
+    "tsx": "^4.19.4",
+    "@types/jest": "workspace:*",
+    "jest": "workspace:*",
+    "ts-jest": "workspace:*"
   },
   "scripts": {
     "pipeline": "NODE_ENV=development tsx index.ts",
-    "print": "NODE_ENV=development tsx lib/printClusters.ts"
+    "print": "NODE_ENV=development tsx lib/printClusters.ts",
+    "test": "jest"
   }
 }
