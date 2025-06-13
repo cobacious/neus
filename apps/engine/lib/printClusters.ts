@@ -1,16 +1,9 @@
 // printClusters.ts
 // Print a human-readable report of clusters, their summaries, and their articles
-import { prisma } from './prisma';
+import { getClustersWithArticles } from '@neus/db';
 
 async function main() {
-  const clusters = await prisma.cluster.findMany({
-    include: {
-      articleAssignments: {
-        include: { article: true },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  const clusters = await getClustersWithArticles();
 
   for (const cluster of clusters) {
     if (!cluster.articleAssignments.length) continue;

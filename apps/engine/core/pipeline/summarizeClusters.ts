@@ -1,5 +1,8 @@
 import OpenAI from 'openai';
-import { prisma } from '../../lib/prisma';
+import {
+  getClustersToSummarize,
+  updateClusterSummary,
+} from '@neus/db';
 import {
   logger,
   logPipelineStep,
@@ -14,21 +17,7 @@ let totalTokensUsed = 0;
 export async function summarizeClusters() {
   logPipelineStep(PipelineStep.Summarise, 'Summarizing clusters...');
 
-  const clusters = await prisma.cluster.findMany({
-    where: {
-      OR: [
-        { headline: { equals: null } },
-        { summary: { equals: null } },
-        { headline: { equals: '' } },
-        { summary: { equals: '' } },
-      ],
-    },
-    include: {
-      articleAssignments: {
-        include: { article: true },
-      },
-    },
-  });
+  const clusters = await getClustersToSummarize();
 
   if (clusters.length === 0) {
     logPipelineSection(
@@ -91,10 +80,7 @@ export async function summarizeClusters() {
       }
 
       if (headline && summary) {
-        await prisma.cluster.update({
-          where: { id: cluster.id },
-          data: { headline, summary },
-        });
+        await updateClusterSummary(cluster.id, headline, summary);
         logPipelineSection(PipelineStep.Summarise, `Updated cluster ${cluster.id}`);
       } else {
         logger.warn(

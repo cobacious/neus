@@ -1,6 +1,6 @@
 // storeArticles.ts
 // Store articles in the database, deduplicating by id (url)
-import { prisma } from '../../lib/prisma';
+import { upsertArticle } from '@neus/db';
 import {
   logger,
   logPipelineStep,
@@ -22,33 +22,13 @@ export async function storeArticles(articles: RssArticle[]) {
         );
         continue;
       }
-      // Build update/create objects, but do NOT set 'id' in update (cannot update PK)
-      const updateData: any = {
+      await upsertArticle({
         url: article.url,
         title: article.title,
         source: article.source,
         publishedAt: new Date(article.publishedAt),
-      };
-      const createData: any = {
-        url: article.url,
-        title: article.title,
-        source: article.source,
-        publishedAt: new Date(article.publishedAt),
-      };
-      if (typeof article.snippet !== 'undefined') {
-        updateData.snippet = article.snippet;
-        createData.snippet = article.snippet;
-      }
-      if (typeof article.content !== 'undefined') {
-        updateData.content = article.content;
-        createData.content = article.content;
-      }
-      await prisma.article.upsert({
-        where: {
-          url: article.url, // Use url for deduplication
-        },
-        update: updateData,
-        create: createData,
+        snippet: article.snippet,
+        content: article.content,
       });
       logger.debug(`[${PipelineStep.Store}] Upserted article: ${article.title} (${article.url})`);
       stored++;
