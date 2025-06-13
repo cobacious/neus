@@ -1,4 +1,8 @@
-import { prisma } from '../../lib/prisma';
+import {
+  getRecentEmbeddedArticles,
+  createCluster,
+  createArticleAssignments,
+} from '@neus/db';
 import { cosineSimilarity } from './utils';
 import {
   logger,
@@ -13,14 +17,9 @@ const MAX_LOOKBACK_HOURS = 48;
 export async function clusterRecentArticles() {
   logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
 
-  const recent = await prisma.article.findMany({
-    where: {
-      embedding: { not: { equals: null } },
-      publishedAt: {
-        gte: new Date(Date.now() - MAX_LOOKBACK_HOURS * 60 * 60 * 1000),
-      },
-    },
-  });
+  const recent = await getRecentEmbeddedArticles(
+    new Date(Date.now() - MAX_LOOKBACK_HOURS * 60 * 60 * 1000)
+  );
 
   // Build articleMap for quick lookup
   const articleMap = new Map(recent.map((a) => [a.id, a]));
@@ -69,9 +68,7 @@ export async function clusterRecentArticles() {
 
   let createdClusters = 0;
   for (const group of clusters) {
-    const cluster = await prisma.cluster.create({
-      data: { origin: 'embedding', label: null },
-    });
+    const cluster = await createCluster('embedding', null);
     // Use map/filter/reduce for assignments
     const assignments = group
       .map((id) => {
@@ -100,7 +97,7 @@ export async function clusterRecentArticles() {
       similarity: number;
       method: string;
     }[];
-    await prisma.articleClusterAssignment.createMany({ data: assignments });
+    await createArticleAssignments(assignments);
     createdClusters++;
   }
   logPipelineSection(

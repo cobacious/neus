@@ -1,6 +1,9 @@
 // fillMissingContent.ts
 // Fetch and update missing article content using @extractus/article-extractor
-import { prisma } from '../../lib/prisma';
+import {
+  getArticlesMissingContent,
+  updateArticleContent,
+} from '@neus/db';
 import { extract, setSanitizeHtmlOptions } from '@extractus/article-extractor';
 import {
   logPipelineStep,
@@ -18,11 +21,7 @@ setSanitizeHtmlOptions({
 export async function fillMissingContent() {
   logPipelineStep(PipelineStep.Fetch, 'Filling missing content...');
   // Only fetch articles missing content
-  const articles = await prisma.article.findMany({
-    where: {
-      OR: [{ content: null }, { content: '' }],
-    },
-  });
+  const articles = await getArticlesMissingContent();
   if (articles.length === 0) {
     logger.info(`[${PipelineStep.Fetch}] No articles missing content. Skipping extraction step.`);
     return;
@@ -38,10 +37,7 @@ export async function fillMissingContent() {
     try {
       const result = await extract(article.url, {});
       if (result?.content && result.content.trim().length > 0) {
-        await prisma.article.update({
-          where: { id: article.id },
-          data: { content: result.content },
-        });
+        await updateArticleContent(article.id, result.content);
         updated++;
       } else {
         logger.warn(

@@ -1,6 +1,7 @@
 {
   "name": "@neus/db",
   "version": "0.0.0",
+  "type": "module",
   "main": "src/index.ts",
   "dependencies": {
     "@prisma/client": "^6.9.0"
