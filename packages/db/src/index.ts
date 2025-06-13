@@ -1,4 +1,3 @@
-export * from './client';
 export * from './articles/getUnembeddedArticles';
 export * from './articles/updateArticleEmbedding';
 export * from './articles/upsertArticle';
