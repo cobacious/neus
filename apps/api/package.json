@@ -10,6 +10,6 @@
     "graphql": "^16.8.1"
   },
   "scripts": {
-    "dev": "NODE_ENV=development tsx index.ts"
+    "dev": "NODE_ENV=development tsx watch index.ts"
   }
 }

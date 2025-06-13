@@ -1,8 +1,5 @@
 import OpenAI from 'openai';
-import {
-  getClustersToSummarize,
-  updateClusterSummary,
-} from '@neus/db';
+import { getClustersToSummarize, updateClusterSummary } from '@neus/db';
 import {
   logger,
   logPipelineStep,
@@ -11,6 +8,7 @@ import {
 } from '../../lib/pipelineLogger';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const TOKEN_CAP_ENABLED = true;
 const TOKEN_CAP = 10000; // Adjust your token budget here
 let totalTokensUsed = 0;
 
@@ -56,7 +54,7 @@ export async function summarizeClusters() {
       totalTokensUsed += usage;
       console.log(`Cluster ${cluster.id} used ${usage} tokens (total: ${totalTokensUsed})`);
 
-      if (totalTokensUsed > TOKEN_CAP) {
+      if (TOKEN_CAP_ENABLED && totalTokensUsed > TOKEN_CAP) {
         console.warn('Token cap reached. Aborting summarisation.');
         break;
       }
