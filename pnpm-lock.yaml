@@ -57,6 +57,9 @@ importers:
         specifier: ^5.1.7
         version: 5.1.7
     devDependencies:
+      '@neus/db':
+        specifier: workspace:^
+        version: link:../../packages/db
       '@types/jest':
         specifier: ^29.5.11
         version: 29.5.14
