@@ -21,18 +21,17 @@ Neus is a news aggregation platform with an emphasis on **neutrality, trust, and
   - TBD: Lightweight local models or third-party services
 - **Hosting/Infra**: Flexible — designed to be deployable on Vercel, Netlify, Railway, or Fly.io
 
-## Project Structure (Tentative)
+## Project Structure
 
 /neus
-/apps
-/engine - backend services
-/web → future frontend
-/mobile → future mobile app
-/packages
-utils
-types
+  /apps
+    /api - API layer
+    /engine - backend pipeline and schedulers
+    /web - frontend prototype
+  /packages
+    /db - database utilities
 
-> This folder (`/packages/backend`) is the focus for now.
+Backend logic lives primarily in `apps/engine` with database helpers in `packages/db`.
 
 ## Short-Term Goals
 
