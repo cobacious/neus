@@ -7,6 +7,13 @@ export async function getClustersWithArticles() {
         include: { article: true },
       },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [
+      {
+        articleAssignments: {
+          _count: 'desc',
+        },
+      },
+      { createdAt: 'desc' },
+    ],
   });
 }

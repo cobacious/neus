@@ -1,9 +1,5 @@
-import {
-  getRecentEmbeddedArticles,
-  createCluster,
-  createArticleAssignments,
-} from '@neus/db';
-import { cosineSimilarity } from './utils';
+import { getRecentEmbeddedArticles, createCluster, createArticleAssignments } from '@neus/db';
+import { cosineSimilarity, jaccard } from './utils';
 import {
   logger,
   logPipelineSection,
@@ -13,6 +9,7 @@ import {
 
 const SIMILARITY_THRESHOLD = 0.85;
 const MAX_LOOKBACK_HOURS = 48;
+const ALLOW_SINGLE_ARTICLE_CLUSTERS = false; // Set to false to skip single article clusters
 
 export async function clusterRecentArticles() {
   logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
@@ -21,10 +18,8 @@ export async function clusterRecentArticles() {
     new Date(Date.now() - MAX_LOOKBACK_HOURS * 60 * 60 * 1000)
   );
 
-  // Build articleMap for quick lookup
   const articleMap = new Map(recent.map((a) => [a.id, a]));
 
-  // Build edges
   const edges = recent.flatMap((a, i) =>
     !Array.isArray(a.embedding)
       ? []
@@ -32,44 +27,70 @@ export async function clusterRecentArticles() {
           .slice(i + 1)
           .filter((b) => Array.isArray(b.embedding))
           .map((b) => {
-            const sim = cosineSimilarity(a.embedding as number[], b.embedding as number[]);
-            return sim > SIMILARITY_THRESHOLD
-              ? ([a.id as string, b.id as string, sim] as [string, string, number])
+            const similarity = cosineSimilarity(a.embedding as number[], b.embedding as number[]);
+            return similarity > SIMILARITY_THRESHOLD
+              ? ([a.id as string, b.id as string, similarity] as [string, string, number])
               : null;
           })
           .filter(Boolean) as [string, string, number][])
   );
 
-  // Cluster discovery (DFS)
-  const visited = new Set<string>();
+  const clustered = new Set<string>(); // Tracks all articles connected in a DFS cluster
   const clusters: string[][] = [];
   recent.forEach((article) => {
-    if (visited.has(article.id)) return;
+    if (clustered.has(article.id)) return;
     const cluster: string[] = [];
     const stack: string[] = [article.id];
     while (stack.length) {
       const current = stack.pop()!;
-      if (visited.has(current)) continue;
-      visited.add(current);
+      if (clustered.has(current)) continue;
+      clustered.add(current);
       cluster.push(current);
       edges
         .filter((e) => e[0] === current || e[1] === current)
         .map((e) => (e[0] === current ? e[1] : e[0]))
         .forEach((neighbor) => {
-          if (!visited.has(neighbor)) stack.push(neighbor);
+          if (!clustered.has(neighbor)) stack.push(neighbor);
         });
     }
     if (cluster.length > 0) clusters.push(cluster);
   });
-  // Add singletons
-  recent.forEach((article) => {
-    if (!visited.has(article.id)) clusters.push([article.id]);
-  });
+
+  const assignedArticles = new Set<string>();
+  const filteredClusters: string[][] = [];
+  let skippedDuplicates = 0;
+  let skippedEmpty = 0;
+
+  for (const cluster of clusters) {
+    const unique = cluster.filter((id) => !assignedArticles.has(id));
+    if (unique.length > 0) {
+      const isDuplicate = filteredClusters.some((existing) => jaccard(existing, unique) > 0.8);
+      if (!isDuplicate) {
+        unique.forEach((id) => assignedArticles.add(id));
+        filteredClusters.push(unique);
+      } else {
+        skippedDuplicates++;
+        logger.warn(
+          `[${PipelineStep.Cluster}]: Skipping near-duplicate cluster with articles: [${unique.join(', ')}]`
+        );
+      }
+    } else {
+      skippedEmpty++;
+    }
+  }
+
+  if (ALLOW_SINGLE_ARTICLE_CLUSTERS) {
+    recent.forEach((article) => {
+      if (!clustered.has(article.id) && !assignedArticles.has(article.id)) {
+        assignedArticles.add(article.id);
+        filteredClusters.push([article.id]);
+      }
+    });
+  }
 
   let createdClusters = 0;
-  for (const group of clusters) {
+  for (const group of filteredClusters) {
     const cluster = await createCluster('embedding', null);
-    // Use map/filter/reduce for assignments
     const assignments = group
       .map((id) => {
         const article = articleMap.get(id);
@@ -102,6 +123,6 @@ export async function clusterRecentArticles() {
   }
   logPipelineSection(
     PipelineStep.Cluster,
-    `Clustering complete. ${createdClusters} clusters created.`
+    `Clustering complete. ${createdClusters} clusters created. ${skippedDuplicates} duplicates skipped, ${skippedEmpty} empty filtered.`
   );
 }

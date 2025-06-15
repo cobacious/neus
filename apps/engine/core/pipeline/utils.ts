@@ -7,3 +7,11 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   }
   return dot / (normA * normB);
 }
+
+export function jaccard(a: string[], b: string[]): number {
+  const A = new Set(a);
+  const B = new Set(b);
+  const intersection = new Set([...A].filter((x) => B.has(x)));
+  const union = new Set([...A, ...B]);
+  return intersection.size / union.size;
+}
