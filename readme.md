@@ -67,4 +67,16 @@ VITE_API_URL=http://localhost:4000/graphql
 
 ---
 
+## Engine Setup
+
+The backend engine expects a `.env` file under `apps/engine`.
+Start by copying the example provided:
+
+```bash
+cp apps/engine/.env.example apps/engine/.env
+```
+
+Fill in the values (at minimum `OPENAI_API_KEY`) before running the pipeline.
+
+
 > This document is a living artifact and should evolve as the product vision and tech stack grow.
