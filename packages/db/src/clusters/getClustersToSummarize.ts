@@ -1,7 +1,7 @@
 import { prisma } from '../client';
 
 export async function getClustersToSummarize() {
-  return prisma.cluster.findMany({
+  const clusters = await prisma.cluster.findMany({
     where: {
       OR: [
         { headline: { equals: null } },
@@ -16,4 +16,6 @@ export async function getClustersToSummarize() {
       },
     },
   });
+
+  return clusters.filter((cluster) => cluster.articleAssignments.length > 1);
 }
