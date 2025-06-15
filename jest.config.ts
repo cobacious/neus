@@ -1,5 +1,6 @@
 // jest.config.ts
 import type { JestConfigWithTsJest } from 'ts-jest';
+import { resolve } from 'path';
 
 const config: JestConfigWithTsJest = {
   preset: 'ts-jest/presets/default-esm',
@@ -10,7 +11,8 @@ const config: JestConfigWithTsJest = {
       'ts-jest',
       {
         useESM: true,
-        tsconfig: './tsconfig.json',
+        tsconfig: resolve(__dirname, 'tsconfig.json'),
+        diagnostics: false,
       },
     ],
   },
