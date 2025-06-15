@@ -54,6 +54,17 @@ We're starting with:
 - The **backend pipeline** for sourcing, clustering, and summarising articles
 - A working prototype that can ingest articles and return grouped, summarised story objects
 
+## Web App
+
+The frontend is built with **Vite** and **React**. The GraphQL endpoint can be
+configured via an environment variable. Create a `.env` file in `apps/web` with:
+
+```bash
+VITE_API_URL=http://localhost:4000/graphql
+```
+
+`VITE_API_URL` will be read at build time, so adjust it for your deployment.
+
 ---
 
 > This document is a living artifact and should evolve as the product vision and tech stack grow.
