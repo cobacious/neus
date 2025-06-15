@@ -10,3 +10,4 @@ node_modules/
 **/node_modules/
 # Ignore local SQLite dev database
 **/*.db
+**/*.db-journal
