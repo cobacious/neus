@@ -4,6 +4,7 @@ export type UpsertArticleInput = {
   url: string;
   title: string;
   source: string;
+  sourceId: string;
   publishedAt: Date;
   snippet?: string;
   content?: string;
