@@ -26,6 +26,7 @@ export async function storeArticles(articles: RssArticle[]) {
         url: article.url,
         title: article.title,
         source: article.source,
+        sourceId: article.sourceId!,
         publishedAt: new Date(article.publishedAt),
         snippet: article.snippet,
         content: article.content,

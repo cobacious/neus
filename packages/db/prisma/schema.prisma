@@ -14,6 +14,8 @@ model Article {
   snippet            String?
   content            String?
   source             String
+  sourceId           String
+  sourceRel          Source  @relation(fields: [sourceId], references: [id])
   publishedAt        DateTime
   rawHtml            String?
   embedding          Json?
@@ -29,6 +31,18 @@ model Cluster {
   headline           String?
   summary            String?
   articleAssignments ArticleClusterAssignment[]
+}
+
+model Source {
+  id            String   @id @default(cuid())
+  name          String
+  domain        String?
+  homepageUrl   String?
+  rssFeedUrl    String   @unique
+  faviconUrl    String?
+  active        Boolean  @default(true)
+  lastFetchedAt DateTime?
+  articles      Article[]
 }
 
 model ArticleClusterAssignment {
