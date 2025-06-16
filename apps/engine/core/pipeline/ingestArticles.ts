@@ -1,7 +1,8 @@
 // ingestArticles.ts
-// Ingest articles from all feeds in FEED_URLS and return a flat array
+// Ingest articles from all configured sources and return a flat array
 import { RssArticle } from '../ingestion/articleIngestion';
 import { fetchArticlesFromRss } from '../ingestion/articleIngestion';
+import type { Source } from '@neus/db';
 import {
   PipelineStep,
   logPipelineStep,
@@ -9,16 +10,21 @@ import {
   logger,
 } from '../../lib/pipelineLogger';
 
-export async function ingestArticles(feedUrls: string[]): Promise<RssArticle[]> {
+export async function ingestArticles(sources: Source[]): Promise<RssArticle[]> {
   logPipelineStep(PipelineStep.Ingest, 'Ingesting articles from all feeds...');
   let allArticles: RssArticle[] = [];
-  for (const url of feedUrls) {
+  for (const source of sources) {
     try {
-      const articles = await fetchArticlesFromRss(url);
-      allArticles = allArticles.concat(articles);
-      logPipelineSection(PipelineStep.Ingest, `Ingested ${articles.length} articles from ${url}`);
+      const articles = await fetchArticlesFromRss(source.rssFeedUrl);
+      allArticles = allArticles.concat(
+        articles.map((a) => ({ ...a, sourceId: source.id }))
+      );
+      logPipelineSection(
+        PipelineStep.Ingest,
+        `Ingested ${articles.length} articles from ${source.rssFeedUrl}`
+      );
     } catch (err: any) {
-      logger.warn({ err }, `Failed to ingest from ${url}`);
+      logger.warn({ err }, `Failed to ingest from ${source.rssFeedUrl}`);
     }
   }
   logPipelineSection(PipelineStep.Ingest, `Total articles ingested: ${allArticles.length}`);

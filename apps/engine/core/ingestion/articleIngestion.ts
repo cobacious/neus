@@ -7,6 +7,7 @@ export type RssArticle = {
   title: string;
   url: string;
   source: string;
+  sourceId?: string;
   publishedAt: string;
   snippet: string;
   content?: string;

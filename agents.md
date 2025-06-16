@@ -60,6 +60,9 @@ Backend logic lives primarily in `apps/engine` with database helpers in `package
 - Be generous with `README.md` and inline comments
 - Include TODOs or FIXME markers where appropriate
 - Copilot: Suggest utility functions for clustering, text cleaning, LLM prompts
+- **Apps must not import from `@prisma/client` or access the Prisma client
+  directly.** All database interactions should go through the exported helpers
+  in `@neus/db` so that the underlying implementation remains encapsulated.
 
 ---
 

@@ -2,7 +2,7 @@
 // This is where clustering, summarisation, and storage will be handled
 import '../../env'; // Loads .env and proxy support
 import { ingestArticles } from './ingestArticles';
-import { FEED_URLS } from '../../feeds.config';
+import { getActiveSources } from '@neus/db';
 import { storeArticles } from './storeArticles';
 import { fillMissingContent } from './fillMissingContent';
 import { embedNewArticles } from './embedArticles';
@@ -12,7 +12,8 @@ import { resetPipelineLogger, logger } from '../../lib/pipelineLogger';
 
 export async function runPipeline() {
   resetPipelineLogger();
-  const allArticles = await ingestArticles(FEED_URLS);
+  const sources = await getActiveSources();
+  const allArticles = await ingestArticles(sources);
   await storeArticles(allArticles);
   await fillMissingContent();
   await embedNewArticles();
