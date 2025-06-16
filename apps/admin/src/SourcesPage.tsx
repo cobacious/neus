@@ -40,11 +40,6 @@ const UPDATE_SOURCE = `
   }
 `;
 
-const DELETE_SOURCE = `
-  mutation DeleteSource($id: String!) {
-    deleteSource(id: $id)
-  }
-`;
 
 interface Source {
   id: string;
@@ -59,7 +54,6 @@ export default function SourcesPage() {
   const [result, reexecute] = useQuery({ query: SOURCES_QUERY });
   const [, createSource] = useMutation(CREATE_SOURCE);
   const [, updateSourceMut] = useMutation(UPDATE_SOURCE);
-  const [, deleteSourceMut] = useMutation(DELETE_SOURCE);
 
   const [form, setForm] = useState({
     name: '',
@@ -82,10 +76,6 @@ export default function SourcesPage() {
     refresh();
   };
 
-  const handleDelete = async (id: string) => {
-    await deleteSourceMut({ id });
-    refresh();
-  };
 
   if (result.fetching) return <p>Loading...</p>;
   if (result.error) return <p>Error loading sources</p>;
@@ -133,32 +123,25 @@ export default function SourcesPage() {
             <th className="p-1">RSS Feed</th>
             <th className="p-1">Active</th>
             <th className="p-1">Last Fetched</th>
-            <th className="p-1">Actions</th>
+            <th className="p-1">Save</th>
           </tr>
         </thead>
         <tbody>
           {result.data.sources.map((source: Source) => (
-            <SourceRow
-              key={source.id}
-              source={source}
-              onUpdate={handleUpdate}
-              onDelete={handleDelete}
-            />
+            <SourceRow key={source.id} source={source} onUpdate={handleUpdate} />
           ))}
-        </tbody>
-      </table>
-    </div>
-  );
+      </tbody>
+    </table>
+  </div>
+);
 }
 
 function SourceRow({
   source,
   onUpdate,
-  onDelete,
 }: {
   source: Source;
   onUpdate: (id: string, data: Partial<Source>) => void;
-  onDelete: (id: string) => void;
 }) {
   const [data, setData] = useState<Source>(source);
 
@@ -197,15 +180,9 @@ function SourceRow({
       <td className="p-1 text-gray-600">
         {data.lastFetchedAt ? new Date(data.lastFetchedAt).toLocaleString() : '-'}
       </td>
-      <td className="p-1 space-x-1">
+      <td className="p-1">
         <button onClick={save} className="bg-green-500 text-white px-2 py-1 rounded">
           Save
-        </button>
-        <button
-          onClick={() => onDelete(source.id)}
-          className="bg-red-500 text-white px-2 py-1 rounded"
-        >
-          Delete
         </button>
       </td>
     </tr>
