@@ -13,7 +13,6 @@ import {
   getSources,
   createSource,
   updateSource,
-  deleteSource,
 } from '@neus/db';
 
 const ArticleSummary = objectType({
@@ -95,16 +94,6 @@ const Mutation = mutationType({
         active: booleanArg(),
       },
       resolve: async (_, args) => updateSource(args),
-    });
-    t.field('deleteSource', {
-      type: 'Boolean',
-      args: {
-        id: nonNull(stringArg()),
-      },
-      resolve: async (_, { id }) => {
-        await deleteSource(id);
-        return true;
-      },
     });
   },
 });

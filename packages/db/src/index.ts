@@ -14,5 +14,4 @@ export * from './sources/getActiveSources';
 export * from './sources/getSources';
 export * from './sources/createSource';
 export * from './sources/updateSource';
-export * from './sources/deleteSource';
 export type { Source } from '@prisma/client';
