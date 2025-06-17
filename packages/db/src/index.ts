@@ -11,4 +11,7 @@ export * from './clusters/getClustersToSummarize';
 export * from './clusters/getClustersWithArticles';
 export * from './clusters/updateClusterSummary';
 export * from './sources/getActiveSources';
+export * from './sources/getSources';
+export * from './sources/createSource';
+export * from './sources/updateSource';
 export type { Source } from '@prisma/client';
