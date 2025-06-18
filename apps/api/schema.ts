@@ -10,20 +10,11 @@ import {
 import {
   countClusters,
   getClustersWithArticles,
+  getClusterById,
   getSources,
   createSource,
   updateSource,
 } from '@neus/db';
-
-const ArticleSummary = objectType({
-  name: 'ArticleSummary',
-  definition(t) {
-    t.string('id');
-    t.string('url');
-    t.string('source');
-    t.string('publishedAt');
-  },
-});
 
 const Cluster = objectType({
   name: 'Cluster',
@@ -52,7 +43,19 @@ const Source = objectType({
     t.nullable.string('homepageUrl');
     t.string('rssFeedUrl');
     t.boolean('active');
+    t.nullable.string('faviconUrl');
     t.nullable.string('lastFetchedAt');
+  },
+});
+
+const ArticleSummary = objectType({
+  name: 'ArticleSummary',
+  definition(t) {
+    t.string('id');
+    t.string('url');
+    t.string('source');
+    t.string('publishedAt');
+    t.field('sourceRel', { type: Source });
   },
 });
 
@@ -61,6 +64,11 @@ const Query = queryType({
     t.list.field('clusters', {
       type: Cluster,
       resolve: async () => getClustersWithArticles(),
+    });
+    t.field('cluster', {
+      type: Cluster,
+      args: { id: nonNull(stringArg()) },
+      resolve: async (_, { id }) => getClusterById(id),
     });
     t.int('clusterCount', {
       resolve: async () => countClusters(),
