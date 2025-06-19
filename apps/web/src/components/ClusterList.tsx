@@ -12,6 +12,11 @@ const CLUSTERS_QUERY = `
       articles {
         id
         url
+        sourceRel {
+          id
+          name
+          faviconUrl
+        }
       }
     }
   }
