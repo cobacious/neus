@@ -4,7 +4,11 @@ export async function getClustersWithArticles() {
   return prisma.cluster.findMany({
     include: {
       articleAssignments: {
-        include: { article: true },
+        include: {
+          article: {
+            include: { sourceRel: true },
+          },
+        },
       },
     },
     orderBy: [
