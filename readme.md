@@ -65,6 +65,17 @@ VITE_API_URL=http://localhost:4000/graphql
 
 `VITE_API_URL` will be read at build time, so adjust it for your deployment.
 
+## API Setup
+
+The GraphQL API reads its configuration from an `.env` file in `apps/api`.
+Copy the example and adjust the `PORT` as desired:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+```
+
+If no `PORT` is specified, the server defaults to `4000`.
+
 ---
 
 ## Engine Setup
