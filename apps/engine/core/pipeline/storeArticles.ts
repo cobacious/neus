@@ -28,8 +28,11 @@ export async function storeArticles(articles: RssArticle[]) {
         source: article.source,
         sourceId: article.sourceId!,
         publishedAt: new Date(article.publishedAt),
+        updatedAt: article.updatedAt ? new Date(article.updatedAt) : undefined,
         snippet: article.snippet,
         content: article.content,
+        author: article.author,
+        categories: article.categories?.join(',') ?? undefined,
       });
       logger.debug(`[${PipelineStep.Store}] Upserted article: ${article.title} (${article.url})`);
       stored++;
