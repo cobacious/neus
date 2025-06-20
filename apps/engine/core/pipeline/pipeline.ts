@@ -1,6 +1,3 @@
-// Main processing pipeline for ingested articles
-// This is where clustering, summarisation, and storage will be handled
-import '../../env'; // Loads .env and proxy support
 import { ingestArticles } from './ingestArticles';
 import { getActiveSources } from '@neus/db';
 import { storeArticles } from './storeArticles';

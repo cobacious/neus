@@ -1,4 +1,4 @@
-// runPipeline.ts
+import './env';
 import { runPipeline } from './core/pipeline/pipeline';
 import { logger } from './lib/pipelineLogger';
 
