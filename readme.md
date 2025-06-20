@@ -91,3 +91,17 @@ Fill in the values (at minimum `OPENAI_API_KEY`) before running the pipeline.
 
 
 > This document is a living artifact and should evolve as the product vision and tech stack grow.
+
+## Cluster Ranking
+
+Clusters returned by the API are ranked using a simple scoring algorithm. Each cluster
+is scored based on how recently articles were published, how many distinct sources
+covered the story, and the average trust score of those sources. No engagement data
+is considered.
+
+```
+score = recency * 0.4 + coverage * 0.3 + trust * 0.3
+```
+
+Weights are intentionally easy to tweak. The `score` value is exposed in the GraphQL
+`Cluster` type, and the implementation lives in `packages/db/src/clusters`.
