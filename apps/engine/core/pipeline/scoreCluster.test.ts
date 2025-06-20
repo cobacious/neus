@@ -1,4 +1,4 @@
-import { scoreCluster } from '@neus/db';
+import { scoreCluster } from '../../../../packages/db/src/clusters/scoreCluster';
 
 describe('scoreCluster', () => {
   it('prefers newer clusters', () => {
