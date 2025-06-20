@@ -17,6 +17,9 @@ model Article {
   sourceId           String
   sourceRel          Source  @relation(fields: [sourceId], references: [id])
   publishedAt        DateTime
+  updatedAt          DateTime?
+  author             String?
+  categories         String?
   rawHtml            String?
   embedding          Json?
   createdAt          DateTime                   @default(now())
@@ -30,6 +33,7 @@ model Cluster {
   origin             String
   headline           String?
   summary            String?
+  score              Float?                     @default(0)
   articleAssignments ArticleClusterAssignment[]
 }
 
@@ -41,6 +45,7 @@ model Source {
   rssFeedUrl    String   @unique
   faviconUrl    String?
   active        Boolean  @default(true)
+  trustScore    Float?   @default(0)
   lastFetchedAt DateTime?
   articles      Article[]
 }
