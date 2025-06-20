@@ -8,8 +8,6 @@ import {
 } from '../../lib/pipelineLogger';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const TOKEN_CAP_ENABLED = true;
-const TOKEN_CAP = 10000; // Adjust your token budget here
 let totalTokensUsed = 0;
 
 export async function summarizeClusters() {
@@ -54,7 +52,7 @@ export async function summarizeClusters() {
       totalTokensUsed += usage;
       console.log(`Cluster ${cluster.id} used ${usage} tokens (total: ${totalTokensUsed})`);
 
-      if (TOKEN_CAP_ENABLED && totalTokensUsed > TOKEN_CAP) {
+      if (process.env.TOKEN_LIMIT && totalTokensUsed > parseInt(process.env.TOKEN_LIMIT)) {
         console.warn('Token cap reached. Aborting summarisation.');
         break;
       }
