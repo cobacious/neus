@@ -1,8 +1,7 @@
 import { prisma } from '../client';
-import { scoreCluster, ScorableCluster } from './scoreCluster';
 
 export async function getRankedClusters() {
-  const clusters = await prisma.cluster.findMany({
+  return prisma.cluster.findMany({
     include: {
       articleAssignments: {
         include: {
@@ -10,9 +9,6 @@ export async function getRankedClusters() {
         },
       },
     },
+    orderBy: { score: 'desc' },
   });
-
-  const scored = clusters.map((c) => ({ ...c, score: scoreCluster(c as ScorableCluster) }));
-  scored.sort((a, b) => b.score - a.score);
-  return scored;
 }

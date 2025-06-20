@@ -25,7 +25,7 @@ const Cluster = objectType({
     t.string('origin');
     t.string('createdAt');
     t.float('score', {
-      resolve: (cluster: any) => cluster.score ?? 0,
+      resolve: (cluster: { score?: number }) => cluster.score ?? 0,
     });
     t.int('articleCount', {
       resolve: (cluster) => cluster.articleAssignments?.length ?? 0,

@@ -95,7 +95,8 @@ Fill in the values (at minimum `OPENAI_API_KEY`) before running the pipeline.
 ## Cluster Ranking
 
 Clusters returned by the API are ranked using a simple scoring algorithm. Each cluster
-is scored based on how recently articles were published, how many distinct sources
+is scored during the pipeline run and the numeric value is stored in the database.
+The score considers how recently articles were published, how many distinct sources
 covered the story, and the average trust score of those sources. No engagement data
 is considered.
 
