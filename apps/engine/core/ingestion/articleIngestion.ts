@@ -9,9 +9,12 @@ export type RssArticle = {
   source: string;
   sourceId?: string;
   publishedAt: string;
+  updatedAt?: string;
   snippet: string;
   content?: string;
   author?: string;
+  guid?: string;
+  categories?: string[];
 };
 
 export async function fetchArticlesFromRss(feedUrl: string): Promise<RssArticle[]> {
@@ -28,9 +31,12 @@ export async function fetchArticlesFromRss(feedUrl: string): Promise<RssArticle[
       url: item.link || '',
       source: feed.title || '',
       publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+      updatedAt: item.isoDate || item.pubDate || undefined,
       snippet: item.contentSnippet || item.content || '', // Store RSS summary/snippet here
       content: undefined, // Full content will be extracted later
       author: item.creator || item.author || undefined,
+      guid: item.guid,
+      categories: item.categories,
     }));
   } finally {
     (globalThis as any).fetch = origFetch;
