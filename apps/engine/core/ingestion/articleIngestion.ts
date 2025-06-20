@@ -31,7 +31,6 @@ export async function fetchArticlesFromRss(feedUrl: string): Promise<RssArticle[
       url: item.link || '',
       source: feed.title || '',
       publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-      updatedAt: item.isoDate || item.pubDate || undefined,
       snippet: item.contentSnippet || item.content || '', // Store RSS summary/snippet here
       content: undefined, // Full content will be extracted later
       author: item.creator || item.author || undefined,
