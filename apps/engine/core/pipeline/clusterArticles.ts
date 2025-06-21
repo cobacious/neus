@@ -1,4 +1,4 @@
-import { getRecentEmbeddedArticles, createCluster, createArticleAssignments } from '@neus/db';
+import { getUnclusteredArticles, createCluster, createArticleAssignments } from '@neus/db';
 import { cosineSimilarity, jaccard } from './utils';
 import {
   logger,
@@ -8,22 +8,19 @@ import {
 } from '../../lib/pipelineLogger';
 
 const SIMILARITY_THRESHOLD = 0.85;
-const MAX_LOOKBACK_HOURS = 48;
 const ALLOW_SINGLE_ARTICLE_CLUSTERS = false; // Set to false to skip single article clusters
 
 export async function clusterRecentArticles() {
   logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
 
-  const recent = await getRecentEmbeddedArticles(
-    new Date(Date.now() - MAX_LOOKBACK_HOURS * 60 * 60 * 1000)
-  );
+  const articles = await getUnclusteredArticles();
 
-  const articleMap = new Map(recent.map((a) => [a.id, a]));
+  const articleMap = new Map(articles.map((a) => [a.id, a]));
 
-  const edges = recent.flatMap((a, i) =>
+  const edges = articles.flatMap((a, i) =>
     !Array.isArray(a.embedding)
       ? []
-      : (recent
+      : (articles
           .slice(i + 1)
           .filter((b) => Array.isArray(b.embedding))
           .map((b) => {
@@ -37,7 +34,7 @@ export async function clusterRecentArticles() {
 
   const clustered = new Set<string>(); // Tracks all articles connected in a DFS cluster
   const clusters: string[][] = [];
-  recent.forEach((article) => {
+  articles.forEach((article) => {
     if (clustered.has(article.id)) return;
     const cluster: string[] = [];
     const stack: string[] = [article.id];
@@ -80,7 +77,7 @@ export async function clusterRecentArticles() {
   }
 
   if (ALLOW_SINGLE_ARTICLE_CLUSTERS) {
-    recent.forEach((article) => {
+    articles.forEach((article) => {
       if (!clustered.has(article.id) && !assignedArticles.has(article.id)) {
         assignedArticles.add(article.id);
         filteredClusters.push([article.id]);
