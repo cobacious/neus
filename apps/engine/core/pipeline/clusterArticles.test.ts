@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 
 const mockDb = {
-  getRecentEmbeddedArticles: jest.fn(),
+  getUnclusteredArticles: jest.fn(),
   createCluster: jest.fn(),
   createArticleAssignments: jest.fn(),
 };
@@ -21,7 +21,7 @@ describe('clusterRecentArticles', () => {
   });
 
   it('creates clusters for similar articles', async () => {
-    mockDb.getRecentEmbeddedArticles.mockResolvedValue([
+    mockDb.getUnclusteredArticles.mockResolvedValue([
       { id: 'a1', embedding: [1, 0] },
       { id: 'a2', embedding: [1, 0] },
     ]);
@@ -31,6 +31,24 @@ describe('clusterRecentArticles', () => {
 
     expect(mockDb.createCluster).toHaveBeenCalledTimes(1);
     expect(mockDb.createArticleAssignments).toHaveBeenCalledTimes(1);
+    const assignments = mockDb.createArticleAssignments.mock.calls[0][0];
+    expect(assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ articleId: 'a1', clusterId: 'c1' }),
+        expect.objectContaining({ articleId: 'a2', clusterId: 'c1' }),
+      ])
+    );
+  });
+
+  it('clusters all articles returned by the DB helper', async () => {
+    mockDb.getUnclusteredArticles.mockResolvedValue([
+      { id: 'a1', embedding: [1, 0], clusterAssignments: [] },
+      { id: 'a2', embedding: [1, 0], clusterAssignments: [{ clusterId: 'old' }] },
+    ]);
+    mockDb.createCluster.mockResolvedValue({ id: 'c1' });
+
+    await clusterRecentArticles();
+
     const assignments = mockDb.createArticleAssignments.mock.calls[0][0];
     expect(assignments).toEqual(
       expect.arrayContaining([
