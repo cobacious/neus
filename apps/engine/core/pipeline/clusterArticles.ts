@@ -1,4 +1,9 @@
-import { getRecentEmbeddedArticles, createCluster, createArticleAssignments } from '@neus/db';
+import {
+  getRecentEmbeddedArticles,
+  createCluster,
+  createArticleAssignments,
+  updateClusterEmbedding,
+} from '@neus/db';
 import { cosineSimilarity, jaccard } from './utils';
 import {
   logger,
@@ -119,6 +124,23 @@ export async function clusterRecentArticles() {
       method: string;
     }[];
     await createArticleAssignments(assignments);
+    const embeddings = group
+      .map((id) => articleMap.get(id))
+      .filter((a): a is { embedding: number[] } => Boolean(a && Array.isArray(a.embedding)))
+      .map((a) => a.embedding as number[]);
+    if (embeddings.length) {
+      const dims = embeddings[0].length;
+      const mean = Array(dims).fill(0);
+      embeddings.forEach((e) =>
+        e.forEach((v, i) => {
+          mean[i] += v;
+        })
+      );
+      for (let i = 0; i < dims; i++) {
+        mean[i] /= embeddings.length;
+      }
+      await updateClusterEmbedding(cluster.id, mean);
+    }
     createdClusters++;
   }
   logPipelineSection(

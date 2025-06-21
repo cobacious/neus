@@ -13,6 +13,7 @@ export * from './clusters/getRankedClusters';
 export * from './clusters/getClusterById';
 export * from './clusters/updateClusterSummary';
 export * from './clusters/updateClusterScore';
+export * from './clusters/updateClusterEmbedding';
 export * from './sources/getActiveSources';
 export * from './sources/getSources';
 export * from './sources/createSource';
