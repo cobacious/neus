@@ -4,6 +4,7 @@ const mockDb = {
   getUnclusteredArticles: jest.fn(),
   createCluster: jest.fn(),
   createArticleAssignments: jest.fn(),
+  updateClusterEmbedding: jest.fn(),
 };
 
 // Use unstable_mockModule for ESM
@@ -31,6 +32,7 @@ describe('clusterRecentArticles', () => {
 
     expect(mockDb.createCluster).toHaveBeenCalledTimes(1);
     expect(mockDb.createArticleAssignments).toHaveBeenCalledTimes(1);
+    expect(mockDb.updateClusterEmbedding).toHaveBeenCalledTimes(1);
     const assignments = mockDb.createArticleAssignments.mock.calls[0][0];
     expect(assignments).toEqual(
       expect.arrayContaining([

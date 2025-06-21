@@ -33,6 +33,7 @@ model Cluster {
   origin             String
   headline           String?
   summary            String?
+  embedding          Json?
   score              Float?                     @default(0)
   articleAssignments ArticleClusterAssignment[]
 }
