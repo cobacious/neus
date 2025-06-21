@@ -9,6 +9,7 @@ export enum PipelineStep {
   Embed = 'EMBED',
   Cluster = 'CLUSTER',
   Summarise = 'SUMMARISE',
+  Score = 'SCORE',
 }
 
 const logger = pino({

@@ -9,7 +9,7 @@ import {
 } from 'nexus';
 import {
   countClusters,
-  getClustersWithArticles,
+  getRankedClusters,
   getClusterById,
   getSources,
   createSource,
@@ -24,6 +24,9 @@ const Cluster = objectType({
     t.nullable.string('summary');
     t.string('origin');
     t.string('createdAt');
+    t.float('score', {
+      resolve: (cluster: { score?: number }) => cluster.score ?? 0,
+    });
     t.int('articleCount', {
       resolve: (cluster) => cluster.articleAssignments?.length ?? 0,
     });
@@ -55,6 +58,7 @@ const ArticleSummary = objectType({
     t.string('url');
     t.string('source');
     t.string('publishedAt');
+    t.nullable.string('author');
     t.field('sourceRel', { type: Source });
   },
 });
@@ -63,7 +67,7 @@ const Query = queryType({
   definition(t) {
     t.list.field('clusters', {
       type: Cluster,
-      resolve: async () => getClustersWithArticles(),
+      resolve: async () => getRankedClusters(),
     });
     t.field('cluster', {
       type: Cluster,
