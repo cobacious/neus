@@ -1,11 +1,17 @@
-import { scoreCluster } from '../../../../packages/db/src/clusters/scoreCluster';
+import { scoreCluster } from './scoreCluster';
 
 describe('scoreCluster', () => {
   it('prefers newer clusters', () => {
     const now = Date.now();
     const old = {
       articleAssignments: [
-        { article: { publishedAt: new Date(now - 86400000), sourceId: 's1', sourceRel: { trustScore: 0.5 } } },
+        {
+          article: {
+            publishedAt: new Date(now - 86400000),
+            sourceId: 's1',
+            sourceRel: { trustScore: 0.5 },
+          },
+        },
       ],
     } as any;
     const recent = {
