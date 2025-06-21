@@ -106,3 +106,14 @@ score = recency * 0.4 + coverage * 0.3 + trust * 0.3
 
 Weights are intentionally easy to tweak. The `score` value is exposed in the GraphQL
 `Cluster` type, and the implementation lives in `packages/db/src/clusters`.
+
+## Maintenance Scripts
+
+The `engine` app ships with a small utility for detecting and removing duplicate clusters. Duplication is determined using each cluster's embedding and the overlap of their article sets.
+
+```bash
+pnpm --filter @neus/engine list-dupes  # lists duplicate clusters
+pnpm --filter @neus/engine dedupe      # reassigns articles and removes duplicates
+```
+
+During deduplication, articles from duplicate clusters are moved to the first cluster in each group before the extras are removed.
