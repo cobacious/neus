@@ -11,3 +11,5 @@ node_modules/
 # Ignore local SQLite dev database
 **/*.db
 **/*.db-journal
+# IDEs
+.vscode/*

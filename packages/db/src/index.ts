@@ -10,7 +10,6 @@ export * from './clusters/createCluster';
 export * from './clusters/getClustersToSummarize';
 export * from './clusters/getClustersWithArticles';
 export * from './clusters/getRankedClusters';
-export * from './clusters/scoreCluster';
 export * from './clusters/getClusterById';
 export * from './clusters/updateClusterSummary';
 export * from './clusters/updateClusterScore';
