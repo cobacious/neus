@@ -4,11 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "pnpm --filter @neus/api --filter @neus/web dev",
     "test": "pnpm -r test",
     "format": "prettier --write .",
-    "pipeline": "pnpm --filter @neus/engine pipeline",
-    "dev": "pnpm --filter @neus/api --filter @neus/web dev",
-    "seed": "pnpm --filter @neus/db exec prisma db seed"
+    "db:generate": "pnpm --filter @neus/db exec prisma generate",
+    "db:migrate": "pnpm --filter @neus/db exec prisma migrate dev",
+    "db:seed": "pnpm --filter @neus/db exec prisma db seed",
+    "pipeline": "pnpm --filter @neus/engine pipeline"
   },
   "keywords": [],
   "author": "",

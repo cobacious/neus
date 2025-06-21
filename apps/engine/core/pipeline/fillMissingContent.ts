@@ -4,7 +4,8 @@ import {
   getArticlesMissingContent,
   updateArticleContent,
 } from '@neus/db';
-import { extract, setSanitizeHtmlOptions } from '@extractus/article-extractor';
+import { extractFromHtml, setSanitizeHtmlOptions } from '@extractus/article-extractor';
+import { fetch } from '../../lib/fetcher';
 import {
   logPipelineStep,
   logPipelineSection,
@@ -35,9 +36,27 @@ export async function fillMissingContent() {
     if (!article.url || !article.source || (article.content && article.content.trim().length > 0))
       continue;
     try {
-      const result = await extract(article.url, {});
+      const res = await fetch(article.url);
+      const html = await res.text();
+      const result = await extractFromHtml(html, article.url);
+
+      let updatedAt: Date | undefined = undefined;
+      const metaMatch = html.match(
+        /(article:modified_time|og:updated_time|dateModified|datemodified|updated_time|modified_time)"? content="([^"]+)/i
+      );
+      if (metaMatch) {
+        const ts = Date.parse(metaMatch[2]);
+        if (!isNaN(ts)) updatedAt = new Date(ts);
+      } else {
+        const header = res.headers.get('last-modified');
+        if (header) {
+          const ts = Date.parse(header);
+          if (!isNaN(ts)) updatedAt = new Date(ts);
+        }
+      }
+
       if (result?.content && result.content.trim().length > 0) {
-        await updateArticleContent(article.id, result.content);
+        await updateArticleContent(article.id, result.content, updatedAt);
         updated++;
       } else {
         logger.warn(

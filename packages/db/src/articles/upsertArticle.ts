@@ -6,8 +6,11 @@ export type UpsertArticleInput = {
   source: string;
   sourceId: string;
   publishedAt: Date;
+  updatedAt?: Date;
   snippet?: string;
   content?: string;
+  author?: string;
+  categories?: string;
 };
 
 export async function upsertArticle(data: UpsertArticleInput) {
