@@ -53,7 +53,7 @@ model Source {
 
 model ArticleClusterAssignment {
   id         String   @id @default(cuid())
-  articleId  String
+  articleId  String   @unique
   clusterId  String
   similarity Float?
   method     String

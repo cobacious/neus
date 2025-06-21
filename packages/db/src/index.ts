@@ -1,5 +1,6 @@
 export * from './articles/getArticlesMissingContent';
 export * from './articles/getRecentEmbeddedArticles';
+export * from './articles/getUnclusteredArticles';
 export * from './articles/getUnembeddedArticles';
 export * from './articles/updateArticleContent';
 export * from './articles/updateArticleEmbedding';
