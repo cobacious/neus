@@ -20,3 +20,5 @@ export * from './sources/getSources';
 export * from './sources/createSource';
 export * from './sources/updateSource';
 export type { Source, Cluster } from '@prisma/client';
+export * from './clusters/deleteCluster';
+export * from './clusters/reassignClusterArticles';

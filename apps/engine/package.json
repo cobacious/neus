@@ -18,6 +18,8 @@
   "scripts": {
     "pipeline": "NODE_ENV=development tsx index.ts",
     "print": "NODE_ENV=development tsx lib/printClusters.ts",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --config ../../jest.config.ts"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --config ../../jest.config.ts",
+    "list-dupes": "NODE_ENV=development tsx lib/listDuplicateClusters.ts",
+    "dedupe": "NODE_ENV=development tsx lib/dedupeClusters.ts"
   }
 }
