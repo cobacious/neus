@@ -12,7 +12,7 @@ import { RssArticle } from '../ingestion/articleIngestion';
 export async function storeArticles(articles: RssArticle[]) {
   logPipelineStep(PipelineStep.Store, 'Storing articles in the database...');
   let stored = 0;
-  for (const article of articles) {
+  articles.forEach(async (article) => {
     try {
       if (!article.url || !article.title) {
         logPipelineSection(
@@ -20,7 +20,7 @@ export async function storeArticles(articles: RssArticle[]) {
           `Skipping article with missing url or title:`,
           article
         );
-        continue;
+        return;
       }
       await upsertArticle({
         url: article.url,
@@ -42,6 +42,6 @@ export async function storeArticles(articles: RssArticle[]) {
         err
       );
     }
-  }
+  });
   logPipelineSection(PipelineStep.Store, `Stored/updated ${stored} articles in the database.`);
 }

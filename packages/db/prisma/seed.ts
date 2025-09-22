@@ -11,26 +11,26 @@ const feeds = [
     homepageUrl: 'https://www.theguardian.com/uk',
     rssFeedUrl: 'https://www.theguardian.com/uk/rss',
   },
-  {
-    name: 'The Times',
-    homepageUrl: 'https://www.thetimes.co.uk',
-    rssFeedUrl: 'https://www.thetimes.co.uk/rss',
-  },
+  // {
+  //   name: 'The Times',
+  //   homepageUrl: 'https://www.thetimes.co.uk',
+  //   rssFeedUrl: 'https://www.thetimes.co.uk/rss',
+  // },
   {
     name: 'The Independent UK',
     homepageUrl: 'https://www.independent.co.uk',
     rssFeedUrl: 'https://www.independent.co.uk/news/rss',
   },
-  {
-    name: 'The Sun',
-    homepageUrl: 'https://www.thesun.co.uk',
-    rssFeedUrl: 'https://www.thesun.co.uk/news/feed/',
-  },
-  {
-    name: 'Daily Express',
-    homepageUrl: 'https://www.express.co.uk',
-    rssFeedUrl: 'https://www.express.co.uk/news/rss',
-  },
+  // {
+  //   name: 'The Sun',
+  //   homepageUrl: 'https://www.thesun.co.uk',
+  //   rssFeedUrl: 'https://www.thesun.co.uk/news/feed/',
+  // },
+  // {
+  //   name: 'Daily Express',
+  //   homepageUrl: 'https://www.express.co.uk',
+  //   rssFeedUrl: 'https://www.express.co.uk/news/rss',
+  // },
   {
     name: 'Metro UK',
     homepageUrl: 'https://metro.co.uk',

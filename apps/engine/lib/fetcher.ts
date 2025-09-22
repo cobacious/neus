@@ -1,20 +1,29 @@
-// fetcher.ts
-// A universal fetch wrapper for Node.js that supports optional proxying via https-proxy-agent if PROXY_ADDRESS is set.
-// Always use this for HTTP(S) requests in the backend engine.
-
 import nodeFetch, { RequestInit, Response } from 'node-fetch';
 import { logger } from './pipelineLogger';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 let agent: any = undefined;
+
 if (process.env.PROXY_ADDRESS) {
-  // Dynamically import https-proxy-agent only if needed
-  const { HttpsProxyAgent } = await import('https-proxy-agent');
+  console.log('[FETCHER] PROXY_ADDRESS detected:', process.env.PROXY_ADDRESS);
+
+  // Trust self-signed certs inside the proxy agent
   agent = new HttpsProxyAgent(process.env.PROXY_ADDRESS);
-  // Optionally log for debugging
-  logger.info(`[FETCHER] Using proxy agent: ${process.env.PROXY_ADDRESS}`);
+  (agent as any).options.rejectUnauthorized = false; // ← override TLS rejection manually
+
+  console.log('[FETCHER] Proxy agent created with rejectUnauthorized=false');
+} else {
+  console.log('[FETCHER] No PROXY_ADDRESS set');
 }
 
 export async function fetch(url: string, options: RequestInit = {}): Promise<Response> {
+  console.log('[FETCHER] Requesting URL:', url);
   const opts = agent ? { ...options, agent } : options;
-  return nodeFetch(url, opts);
+
+  try {
+    return await nodeFetch(url, opts);
+  } catch (error) {
+    logger.error(`[FETCHER] Error fetching ${url}:`, error);
+    throw error;
+  }
 }
