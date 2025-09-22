@@ -1,9 +1,6 @@
 // fillMissingContent.ts
 // Fetch and update missing article content using @extractus/article-extractor
-import {
-  getArticlesMissingContent,
-  updateArticleContent,
-} from '@neus/db';
+import { getArticlesMissingContent, updateArticleContent } from '@neus/db';
 import { extractFromHtml, setSanitizeHtmlOptions } from '@extractus/article-extractor';
 import { fetch } from '../../lib/fetcher';
 import {
@@ -16,7 +13,7 @@ import {
 setSanitizeHtmlOptions({
   allowedTags: [], // remove all tags
   allowedAttributes: {},
-  exclusiveFilter: (frame) => !frame.text.trim(), // remove empty blocks
+  exclusiveFilter: (frame: { text: string }) => !frame.text.trim(), // remove empty blocks
 });
 
 export async function fillMissingContent() {
@@ -32,9 +29,9 @@ export async function fillMissingContent() {
     PipelineStep.Fetch,
     `Attempting to extract full content for ${articles.length} articles.`
   );
-  for (const article of articles) {
+  articles.forEach(async (article) => {
     if (!article.url || !article.source || (article.content && article.content.trim().length > 0))
-      continue;
+      return;
     try {
       const res = await fetch(article.url);
       const html = await res.text();
@@ -59,18 +56,18 @@ export async function fillMissingContent() {
         await updateArticleContent(article.id, result.content, updatedAt);
         updated++;
       } else {
-        logger.warn(
-          PipelineStep.Fetch,
-          `No full content extracted for: ${article.title} (${article.url})`
-        );
+        logger.warn({
+          step: PipelineStep.Fetch,
+          msg: `No full content extracted for: ${article.title} (${article.url})`,
+        });
       }
     } catch (err) {
-      logger.error(
-        PipelineStep.Fetch,
-        `Failed to extract content for: ${article.title} (${article.url})`,
-        err
-      );
+      logger.error({
+        step: PipelineStep.Fetch,
+        msg: `Failed to extract content for: ${article.title} (${article.url})`,
+        err,
+      });
     }
-  }
+  });
   logger.info(`[${PipelineStep.Fetch}] Filled content for ${updated} articles.`);
 }

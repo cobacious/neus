@@ -1,7 +1,7 @@
 import { prisma } from '../client';
 
 export async function getRankedClusters() {
-  return prisma.cluster.findMany({
+  const clusters = await prisma.cluster.findMany({
     include: {
       articleAssignments: {
         include: {
@@ -11,4 +11,5 @@ export async function getRankedClusters() {
     },
     orderBy: { score: 'desc' },
   });
+  return clusters.filter((cluster) => cluster.articleAssignments.length > 1);
 }

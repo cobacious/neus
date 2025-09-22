@@ -1,8 +1,5 @@
 import OpenAI from 'openai';
-import {
-  getUnembeddedArticles,
-  updateArticleEmbedding,
-} from '@neus/db';
+import { getUnembeddedArticles, updateArticleEmbedding } from '@neus/db';
 import {
   logger,
   logPipelineSection,
@@ -17,17 +14,17 @@ const MAX_EMBEDDING_CHARS = 8192;
 export async function embedNewArticles() {
   logPipelineStep(PipelineStep.Embed, 'Embedding new articles...');
 
-  const unembedded = await getUnembeddedArticles();
+  const unembeddedArticles = await getUnembeddedArticles();
 
-  logPipelineSection(PipelineStep.Embed, `Found ${unembedded.length} unembedded articles`);
+  logPipelineSection(PipelineStep.Embed, `Found ${unembeddedArticles.length} unembedded articles`);
 
-  for (const article of unembedded) {
+  unembeddedArticles.forEach(async (article) => {
     if (!article.content) {
       logPipelineSection(
         PipelineStep.Embed,
         `Skipping (no content): ${article.title} (${article.url})`
       );
-      continue;
+      return;
     }
     try {
       const abridged = article.content.slice(0, MAX_EMBEDDING_CHARS);
@@ -43,5 +40,5 @@ export async function embedNewArticles() {
         err
       );
     }
-  }
+  });
 }
