@@ -11,6 +11,11 @@
     "dotenv": "^16.5.0"
   },
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch index.ts"
+    "dev": "NODE_ENV=development tsx watch index.ts",
+    "build": "tsc --project tsconfig.build.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.3.3"
   }
 }

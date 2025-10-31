@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "pnpm -r --filter @neus/db --filter @neus/api --filter @neus/web run --if-present build",
     "dev": "pnpm --filter @neus/api --filter @neus/web dev",
     "test": "pnpm -r test",
     "format": "prettier --write .",
