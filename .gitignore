@@ -8,6 +8,8 @@ node_modules/
 **/.env
 # Ignore all node_modules in subfolders (redundant, but safe)
 **/node_modules/
+# Ignore build outputs
+**/dist/
 # Ignore local SQLite dev database
 **/*.db
 **/*.db-journal

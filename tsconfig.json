@@ -12,7 +12,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@neus/db": ["packages/db/src"]
+      "@neus/db/*": ["packages/db/dist/*.d.ts", "packages/db/dist/*", "packages/db/src/*"]
     }
   },
   "include": ["apps/**/*", "packages/**/*"]
