@@ -1,11 +1,13 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ClusterList from './components/ClusterList';
 import ClusterDetailPage from './ClusterDetailPage';
+import BetaBanner from './components/BetaBanner';
 
 export default function App() {
   return (
     <BrowserRouter>
       <div className="max-w-3xl mx-auto p-4">
+        <BetaBanner />
         <h1 className="text-2xl font-bold mb-4">Neus Clusters</h1>
         <Routes>
           <Route path="/" element={<ClusterList />} />
