@@ -13,3 +13,7 @@ node_modules/
 **/*.db-journal
 # IDEs
 .vscode/*
+
+# AI tool caches
+**/.claude/
+**/.openai/
