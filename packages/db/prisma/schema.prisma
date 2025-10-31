@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Article {
@@ -15,7 +15,7 @@ model Article {
   content            String?
   source             String
   sourceId           String
-  sourceRel          Source  @relation(fields: [sourceId], references: [id])
+  sourceRel          Source                     @relation(fields: [sourceId], references: [id])
   publishedAt        DateTime
   updatedAt          DateTime?
   author             String?
@@ -39,14 +39,14 @@ model Cluster {
 }
 
 model Source {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
   domain        String?
   homepageUrl   String?
-  rssFeedUrl    String   @unique
+  rssFeedUrl    String    @unique
   faviconUrl    String?
-  active        Boolean  @default(true)
-  trustScore    Float?   @default(0)
+  active        Boolean   @default(true)
+  trustScore    Float?    @default(0)
   lastFetchedAt DateTime?
   articles      Article[]
 }
