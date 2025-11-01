@@ -9,9 +9,12 @@ export default function App() {
     <BrowserRouter>
       <div className="max-w-3xl mx-auto">
         <header className="my-6">
-          <a href="/">
-            <Logo className="h-8 lg:h-12 w-auto mx-auto" />
-          </a>
+          <h1>
+            <a href="/" className="block">
+              <Logo className="h-8 lg:h-12 w-auto mx-auto" />
+              <span className="sr-only">Neus</span>
+            </a>
+          </h1>
         </header>
         <BetaBanner />
         <Routes>
