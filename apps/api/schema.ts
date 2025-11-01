@@ -23,7 +23,7 @@ const Cluster = objectType({
     t.nullable.string('headline');
     t.nullable.string('summary');
     t.string('origin');
-    t.string('createdAt');
+    t.float('createdAt');
     t.float('score', {
       resolve: (cluster: { score?: number }) => cluster.score ?? 0,
     });
