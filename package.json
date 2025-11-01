@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "pnpm -r --filter @neus/db --filter @neus/api --filter @neus/web run --if-present build",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @neus/db --filter @neus/api build",
+    "build:web": "pnpm --filter @neus/db --filter @neus/web build",
+    "start:api": "pnpm --filter @neus/api start",
+    "start:web": "pnpm --filter @neus/web start",
     "dev": "pnpm --filter @neus/api --filter @neus/web dev",
     "test": "pnpm -r test",
     "format": "prettier --write .",
