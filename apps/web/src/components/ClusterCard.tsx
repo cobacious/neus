@@ -36,9 +36,7 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
     >
       <h2 className="text-xl font-semibold">{cluster.headline}</h2>
       <p className="text-gray-600 mb-2">{cluster.summary}</p>
-      <div className="text-sm text-gray-500 mb-2">
-        {cluster.origin} • {date}
-      </div>
+      <div className="text-sm text-gray-500 mb-2">{date} </div>
       <div className="flex items-center space-x-1">
         {visible.map((source) => (
           <img
