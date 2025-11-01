@@ -1,108 +1,199 @@
-# Neus – Context and Vision
+# Neus
 
-## Overview
+**Live at [neus.news](https://neus.news)**
 
-**Neus** is a news aggregation platform designed for neutrality, trust, and clarity. It aims to reduce polarisation and combat misinformation by rethinking how news is presented, summarised, and sourced. The goal is to provide a calming, credible alternative to algorithmically polarised social feeds and rage-driven headlines.
+An AI-powered news aggregation platform that cuts through media bias by presenting neutral, clustered news stories.
 
-The MVP is a web and mobile app with a **news feed** as the core experience. Articles covering the same story from different publications are grouped into a single **story card**, featuring:
+[![Neus Desktop](./screenshots/neus-desktop.png)](https://neus.news)
 
-- An **AI-generated neutral headline and summary**
-- A tray of **publication icons/logos** that link to the original sources
-- Optional **source material links** (e.g. press releases, research papers)
+## What is Neus?
 
-## Goals
+Neus is a personal prototype exploring AI-powered news clustering. It aims to reduce polarisation and combat misinformation by rethinking how news is presented, summarised, and sourced.
 
-- Rebuild trust in journalism through **transparency**, **nuance**, and **context**
-- Offer a more **balanced and informative** way to stay updated
-- Support thoughtful **consumption over dopamine-fueled doomscrolling**
-- Enable **users to explore multiple perspectives** on a story
+Instead of sensationalized headlines and algorithmic rage-feeds, Neus groups related articles from different publications into single story cards, each featuring:
 
-## Guiding Principles
+- **AI-generated neutral headlines and summaries** - abstracting away ideological slants
+- **Source icons linking to original articles** - maintaining transparency and attribution
+- **Semantic clustering** - grouping coverage of the same story across the political spectrum
 
-- **Neutral summaries**: Use AI to abstract away ideological slants in headlines and lead-ins
-- **Clustered stories**: Group related articles from different outlets into a single story unit
-- **Source visibility**: Where possible, link directly to underlying documents or data
-- **Relevance over virality**: Prioritise accuracy and insight, not clicks
-- **Future-proofing**: Design the architecture to support premium features and extensions
+## How It Works
 
-## Potential Premium Features (Post-MVP)
+1. **Ingestion**: RSS feeds from multiple UK news sources are crawled regularly
+2. **Embedding**: Article content is converted to vector embeddings using OpenAI's API
+3. **Clustering**: Stories are grouped using cosine similarity and graph-based connected components
+4. **Summarization**: GPT generates neutral headlines and summaries for each cluster
+5. **Ranking**: Clusters are scored based on recency, source coverage, and source trust
 
-- **Article heatmaps**: Highlight facts, opinions, and contested claims within articles
-- **Fact check overlays**: Inline fact-checking and cross-source validation
-- **What’s Missing**: Highlight key facts or perspectives mentioned in other articles but omitted in the current one
-- **Endorsements and signals**: Let qualified users endorse or contextualise claims
+## Tech Stack
 
-## Tech Strategy
+- **Frontend**: React + TypeScript + Vite
+- **Backend API**: GraphQL (GraphQL Yoga)
+- **Engine**: Node.js pipeline for ingestion, embedding, and clustering
+- **Database**: PostgreSQL (hosted on Supabase)
+- **AI**: OpenAI embeddings (text-embedding-3-small) + GPT-4o-mini for summarization
+- **Deployment**: Vercel (frontend) + Railway (API)
+- **Monorepo**: pnpm workspaces
 
-- **Monorepo** setup using `pnpm` workspaces
-- Written in **TypeScript** (backend + frontend)
-- Start with a **serverless-friendly backend**, storing and analysing articles
-- Use **LLMs** for story clustering, summarisation, and claim detection
-- Store structured data in **PostgreSQL** or **Supabase**, starting simple
-- Explore **Edge Functions** and **cron jobs** for scheduled tasks (e.g., news scraping)
+## Architecture
 
-## Monetisation Strategy (Future)
-
-- Likely via **freemium** or **optional subscription**
-- No ads, no engagement bait
-- Revenue model must align with the ethos of **calm, honest information**
-
-## Current Phase
-
-We're starting with:
-
-- The **backend pipeline** for sourcing, clustering, and summarising articles
-- A working prototype that can ingest articles and return grouped, summarised story objects
-
-## Web App
-
-The frontend is built with **Vite** and **React**. The GraphQL endpoint can be
-configured via an environment variable. Create a `.env` file in `apps/web` with:
-
-```bash
-VITE_API_URL=http://localhost:4000/graphql
+```
+News Sources (RSS) 
+    ↓
+Engine (clustering/summarization) 
+    ↓
+PostgreSQL Database 
+    ↓
+GraphQL API 
+    ↓
+React Web App
 ```
 
-`VITE_API_URL` will be read at build time, so adjust it for your deployment.
+## Key Features
 
-## API Setup
+### Semantic Clustering
+Uses OpenAI embeddings and cosine similarity (threshold: 0.85) to identify related articles. Implements graph-based clustering via depth-first search to find connected components.
 
-The GraphQL API reads its configuration from an `.env` file in `apps/api`.
-Copy the example and adjust the `PORT` as desired:
+### Neutral Summarization
+Prompt-engineered GPT queries generate bias-neutral headlines and summaries, with structured JSON outputs and fallback regex parsing for reliability.
 
+### Cost Controls
+- Token usage limits (`TOKEN_LIMIT` env var)
+- Content truncation for embeddings (8192 chars max)
+- Configurable model selection (gpt-4o-mini for summarization)
+- Manual pipeline execution (no runaway costs)
+
+### Smart Deduplication
+Uses Jaccard similarity to detect and filter near-duplicate clusters, preventing redundant story cards.
+
+## Local Development
+
+### Prerequisites
+- Node.js 18+
+- pnpm 8+
+- PostgreSQL (or Supabase account)
+- OpenAI API key
+
+### Setup
+
+1. **Clone and install dependencies**
 ```bash
-cp apps/api/.env.example apps/api/.env
+git clone https://github.com/cobacious/neus.git
+cd neus
+pnpm install
 ```
 
-If no `PORT` is specified, the server defaults to `4000`.
+2. **Configure database**
+```bash
+# Set up your DATABASE_URL in packages/db/.env
+cp packages/db/.env.example packages/db/.env
 
----
+# Run migrations
+pnpm db:migrate
+```
 
-## Engine Setup
-
-The backend engine expects a `.env` file under `apps/engine`.
-Start by copying the example provided:
-
+3. **Configure engine**
 ```bash
 cp apps/engine/.env.example apps/engine/.env
+# Add your OPENAI_API_KEY and other settings
 ```
 
-Fill in the values (at minimum `OPENAI_API_KEY`) before running the pipeline.
+4. **Configure API**
+```bash
+cp apps/api/.env.example apps/api/.env
+# Add DATABASE_URL
+```
 
+5. **Configure web app**
+```bash
+cp apps/web/.env.example apps/web/.env
+# Set VITE_API_URL (default: http://localhost:4000/graphql)
+```
 
-> This document is a living artifact and should evolve as the product vision and tech stack grow.
+### Running Locally
 
-## Cluster Ranking
+```bash
+# Terminal 1: Start API
+pnpm --filter @neus/api dev
 
-Clusters returned by the API are ranked using a simple scoring algorithm. Each cluster
-is scored during the pipeline run and the numeric value is stored in the database.
-The score considers how recently articles were published, how many distinct sources
-covered the story, and the average trust score of those sources. No engagement data
-is considered.
+# Terminal 2: Start web app  
+pnpm --filter @neus/web dev
+
+# Terminal 3: Run pipeline (one-time)
+pnpm pipeline
+```
+
+Visit `http://localhost:5173` (or whatever port Vite assigns)
+
+## Deployment
+
+- **Frontend**: Deployed to Vercel from `apps/web`
+- **API**: Deployed to Railway from `apps/api`
+- **Database**: Hosted on Supabase (free tier)
+- **Pipeline**: Run manually as needed (cost-controlled)
+
+The pipeline is executed locally or via CI when data refresh is needed, typically 1-2 times per week.
+
+## Project Structure
+
+```
+neus/
+├── apps/
+│   ├── api/          # GraphQL API server
+│   ├── web/          # React frontend
+│   ├── engine/       # Ingestion & clustering pipeline
+│   └── admin/        # Admin UI for feed management
+├── packages/
+│   └── db/           # Prisma schema & database client
+└── screenshots/      # App screenshots
+```
+
+## Scoring Algorithm
+
+Clusters are ranked using:
 
 ```
 score = recency * 0.4 + coverage * 0.3 + trust * 0.3
 ```
 
-Weights are intentionally easy to tweak. The `score` value is exposed in the GraphQL
-`Cluster` type, and the implementation lives in `packages/db/src/clusters`.
+Where:
+- **Recency**: How recent the articles were published
+- **Coverage**: Number of distinct sources covering the story
+- **Trust**: Average trust score of sources (manually curated)
+
+No engagement metrics are considered - ranking is purely editorial.
+
+## Screenshots
+
+### Desktop View
+![Neus Desktop Interface](./screenshots/neus-desktop.png)
+
+### Mobile View  
+![Neus Mobile Interface](./screenshots/neus-mobile.png)
+
+## Current Status
+
+Neus is a **working prototype** demonstrating AI-powered news clustering and neutral summarization. Data is refreshed manually via the pipeline. Expect limited sources, occasional bugs, and rough edges.
+
+This is a personal project exploring:
+- Practical applications of embeddings and semantic search
+- LLM prompt engineering for bias reduction
+- Production-grade AI pipeline architecture
+- Cost-controlled AI feature development
+
+## Future Possibilities
+
+- Article heatmaps highlighting facts vs. opinions
+- Inline fact-checking and cross-source validation  
+- "What's Missing" - perspectives omitted from coverage
+- Browser extension for on-demand article clustering
+- Expanded source coverage across political spectrum
+
+## License
+
+Copyright © 2024. All rights reserved.
+
+This code is available for viewing and reference purposes. For any other use, please contact the repository owner.
+
+---
+
+*Note: Neus is not intended as a commercial product. It's an exploration of using AI to combat information polarization and improve news consumption.*
