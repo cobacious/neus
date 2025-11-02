@@ -56,6 +56,7 @@ const ArticleSummary = objectType({
   definition(t) {
     t.string('id');
     t.string('url');
+    t.string('title');
     t.string('source');
     t.string('publishedAt');
     t.nullable.string('author');

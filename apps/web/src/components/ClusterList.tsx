@@ -1,5 +1,6 @@
 import { useQuery } from 'urql';
 import ClusterCard from './ClusterCard';
+import Loading from './Loading';
 
 const CLUSTERS_QUERY = `
   query GetClusters {
@@ -26,7 +27,7 @@ export default function ClusterList() {
   const [result] = useQuery({ query: CLUSTERS_QUERY });
 
   if (result.fetching) {
-    return <p>Loading clusters...</p>;
+    return <Loading />;
   }
 
   if (result.error) {
