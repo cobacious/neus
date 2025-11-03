@@ -11,6 +11,7 @@ import {
   PipelineStep,
   logger,
 } from '../../lib/pipelineLogger';
+import { cleanArticleText } from './cleanArticleText';
 
 setSanitizeHtmlOptions({
   allowedTags: [], // remove all tags
@@ -55,7 +56,8 @@ export async function fillMissingContent() {
       }
 
       if (result?.content && result.content.trim().length > 0) {
-        await updateArticleContent(article.id, result.content, updatedAt);
+        const cleaned = cleanArticleText(result.content);
+        await updateArticleContent(article.id, cleaned, updatedAt);
         updated++;
       } else {
         logger.warn(
