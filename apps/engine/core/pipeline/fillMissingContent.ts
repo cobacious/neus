@@ -5,7 +5,6 @@ import {
   updateArticleContent,
 } from '@neus/db';
 import { extractFromHtml, setSanitizeHtmlOptions } from '@extractus/article-extractor';
-import { fetch } from '../../lib/fetcher';
 import {
   logPipelineStep,
   logPipelineSection,
