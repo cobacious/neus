@@ -2,7 +2,6 @@
   "name": "@neus/engine",
   "version": "0.1.0",
   "main": "index.js",
-  "type": "module",
   "dependencies": {
     "@neus/db": "workspace:^",
     "dotenv": "^16.5.0",
