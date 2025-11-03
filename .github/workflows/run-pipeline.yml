@@ -31,6 +31,9 @@ jobs:
       
       - name: Generate Prisma Client
         run: pnpm --filter @neus/db exec prisma generate
+
+      - name: Build database package
+        run: pnpm --filter @neus/db build
       
       - name: Run pipeline
         run: pnpm pipeline
