@@ -25,7 +25,8 @@ export default function ClusterDetailPage() {
   const [result] = useQuery({ query: CLUSTER_QUERY, variables: { id } });
 
   if (result.fetching) return <Loading />;
-  if (result.error || !result.data.cluster) return <p>Error loading cluster</p>;
+  if (result.error || !result.data.cluster)
+    return <p className="text-center">Error loading cluster</p>;
 
   const cluster = result.data.cluster;
   const date = new Date(cluster.createdAt).toLocaleDateString();
