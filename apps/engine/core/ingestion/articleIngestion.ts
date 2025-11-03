@@ -1,8 +1,6 @@
 // Article ingestion service for Neus backend engine
 // Fetches articles from RSS feeds (initial version)
 
-import { fetch } from '../../lib/fetcher';
-
 export type RssArticle = {
   title: string;
   url: string;
