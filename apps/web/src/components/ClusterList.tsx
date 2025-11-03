@@ -31,7 +31,7 @@ export default function ClusterList() {
   }
 
   if (result.error) {
-    return <p>Error loading clusters</p>;
+    return <p className="text-center">Error loading clusters</p>;
   }
 
   return (
