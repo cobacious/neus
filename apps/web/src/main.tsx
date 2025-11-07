@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { cacheExchange, createClient, fetchExchange, Provider } from 'urql';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import './index.css';
 
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <Provider value={client}>
       <App />
+      <Analytics />
     </Provider>
   </React.StrictMode>
 );
