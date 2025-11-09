@@ -1,10 +1,10 @@
-import { getClustersWithArticles, updateClusterScore } from '@neus/db';
+import { getClustersForScoring, updateClusterScore } from '@neus/db';
 import { scoreCluster } from './scoreCluster';
 import { logPipelineStep, logPipelineSection, PipelineStep } from '../../lib/pipelineLogger';
 
 export async function scoreClusters() {
   logPipelineStep(PipelineStep.Score, 'Scoring clusters...');
-  const clusters = await getClustersWithArticles();
+  const clusters = await getClustersForScoring();
   let updated = 0;
   for (const cluster of clusters) {
     const score = scoreCluster(cluster);
