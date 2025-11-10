@@ -13,6 +13,7 @@ import {
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const MAX_EMBEDDING_CHARS = 8192;
+const MAX_EMBEDDINGS_PER_RUN = 200; // Safety limit to prevent runaway costs (~$0.002/run)
 
 export async function embedNewArticles() {
   logPipelineStep(PipelineStep.Embed, 'Embedding new articles...');
@@ -21,7 +22,17 @@ export async function embedNewArticles() {
 
   logPipelineSection(PipelineStep.Embed, `Found ${unembedded.length} unembedded articles`);
 
-  for (const article of unembedded) {
+  // Apply safety limit
+  const articlesToEmbed = unembedded.slice(0, MAX_EMBEDDINGS_PER_RUN);
+  if (unembedded.length > MAX_EMBEDDINGS_PER_RUN) {
+    logPipelineSection(
+      PipelineStep.Embed,
+      `Limiting to ${MAX_EMBEDDINGS_PER_RUN} articles to prevent excessive API costs`
+    );
+  }
+
+  let embedded = 0;
+  for (const article of articlesToEmbed) {
     if (!article.content) {
       logPipelineSection(
         PipelineStep.Embed,
@@ -37,6 +48,7 @@ export async function embedNewArticles() {
       });
       const embedding = response.data[0].embedding as number[];
       await updateArticleEmbedding(article.id, embedding);
+      embedded++;
     } catch (err) {
       logger.error(
         `[${PipelineStep.Embed}] Failed embedding: ${article.title} (${article.url})`,
@@ -44,4 +56,6 @@ export async function embedNewArticles() {
       );
     }
   }
+
+  logPipelineSection(PipelineStep.Embed, `Successfully embedded ${embedded} articles`);
 }
