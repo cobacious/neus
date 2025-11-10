@@ -9,6 +9,7 @@ export * from './clusters/countClusters';
 export * from './clusters/createArticleAssignments';
 export type { ClusterAssignment } from './clusters/createArticleAssignments';
 export * from './clusters/createCluster';
+export * from './clusters/deleteEmptyClusters';
 export * from './clusters/getClusterById';
 export * from './clusters/getClustersForScoring';
 export * from './clusters/getClustersToSummarize';

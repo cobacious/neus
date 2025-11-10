@@ -5,7 +5,7 @@ import { prisma } from '../client';
  *
  * Optimizations:
  * - Only fetches articles from the last 7 days (failed extractions don't retry forever)
- * - Limits to 50 articles per run to prevent slow accumulation
+ * - Limits to 100 articles per run to prevent slow accumulation
  * - Orders by createdAt DESC to prioritize newest articles
  *
  * This prevents the pipeline from retrying failed content extractions indefinitely
@@ -25,6 +25,6 @@ export async function getArticlesMissingContent() {
     orderBy: {
       createdAt: 'desc',
     },
-    take: 50,
+    take: 100,
   });
 }

@@ -6,6 +6,7 @@ import { embedNewArticles } from './embedArticles';
 import { clusterRecentArticles } from './clusterArticles';
 import { scoreClusters } from './scoreClusters';
 import { summarizeClusters } from './summarizeClusters';
+import { cleanupEmptyClusters } from './cleanupEmptyClusters';
 import { resetPipelineLogger, logger } from '../../lib/pipelineLogger';
 
 export async function runPipeline() {
@@ -18,4 +19,5 @@ export async function runPipeline() {
   await clusterRecentArticles();
   await scoreClusters();
   await summarizeClusters();
+  await cleanupEmptyClusters();
 }
