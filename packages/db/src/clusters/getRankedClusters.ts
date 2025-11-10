@@ -1,7 +1,8 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../client';
 
 export async function getRankedClusters(limit?: number, offset?: number) {
-  const query: any = {
+  const query: Prisma.ClusterFindManyArgs = {
     where: {
       AND: [
         { headline: { not: null } },
