@@ -5,9 +5,24 @@ export async function getClusterById(id: string) {
     where: { id },
     include: {
       articleAssignments: {
-        include: {
+        select: {
+          createdAt: true,
           article: {
-            include: { sourceRel: true },
+            select: {
+              id: true,
+              url: true,
+              title: true,
+              source: true,
+              publishedAt: true,
+              author: true,
+              sourceRel: {
+                select: {
+                  id: true,
+                  name: true,
+                  faviconUrl: true,
+                },
+              },
+            },
           },
         },
       },
