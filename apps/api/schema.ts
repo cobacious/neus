@@ -12,6 +12,7 @@ import {
   countClusters,
   getRankedClusters,
   getClusterById,
+  getClusterBySlug,
   getSources,
   createSource,
   updateSource,
@@ -22,6 +23,7 @@ const Cluster = objectType({
   definition(t) {
     t.string('id');
     t.nullable.string('headline');
+    t.nullable.string('slug');
     t.nullable.string('summary');
     t.string('origin');
     t.float('createdAt');
@@ -77,8 +79,8 @@ const Query = queryType({
     });
     t.field('cluster', {
       type: Cluster,
-      args: { id: nonNull(stringArg()) },
-      resolve: async (_, { id }) => getClusterById(id),
+      args: { slug: nonNull(stringArg()) },
+      resolve: async (_, { slug }) => getClusterBySlug(slug),
     });
     t.int('clusterCount', {
       resolve: async () => countClusters(),

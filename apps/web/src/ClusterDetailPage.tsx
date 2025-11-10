@@ -3,8 +3,8 @@ import { useQuery } from 'urql';
 import Loading from './components/Loading';
 
 const CLUSTER_QUERY = `
-  query Cluster($id: String!) {
-    cluster(id: $id) {
+  query Cluster($slug: String!) {
+    cluster(slug: $slug) {
       id
       headline
       summary
@@ -21,8 +21,8 @@ const CLUSTER_QUERY = `
 `;
 
 export default function ClusterDetailPage() {
-  const { id } = useParams();
-  const [result] = useQuery({ query: CLUSTER_QUERY, variables: { id } });
+  const { slug } = useParams();
+  const [result] = useQuery({ query: CLUSTER_QUERY, variables: { slug } });
 
   if (result.fetching) return <Loading />;
   if (result.error || !result.data.cluster)

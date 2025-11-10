@@ -8,6 +8,7 @@ const CLUSTERS_QUERY = `
     clusters(limit: $limit, offset: $offset) {
       id
       headline
+      slug
       summary
       createdAt
       origin

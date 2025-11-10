@@ -29,7 +29,7 @@ export default function App() {
         <BetaBanner />
         <Routes>
           <Route path="/" element={<ClusterList />} />
-          <Route path="/clusters/:id" element={<ClusterDetailPage />} />
+          <Route path="/:slug" element={<ClusterDetailPage />} />
         </Routes>
       </div>
     </BrowserRouter>

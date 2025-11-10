@@ -32,10 +32,15 @@ model Cluster {
   label              String?
   origin             String
   headline           String?
+  slug               String?                    @unique
   summary            String?
   embedding          Json?
   score              Float?                     @default(0)
   articleAssignments ArticleClusterAssignment[]
+
+  @@index([headline])
+  @@index([score])
+  @@index([summary])
 }
 
 model Source {
