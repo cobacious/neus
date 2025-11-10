@@ -15,6 +15,7 @@ interface Article {
 interface Cluster {
   id: string;
   headline: string;
+  slug: string | null;
   summary: string;
   createdAt: string;
   origin: string;
@@ -31,7 +32,7 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
 
   return (
     <Link
-      to={`/clusters/${cluster.id}`}
+      to={`/${cluster.slug || cluster.id}`}
       className="block bg-white shadow p-4 rounded hover:bg-gray-50"
     >
       <h2 className="text-xl font-semibold">{cluster.headline}</h2>

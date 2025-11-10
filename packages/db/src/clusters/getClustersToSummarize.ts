@@ -13,6 +13,7 @@ import { prisma } from '../client';
 export async function getClustersToSummarize() {
   const clusters = await prisma.cluster.findMany({
     where: {
+      archived: false,
       OR: [
         { headline: { equals: null } },
         { summary: { equals: null } },

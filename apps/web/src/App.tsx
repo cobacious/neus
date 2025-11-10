@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ClusterList from './components/ClusterList';
 import ClusterDetailPage from './ClusterDetailPage';
+import ClusterRedirect from './ClusterRedirect';
 import BetaBanner from './components/BetaBanner';
 import Logo from './components/Logo';
 import GitHubIcon from './components/GitHubIcon';
@@ -29,7 +30,8 @@ export default function App() {
         <BetaBanner />
         <Routes>
           <Route path="/" element={<ClusterList />} />
-          <Route path="/clusters/:id" element={<ClusterDetailPage />} />
+          <Route path="/clusters/:id" element={<ClusterRedirect />} />
+          <Route path="/:slug" element={<ClusterDetailPage />} />
         </Routes>
       </div>
     </BrowserRouter>
