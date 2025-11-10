@@ -18,6 +18,11 @@ const CLUSTER_QUERY = `
         source
         url
         publishedAt
+        sourceRel {
+          id
+          name
+          faviconUrl
+        }
       }
     }
   }
@@ -123,18 +128,32 @@ export default function ClusterDetailPage() {
       <p className="text-gray-600 my-3">{cluster.summary}</p>
 
       {dates.map((date) => (
-        <div key={date} className="mb-4">
-          <h3 className="font-semibold text-gray-700 mb-2">{date}</h3>
-          <ul className="list-inside space-y-2">
+        <div key={date} className="mb-6">
+          <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wide mb-3 pb-2 border-b border-gray-200">{date}</h3>
+          <ul className="space-y-3">
             {articlesByDate[date].map((article: any) => (
               <li key={article.id}>
                 <a
                   href={article.url}
-                  className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all group"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {`${article.title} | ${article.source}`}
+                  {article.sourceRel?.faviconUrl && (
+                    <img
+                      src={article.sourceRel.faviconUrl}
+                      alt={article.sourceRel.name}
+                      className="w-5 h-5 mt-0.5 flex-shrink-0 rounded-sm"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-gray-900 group-hover:text-blue-600 transition-colors font-medium">
+                      {article.title}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      {article.source}
+                    </div>
+                  </div>
                 </a>
               </li>
             ))}
