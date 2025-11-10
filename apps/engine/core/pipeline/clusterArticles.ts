@@ -1,9 +1,11 @@
 import {
   getUnclusteredArticles,
+  getRecentClustersWithEmbeddings,
   createCluster,
   createArticleAssignments,
   updateClusterEmbedding,
 } from '@neus/db';
+import type { ClusterAssignment } from '@neus/db';
 import { cosineSimilarity, jaccard } from './utils';
 import {
   logger,
@@ -19,13 +21,75 @@ export async function clusterRecentArticles() {
   logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
 
   const articles = await getUnclusteredArticles();
+  const existingClusters = await getRecentClustersWithEmbeddings();
 
-  const articleMap = new Map(articles.map((a) => [a.id, a]));
+  logPipelineSection(
+    PipelineStep.Cluster,
+    `Found ${articles.length} unclustered articles and ${existingClusters.length} recent clusters`
+  );
 
-  const edges = articles.flatMap((a, i) =>
+  // Step 1: Try to assign articles to existing clusters first (prevents duplicates)
+  const assignedToExisting: string[] = [];
+  const assignmentsToExisting: ClusterAssignment[] = [];
+
+  for (const article of articles) {
+    if (!Array.isArray(article.embedding)) continue;
+
+    // Find best matching existing cluster
+    let bestMatch: { clusterId: string; similarity: number } | null = null;
+
+    for (const cluster of existingClusters) {
+      if (!Array.isArray(cluster.embedding)) continue;
+
+      const similarity = cosineSimilarity(
+        article.embedding as number[],
+        cluster.embedding as number[]
+      );
+
+      if (similarity > SIMILARITY_THRESHOLD && (!bestMatch || similarity > bestMatch.similarity)) {
+        bestMatch = { clusterId: cluster.id, similarity };
+      }
+    }
+
+    if (bestMatch) {
+      assignmentsToExisting.push({
+        articleId: article.id,
+        clusterId: bestMatch.clusterId,
+        similarity: bestMatch.similarity,
+        method: 'embedding',
+      });
+      assignedToExisting.push(article.id);
+    }
+  }
+
+  // Create assignments to existing clusters
+  if (assignmentsToExisting.length > 0) {
+    await createArticleAssignments(assignmentsToExisting);
+    logPipelineSection(
+      PipelineStep.Cluster,
+      `Assigned ${assignmentsToExisting.length} articles to ${new Set(assignmentsToExisting.map((a) => a.clusterId)).size} existing clusters`
+    );
+  }
+
+  // Step 2: Cluster remaining articles among themselves
+  const remainingArticles = articles.filter((a) => !assignedToExisting.includes(a.id));
+
+  if (remainingArticles.length === 0) {
+    logPipelineSection(PipelineStep.Cluster, 'No remaining articles to cluster. Done.');
+    return;
+  }
+
+  logPipelineSection(
+    PipelineStep.Cluster,
+    `Clustering ${remainingArticles.length} remaining articles`
+  );
+
+  const articleMap = new Map(remainingArticles.map((a) => [a.id, a]));
+
+  const edges = remainingArticles.flatMap((a, i) =>
     !Array.isArray(a.embedding)
       ? []
-      : (articles
+      : (remainingArticles
           .slice(i + 1)
           .filter((b) => Array.isArray(b.embedding))
           .map((b) => {
@@ -39,7 +103,7 @@ export async function clusterRecentArticles() {
 
   const clustered = new Set<string>(); // Tracks all articles connected in a DFS cluster
   const clusters: string[][] = [];
-  articles.forEach((article) => {
+  remainingArticles.forEach((article) => {
     if (clustered.has(article.id)) return;
     const cluster: string[] = [];
     const stack: string[] = [article.id];
@@ -82,7 +146,7 @@ export async function clusterRecentArticles() {
   }
 
   if (ALLOW_SINGLE_ARTICLE_CLUSTERS) {
-    articles.forEach((article) => {
+    remainingArticles.forEach((article) => {
       if (!clustered.has(article.id) && !assignedArticles.has(article.id)) {
         assignedArticles.add(article.id);
         filteredClusters.push([article.id]);
