@@ -46,6 +46,51 @@ const feeds = [
     homepageUrl: 'https://www.itv.com/news',
     rssFeedUrl: 'https://www.itv.com/news/feeds/rss/uk/',
   },
+  {
+    name: 'Financial Times',
+    homepageUrl: 'https://www.ft.com',
+    rssFeedUrl: 'https://www.ft.com/?format=rss',
+  },
+  {
+    name: 'Daily Mail',
+    homepageUrl: 'https://www.dailymail.co.uk',
+    rssFeedUrl: 'https://www.dailymail.co.uk/news/index.rss',
+  },
+  {
+    name: 'The Telegraph',
+    homepageUrl: 'https://www.telegraph.co.uk',
+    rssFeedUrl: 'https://www.telegraph.co.uk/rss.xml',
+  },
+  {
+    name: 'Channel 4 News',
+    homepageUrl: 'https://www.channel4.com/news',
+    rssFeedUrl: 'https://www.channel4.com/news/feed',
+  },
+  {
+    name: 'Politico Europe',
+    homepageUrl: 'https://www.politico.eu',
+    rssFeedUrl: 'https://www.politico.eu/feed/',
+  },
+  {
+    name: 'UK Parliament',
+    homepageUrl: 'https://www.parliament.uk',
+    rssFeedUrl: 'https://www.parliament.uk/site-information/rss-feeds/',
+  },
+  {
+    name: 'Reuters',
+    homepageUrl: 'https://www.reuters.com',
+    rssFeedUrl: 'https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best',
+  },
+  {
+    name: 'AP News',
+    homepageUrl: 'https://apnews.com',
+    rssFeedUrl: 'https://apnews.com/rss',
+  },
+  {
+    name: 'Al Jazeera English',
+    homepageUrl: 'https://www.aljazeera.com',
+    rssFeedUrl: 'https://www.aljazeera.com/xml/rss/all.xml',
+  },
 ];
 
 async function main() {
