@@ -5,6 +5,7 @@ import {
   mutationType,
   stringArg,
   booleanArg,
+  intArg,
   nonNull,
 } from 'nexus';
 import {
@@ -68,7 +69,11 @@ const Query = queryType({
   definition(t) {
     t.list.field('clusters', {
       type: Cluster,
-      resolve: async () => getRankedClusters(),
+      args: {
+        limit: intArg(),
+        offset: intArg(),
+      },
+      resolve: async (_, { limit, offset }) => getRankedClusters(limit ?? undefined, offset ?? undefined),
     });
     t.field('cluster', {
       type: Cluster,

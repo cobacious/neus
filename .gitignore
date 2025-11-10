@@ -4,6 +4,8 @@ node_modules/
 /generated/prisma
 # pnpm
 .pnpm-debug.log*
+# npm (project uses pnpm)
+package-lock.json
 # Ignore all .env files in subfolders
 **/.env
 # Ignore all node_modules in subfolders (redundant, but safe)
