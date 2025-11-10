@@ -33,16 +33,28 @@ export default function ClusterDetailPage() {
 
   const cluster = result.data.cluster;
 
-  // Helper function to safely convert timestamps to dates
-  const toLocalDate = (timestamp: number | string | null | undefined): string => {
+  // Helper function to format relative dates
+  const formatRelativeDate = (timestamp: number | string | null | undefined): string => {
     if (!timestamp) return 'N/A';
     const date = new Date(Number(timestamp));
-    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+    if (isNaN(date.getTime())) return 'Invalid Date';
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
-  const firstSeen = toLocalDate(cluster.createdAt);
+  const firstSeen = formatRelativeDate(cluster.createdAt);
   const lastUpdated = cluster.lastUpdatedAt
-    ? toLocalDate(cluster.lastUpdatedAt)
+    ? formatRelativeDate(cluster.lastUpdatedAt)
     : firstSeen;
 
   // Sort articles by publishedAt (newest first)
@@ -73,8 +85,8 @@ export default function ClusterDetailPage() {
 
   return (
     <div className="bg-white shadow p-4 rounded">
-      <Link to="/" className="text-blue-600 underline">
-        Back to list
+      <Link to="/" className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium mb-4 transition-colors">
+        ← Back to list
       </Link>
 
       {cluster.archived && (
@@ -102,7 +114,7 @@ export default function ClusterDetailPage() {
         </div>
       )}
 
-      <h2 className="text-xl font-semibold my-3">{cluster.headline}</h2>
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 my-4">{cluster.headline}</h2>
       <div className="text-sm text-gray-500 mb-2">
         <span className="font-medium">First seen:</span> {firstSeen}
         {' • '}
@@ -118,7 +130,7 @@ export default function ClusterDetailPage() {
               <li key={article.id}>
                 <a
                   href={article.url}
-                  className="text-blue-600 underline"
+                  className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
