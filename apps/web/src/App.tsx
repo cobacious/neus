@@ -10,8 +10,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="max-w-3xl mx-auto">
-        <header className="my-6 px-4 py-4 flex items-center justify-between border-b border-gray-200 pb-6">
-          <h1 className="flex-1 flex justify-center">
+        <header className="my-6 px-4 py-4 border-b border-gray-200 pb-6 relative">
+          <h1 className="flex justify-center">
             <a href="/" className="block">
               <Logo className="h-10 lg:h-14 w-auto" />
               <span className="sr-only">Neus</span>
@@ -21,7 +21,7 @@ export default function App() {
             href="https://github.com/cobacious/neus"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-gray-500 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
             aria-label="View source on GitHub"
           >
             <GitHubIcon className="h-6 w-6" />
