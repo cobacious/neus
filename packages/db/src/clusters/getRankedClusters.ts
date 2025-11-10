@@ -1,6 +1,6 @@
 import { prisma } from '../client';
 
-export async function getRankedClusters() {
+export async function getRankedClusters(limit?: number, offset?: number) {
   return prisma.cluster.findMany({
     where: {
       AND: [
@@ -18,5 +18,7 @@ export async function getRankedClusters() {
       },
     },
     orderBy: { score: 'desc' },
+    ...(limit !== undefined && { take: limit }),
+    ...(offset !== undefined && { skip: offset }),
   });
 }
