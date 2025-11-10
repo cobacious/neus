@@ -33,15 +33,19 @@ export async function embedNewArticles() {
 
   let embedded = 0;
   for (const article of articlesToEmbed) {
-    if (!article.content) {
+    // Use content if available, otherwise fall back to snippet
+    const textToEmbed = article.content || article.snippet || article.title;
+
+    if (!textToEmbed || textToEmbed.trim().length === 0) {
       logPipelineSection(
         PipelineStep.Embed,
-        `Skipping (no content): ${article.title} (${article.url})`
+        `Skipping (no text): ${article.title} (${article.url})`
       );
       continue;
     }
+
     try {
-      const abridged = article.content.slice(0, MAX_EMBEDDING_CHARS);
+      const abridged = textToEmbed.slice(0, MAX_EMBEDDING_CHARS);
       const response = await openai.embeddings.create({
         model: EMBEDDING_MODEL,
         input: abridged,
