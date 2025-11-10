@@ -1,22 +1,28 @@
 import { prisma } from '../client';
 
 /**
- * Deletes clusters that have no article assignments.
+ * Archives clusters that have no article assignments instead of deleting them.
  *
  * Empty clusters can occur when:
  * - Articles are reassigned to different clusters
  * - Articles are deleted
  * - Clustering algorithm creates then abandons a cluster
  *
- * Returns the number of clusters deleted.
+ * Soft delete (archiving) preserves:
+ * - Historical URLs and SEO value
+ * - Ability to show "archived" message instead of 404
+ * - Data for analytics and debugging
+ *
+ * Returns the number of clusters archived.
  */
 export async function deleteEmptyClusters(): Promise<number> {
-  // Find clusters with no article assignments
+  // Find clusters with no article assignments that aren't already archived
   const emptyClusters = await prisma.cluster.findMany({
     where: {
       articleAssignments: {
         none: {},
       },
+      archived: false,
     },
     select: {
       id: true,
@@ -27,12 +33,15 @@ export async function deleteEmptyClusters(): Promise<number> {
     return 0;
   }
 
-  // Delete them
-  const result = await prisma.cluster.deleteMany({
+  // Archive them (soft delete)
+  const result = await prisma.cluster.updateMany({
     where: {
       id: {
         in: emptyClusters.map((c) => c.id),
       },
+    },
+    data: {
+      archived: true,
     },
   });
 

@@ -12,6 +12,7 @@ import {
   countClusters,
   getRankedClusters,
   getClusterById,
+  getClusterBySlug,
   getSources,
   createSource,
   updateSource,
@@ -22,9 +23,11 @@ const Cluster = objectType({
   definition(t) {
     t.string('id');
     t.nullable.string('headline');
+    t.nullable.string('slug');
     t.nullable.string('summary');
     t.string('origin');
     t.float('createdAt');
+    t.boolean('archived');
     t.float('score', {
       resolve: (cluster: { score?: number }) => cluster.score ?? 0,
     });
@@ -76,6 +79,11 @@ const Query = queryType({
       resolve: async (_, { limit, offset }) => getRankedClusters(limit ?? undefined, offset ?? undefined),
     });
     t.field('cluster', {
+      type: Cluster,
+      args: { slug: nonNull(stringArg()) },
+      resolve: async (_, { slug }) => getClusterBySlug(slug),
+    });
+    t.field('clusterById', {
       type: Cluster,
       args: { id: nonNull(stringArg()) },
       resolve: async (_, { id }) => getClusterById(id),
