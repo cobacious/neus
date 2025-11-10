@@ -9,6 +9,7 @@ export async function getRankedClusters(limit?: number, offset?: number) {
         { headline: { not: '' } },
         { summary: { not: null } },
         { summary: { not: '' } },
+        { archived: false },
       ],
     },
     include: {

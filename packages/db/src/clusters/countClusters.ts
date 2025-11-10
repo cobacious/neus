@@ -8,6 +8,7 @@ export async function countClusters() {
         { headline: { not: '' } },
         { summary: { not: null } },
         { summary: { not: '' } },
+        { archived: false },
       ],
     },
   });
