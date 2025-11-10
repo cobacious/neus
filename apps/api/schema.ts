@@ -27,6 +27,7 @@ const Cluster = objectType({
     t.nullable.string('summary');
     t.string('origin');
     t.float('createdAt');
+    t.boolean('archived');
     t.float('score', {
       resolve: (cluster: { score?: number }) => cluster.score ?? 0,
     });
@@ -81,6 +82,11 @@ const Query = queryType({
       type: Cluster,
       args: { slug: nonNull(stringArg()) },
       resolve: async (_, { slug }) => getClusterBySlug(slug),
+    });
+    t.field('clusterById', {
+      type: Cluster,
+      args: { id: nonNull(stringArg()) },
+      resolve: async (_, { id }) => getClusterById(id),
     });
     t.int('clusterCount', {
       resolve: async () => countClusters(),

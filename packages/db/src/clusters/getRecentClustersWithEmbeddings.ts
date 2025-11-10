@@ -20,6 +20,7 @@ export async function getRecentClustersWithEmbeddings(daysBack: number = 7) {
       embedding: {
         not: { equals: null },
       },
+      archived: false,
     },
     select: {
       id: true,

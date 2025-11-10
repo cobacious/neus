@@ -20,6 +20,9 @@ import { prisma } from '../client';
  */
 export async function getClustersForScoring() {
   return prisma.cluster.findMany({
+    where: {
+      archived: false,
+    },
     select: {
       id: true,
       articleAssignments: {

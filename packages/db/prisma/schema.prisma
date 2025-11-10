@@ -36,11 +36,13 @@ model Cluster {
   summary            String?
   embedding          Json?
   score              Float?                     @default(0)
+  archived           Boolean                    @default(false)
   articleAssignments ArticleClusterAssignment[]
 
   @@index([headline])
   @@index([score])
   @@index([summary])
+  @@index([archived])
 }
 
 model Source {
