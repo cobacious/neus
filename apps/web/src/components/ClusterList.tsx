@@ -34,6 +34,7 @@ export default function ClusterList() {
   const [result] = useQuery({
     query: CLUSTERS_QUERY,
     variables: { limit: CLUSTERS_PER_PAGE, offset },
+    requestPolicy: 'cache-and-network',
   });
 
   // Update displayed clusters when new data arrives
