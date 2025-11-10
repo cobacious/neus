@@ -26,8 +26,22 @@ const Cluster = objectType({
     t.nullable.string('slug');
     t.nullable.string('summary');
     t.string('origin');
-    t.float('createdAt');
+    t.float('createdAt', {
+      resolve: (cluster: any) => new Date(cluster.createdAt).getTime(),
+    });
     t.boolean('archived');
+    t.nullable.float('lastUpdatedAt', {
+      resolve: (cluster: any) => {
+        // Get the most recent article assignment date
+        if (!cluster.articleAssignments || cluster.articleAssignments.length === 0) {
+          return null;
+        }
+        const dates = cluster.articleAssignments
+          .map((assignment: any) => new Date(assignment.createdAt).getTime())
+          .filter((time: number) => !isNaN(time));
+        return dates.length > 0 ? Math.max(...dates) : null;
+      },
+    });
     t.float('score', {
       resolve: (cluster: { score?: number }) => cluster.score ?? 0,
     });
@@ -62,7 +76,9 @@ const ArticleSummary = objectType({
     t.string('url');
     t.string('title');
     t.string('source');
-    t.string('publishedAt');
+    t.string('publishedAt', {
+      resolve: (article: any) => new Date(article.publishedAt).toISOString(),
+    });
     t.nullable.string('author');
     t.field('sourceRel', { type: Source });
   },

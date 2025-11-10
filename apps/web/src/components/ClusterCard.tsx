@@ -18,12 +18,23 @@ interface Cluster {
   slug: string | null;
   summary: string;
   createdAt: string;
+  lastUpdatedAt?: string | null;
   origin: string;
   articles: Article[];
 }
 
 export default function ClusterCard({ cluster }: { cluster: Cluster }) {
-  const date = new Date(cluster.createdAt).toLocaleDateString();
+  // Helper function to safely convert timestamps to dates
+  const toLocalDate = (timestamp: number | string | null | undefined): string => {
+    if (!timestamp) return 'N/A';
+    const date = new Date(Number(timestamp));
+    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+  };
+
+  const firstSeen = toLocalDate(cluster.createdAt);
+  const lastUpdated = cluster.lastUpdatedAt
+    ? toLocalDate(cluster.lastUpdatedAt)
+    : firstSeen;
 
   const sourcesMap = new Map(cluster.articles.map((a) => [a.sourceRel.id, a.sourceRel]));
   const sources = Array.from(sourcesMap.values());
@@ -37,7 +48,11 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
     >
       <h2 className="text-xl font-semibold">{cluster.headline}</h2>
       <p className="text-gray-600 mb-2">{cluster.summary}</p>
-      <div className="text-sm text-gray-500 mb-2">{date} </div>
+      <div className="text-sm text-gray-500 mb-2">
+        <span className="font-medium">First seen:</span> {firstSeen}
+        {' • '}
+        <span className="font-medium">Last updated:</span> {lastUpdated}
+      </div>
       <div className="flex items-center space-x-1">
         {visible.map((source) => (
           <img

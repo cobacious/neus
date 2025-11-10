@@ -11,6 +11,7 @@ const CLUSTERS_QUERY = `
       slug
       summary
       createdAt
+      lastUpdatedAt
       origin
       articles {
         id

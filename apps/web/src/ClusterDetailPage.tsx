@@ -9,6 +9,7 @@ const CLUSTER_QUERY = `
       headline
       summary
       createdAt
+      lastUpdatedAt
       origin
       archived
       articles {
@@ -16,6 +17,7 @@ const CLUSTER_QUERY = `
         title
         source
         url
+        publishedAt
       }
     }
   }
@@ -30,7 +32,44 @@ export default function ClusterDetailPage() {
     return <p className="text-center">Error loading cluster</p>;
 
   const cluster = result.data.cluster;
-  const date = new Date(cluster.createdAt).toLocaleDateString();
+
+  // Helper function to safely convert timestamps to dates
+  const toLocalDate = (timestamp: number | string | null | undefined): string => {
+    if (!timestamp) return 'N/A';
+    const date = new Date(Number(timestamp));
+    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+  };
+
+  const firstSeen = toLocalDate(cluster.createdAt);
+  const lastUpdated = cluster.lastUpdatedAt
+    ? toLocalDate(cluster.lastUpdatedAt)
+    : firstSeen;
+
+  // Sort articles by publishedAt (newest first)
+  const sortedArticles = [...cluster.articles].sort((a, b) => {
+    const dateA = new Date(a.publishedAt).getTime();
+    const dateB = new Date(b.publishedAt).getTime();
+    // Handle invalid dates by putting them at the end
+    if (isNaN(dateA) && isNaN(dateB)) return 0;
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+    return dateB - dateA; // Descending order (newest first)
+  });
+
+  // Group articles by date
+  const articlesByDate: { [date: string]: any[] } = {};
+  sortedArticles.forEach((article) => {
+    const articleDate = new Date(article.publishedAt);
+    const date = isNaN(articleDate.getTime())
+      ? 'Unknown Date'
+      : articleDate.toLocaleDateString();
+    if (!articlesByDate[date]) {
+      articlesByDate[date] = [];
+    }
+    articlesByDate[date].push(article);
+  });
+
+  const dates = Object.keys(articlesByDate);
 
   return (
     <div className="bg-white shadow p-4 rounded">
@@ -64,22 +103,32 @@ export default function ClusterDetailPage() {
       )}
 
       <h2 className="text-xl font-semibold my-3">{cluster.headline}</h2>
-      <div className="text-sm text-gray-500">{date}</div>
+      <div className="text-sm text-gray-500 mb-2">
+        <span className="font-medium">First seen:</span> {firstSeen}
+        {' • '}
+        <span className="font-medium">Last updated:</span> {lastUpdated}
+      </div>
       <p className="text-gray-600 my-3">{cluster.summary}</p>
-      <ul className="list-inside space-y-3">
-        {cluster.articles.map((article: any) => (
-          <li key={article.id}>
-            <a
-              href={article.url}
-              className="text-blue-600 underline"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {`${article.title} | ${article.source}`}
-            </a>
-          </li>
-        ))}
-      </ul>
+
+      {dates.map((date) => (
+        <div key={date} className="mb-4">
+          <h3 className="font-semibold text-gray-700 mb-2">{date}</h3>
+          <ul className="list-inside space-y-2">
+            {articlesByDate[date].map((article: any) => (
+              <li key={article.id}>
+                <a
+                  href={article.url}
+                  className="text-blue-600 underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {`${article.title} | ${article.source}`}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
