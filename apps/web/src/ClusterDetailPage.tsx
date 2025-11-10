@@ -18,6 +18,11 @@ const CLUSTER_QUERY = `
         source
         url
         publishedAt
+        sourceRel {
+          id
+          name
+          faviconUrl
+        }
       }
     }
   }
@@ -33,16 +38,28 @@ export default function ClusterDetailPage() {
 
   const cluster = result.data.cluster;
 
-  // Helper function to safely convert timestamps to dates
-  const toLocalDate = (timestamp: number | string | null | undefined): string => {
+  // Helper function to format relative dates
+  const formatRelativeDate = (timestamp: number | string | null | undefined): string => {
     if (!timestamp) return 'N/A';
     const date = new Date(Number(timestamp));
-    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+    if (isNaN(date.getTime())) return 'Invalid Date';
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
-  const firstSeen = toLocalDate(cluster.createdAt);
+  const firstSeen = formatRelativeDate(cluster.createdAt);
   const lastUpdated = cluster.lastUpdatedAt
-    ? toLocalDate(cluster.lastUpdatedAt)
+    ? formatRelativeDate(cluster.lastUpdatedAt)
     : firstSeen;
 
   // Sort articles by publishedAt (newest first)
@@ -73,8 +90,8 @@ export default function ClusterDetailPage() {
 
   return (
     <div className="bg-white shadow p-4 rounded">
-      <Link to="/" className="text-blue-600 underline">
-        Back to list
+      <Link to="/" className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium mb-4 transition-colors">
+        ← Back to list
       </Link>
 
       {cluster.archived && (
@@ -102,7 +119,7 @@ export default function ClusterDetailPage() {
         </div>
       )}
 
-      <h2 className="text-xl font-semibold my-3">{cluster.headline}</h2>
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 my-4">{cluster.headline}</h2>
       <div className="text-sm text-gray-500 mb-2">
         <span className="font-medium">First seen:</span> {firstSeen}
         {' • '}
@@ -111,18 +128,32 @@ export default function ClusterDetailPage() {
       <p className="text-gray-600 my-3">{cluster.summary}</p>
 
       {dates.map((date) => (
-        <div key={date} className="mb-4">
-          <h3 className="font-semibold text-gray-700 mb-2">{date}</h3>
-          <ul className="list-inside space-y-2">
+        <div key={date} className="mb-6">
+          <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wide mb-3 pb-2 border-b border-gray-200">{date}</h3>
+          <ul className="space-y-3">
             {articlesByDate[date].map((article: any) => (
               <li key={article.id}>
                 <a
                   href={article.url}
-                  className="text-blue-600 underline"
+                  className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all group"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {`${article.title} | ${article.source}`}
+                  {article.sourceRel?.faviconUrl && (
+                    <img
+                      src={article.sourceRel.faviconUrl}
+                      alt={article.sourceRel.name}
+                      className="w-5 h-5 mt-0.5 flex-shrink-0 rounded-sm"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-gray-900 group-hover:text-blue-600 transition-colors font-medium">
+                      {article.title}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      {article.source}
+                    </div>
+                  </div>
                 </a>
               </li>
             ))}

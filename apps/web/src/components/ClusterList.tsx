@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from 'urql';
 import ClusterCard from './ClusterCard';
+import ClusterCardSkeleton from './ClusterCardSkeleton';
 import Loading from './Loading';
 
 const CLUSTERS_QUERY = `
@@ -63,7 +64,13 @@ export default function ClusterList() {
 
   // Initial loading state
   if (result.fetching && displayedClusters.length === 0) {
-    return <Loading />;
+    return (
+      <div className="space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <ClusterCardSkeleton key={i} />
+        ))}
+      </div>
+    );
   }
 
   if (result.error) {
@@ -80,11 +87,11 @@ export default function ClusterList() {
       ))}
 
       {hasMore && (
-        <div className="flex justify-center py-4">
+        <div className="pt-4 pb-8">
           <button
             onClick={handleLoadMore}
             disabled={result.fetching}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="w-full px-8 py-3 bg-white text-gray-900 rounded-lg font-medium hover:bg-gray-900 hover:text-white disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-all border border-gray-300 hover:border-gray-900 disabled:border-gray-200"
           >
             {result.fetching ? 'Loading...' : 'Load more'}
           </button>
