@@ -1,8 +1,8 @@
 export default function BetaBanner() {
   return (
-    <div className="bg-yellow-50 border-b border-yellow-300 px-5 py-3 mb-5 text-sm text-yellow-900">
-      <p>
-        <strong>Note:</strong> Neus is a personal prototype exploring AI-powered news clustering. It aims to neutralise media bias through AI-generated headlines and summaries. Expect limited sources and rough edges.
+    <div className="bg-blue-50 border border-blue-200 rounded-lg px-5 py-4 mb-6 text-sm">
+      <p className="text-blue-900">
+        <span className="font-semibold">About Neus:</span> A personal prototype exploring AI-powered news clustering to neutralise media bias through AI-generated headlines and summaries. Expect limited sources and rough edges.
       </p>
     </div>
   );
