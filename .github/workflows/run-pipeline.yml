@@ -4,9 +4,9 @@ on:
   # Manual trigger from GitHub UI
   workflow_dispatch:
 
-  # Scheduled run every 4 hours (6x daily)
+  # Scheduled run every 4 hours from 8am-8pm
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 8-20/4 * * *'
 
 jobs:
   run-pipeline:
