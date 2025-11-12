@@ -66,6 +66,10 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
         <span className="font-medium">Last updated:</span> {lastUpdated}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-600 font-medium">
+          {cluster.articles.length} {cluster.articles.length === 1 ? 'article' : 'articles'}
+        </span>
+        <span className="text-xs text-gray-500">•</span>
         <span className="text-xs text-gray-600 font-medium">Sources:</span>
         {visible.map((source) => (
           <img
