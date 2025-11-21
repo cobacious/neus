@@ -48,7 +48,7 @@ export default function Header() {
       {/* Sticky header - slides in from top after original is off screen */}
       <header
         className={`
-          fixed top-0 left-0 right-0 px-4 py-3 bg-white border-b border-gray-200 shadow-sm z-50
+          fixed top-0 left-0 right-0 px-4 py-2 bg-white border-b border-gray-200 shadow-sm z-50
           transition-transform duration-300 ease-out
           ${showStickyHeader ? 'translate-y-0' : '-translate-y-full'}
         `}
@@ -57,7 +57,7 @@ export default function Header() {
         <div className="max-w-3xl mx-auto flex items-center">
           <h1 className="flex">
             <a href="/" className="block">
-              <Logo className="h-8 w-auto" />
+              <Logo className="h-6 w-auto" />
               <span className="sr-only">Neus</span>
             </a>
           </h1>
@@ -65,11 +65,11 @@ export default function Header() {
             href="https://github.com/cobacious/neus"
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto text-gray-500 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
+            className="ml-auto text-gray-500 hover:text-gray-900 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
             aria-label="View source on GitHub"
             tabIndex={showStickyHeader ? 0 : -1}
           >
-            <GitHubIcon className="h-5 w-5" />
+            <GitHubIcon className="h-4 w-4" />
           </a>
         </div>
       </header>
