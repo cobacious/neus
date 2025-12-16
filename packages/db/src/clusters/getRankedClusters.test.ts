@@ -14,10 +14,36 @@ describe('getRankedClusters', () => {
     findMany.mockResolvedValue([]);
     await getRankedClusters();
     expect(findMany).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          { headline: { not: null } },
+          { headline: { not: '' } },
+          { summary: { not: null } },
+          { summary: { not: '' } },
+          { archived: false },
+        ],
+      },
       include: {
         articleAssignments: {
-          include: {
-            article: { include: { sourceRel: true } },
+          select: {
+            createdAt: true,
+            article: {
+              select: {
+                id: true,
+                url: true,
+                title: true,
+                source: true,
+                publishedAt: true,
+                author: true,
+                sourceRel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    faviconUrl: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

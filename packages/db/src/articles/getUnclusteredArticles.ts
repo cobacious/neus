@@ -25,6 +25,11 @@ export async function getUnclusteredArticles(daysBack: number = 3) {
         gte: cutoffDate,
       },
     },
+    select: {
+      id: true,
+      embedding: true,
+      createdAt: true,
+    },
     orderBy: {
       createdAt: 'desc',
     },
