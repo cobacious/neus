@@ -5,7 +5,7 @@ import { prisma } from '../client';
  *
  * Optimizations:
  * - Only fetches articles from the last 7 days (failed extractions don't retry forever)
- * - Limits to 100 articles per run to prevent slow accumulation
+ * - Limits articles per run if MAX_CONTENT_EXTRACTION is set (set to 0 for unlimited)
  * - Orders by createdAt DESC to prioritize newest articles
  *
  * This prevents the pipeline from retrying failed content extractions indefinitely
@@ -15,7 +15,11 @@ export async function getArticlesMissingContent() {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  return prisma.article.findMany({
+  const maxArticles = process.env.MAX_CONTENT_EXTRACTION
+    ? parseInt(process.env.MAX_CONTENT_EXTRACTION, 10)
+    : 0; // 0 = unlimited
+
+  const query: any = {
     where: {
       OR: [{ content: null }, { content: '' }],
       createdAt: {
@@ -25,6 +29,12 @@ export async function getArticlesMissingContent() {
     orderBy: {
       createdAt: 'desc',
     },
-    take: 100,
-  });
+  };
+
+  // Only add limit if configured
+  if (maxArticles > 0) {
+    query.take = maxArticles;
+  }
+
+  return prisma.article.findMany(query);
 }

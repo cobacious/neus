@@ -79,7 +79,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          TOKEN_LIMIT: 20000
+          # Pipeline limits (0 = unlimited)
+          MAX_EMBEDDINGS: 0
+          MAX_CONTENT_EXTRACTION: 0
+          TOKEN_LIMIT: 0
           NODE_ENV: production
 
       # Report pipeline completion

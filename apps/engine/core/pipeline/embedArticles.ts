@@ -13,7 +13,10 @@ import {
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const MAX_EMBEDDING_CHARS = 8192;
-const MAX_EMBEDDINGS_PER_RUN = 200; // Safety limit to prevent runaway costs (~$0.002/run)
+// Configurable via MAX_EMBEDDINGS env var. Set to 0 or omit for unlimited.
+const MAX_EMBEDDINGS_PER_RUN = process.env.MAX_EMBEDDINGS
+  ? parseInt(process.env.MAX_EMBEDDINGS, 10)
+  : 0; // 0 = unlimited
 
 export async function embedNewArticles() {
   logPipelineStep(PipelineStep.Embed, 'Embedding new articles...');
@@ -22,12 +25,13 @@ export async function embedNewArticles() {
 
   logPipelineSection(PipelineStep.Embed, `Found ${unembedded.length} unembedded articles`);
 
-  // Apply safety limit
-  const articlesToEmbed = unembedded.slice(0, MAX_EMBEDDINGS_PER_RUN);
-  if (unembedded.length > MAX_EMBEDDINGS_PER_RUN) {
+  // Apply limit if configured
+  const articlesToEmbed =
+    MAX_EMBEDDINGS_PER_RUN > 0 ? unembedded.slice(0, MAX_EMBEDDINGS_PER_RUN) : unembedded;
+  if (MAX_EMBEDDINGS_PER_RUN > 0 && unembedded.length > MAX_EMBEDDINGS_PER_RUN) {
     logPipelineSection(
       PipelineStep.Embed,
-      `Limiting to ${MAX_EMBEDDINGS_PER_RUN} articles to prevent excessive API costs`
+      `Limiting to ${MAX_EMBEDDINGS_PER_RUN} articles (set MAX_EMBEDDINGS=0 for unlimited)`
     );
   }
 
