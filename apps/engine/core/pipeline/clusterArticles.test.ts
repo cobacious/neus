@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 
 const mockDb = {
   getUnclusteredArticles: jest.fn(),
+  getRecentClustersWithEmbeddings: jest.fn(),
   createCluster: jest.fn(),
   createArticleAssignments: jest.fn(),
   updateClusterEmbedding: jest.fn(),
@@ -26,6 +27,7 @@ describe('clusterRecentArticles', () => {
       { id: 'a1', embedding: [1, 0] },
       { id: 'a2', embedding: [1, 0] },
     ]);
+    mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([]);
     mockDb.createCluster.mockResolvedValue({ id: 'c1' });
 
     await clusterRecentArticles();
@@ -47,6 +49,7 @@ describe('clusterRecentArticles', () => {
       { id: 'a1', embedding: [1, 0], clusterAssignments: [] },
       { id: 'a2', embedding: [1, 0], clusterAssignments: [{ clusterId: 'old' }] },
     ]);
+    mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([]);
     mockDb.createCluster.mockResolvedValue({ id: 'c1' });
 
     await clusterRecentArticles();

@@ -52,8 +52,10 @@ export async function summarizeClusters() {
       totalTokensUsed += usage;
       console.log(`Cluster ${cluster.id} used ${usage} tokens (total: ${totalTokensUsed})`);
 
-      if (process.env.TOKEN_LIMIT && totalTokensUsed > parseInt(process.env.TOKEN_LIMIT)) {
-        console.warn('Token cap reached. Aborting summarisation.');
+      // Check token limit if configured (0 or omitted = unlimited)
+      const tokenLimit = process.env.TOKEN_LIMIT ? parseInt(process.env.TOKEN_LIMIT, 10) : 0;
+      if (tokenLimit > 0 && totalTokensUsed > tokenLimit) {
+        console.warn(`Token limit (${tokenLimit}) reached. Aborting summarisation.`);
         break;
       }
 
