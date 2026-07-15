@@ -78,7 +78,9 @@ jobs:
         run: pnpm pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SUMMARY_MODEL: gemini-1.5-flash
           # Pipeline limits (0 = unlimited)
           MAX_EMBEDDINGS: 0
           MAX_CONTENT_EXTRACTION: 0

@@ -7,7 +7,11 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+});
+const SUMMARY_MODEL = process.env.SUMMARY_MODEL || 'gemini-1.5-flash';
 let totalTokensUsed = 0;
 
 export async function summarizeClusters() {
@@ -38,7 +42,7 @@ export async function summarizeClusters() {
 
     try {
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: SUMMARY_MODEL,
         messages: [
           { role: 'system', content: 'You are a helpful news editor.' },
           { role: 'user', content: prompt },

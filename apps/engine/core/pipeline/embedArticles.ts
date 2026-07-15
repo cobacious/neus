@@ -10,8 +10,11 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const EMBEDDING_MODEL = 'text-embedding-3-small';
+const openai = new OpenAI({
+  apiKey: process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+});
+const EMBEDDING_MODEL = 'text-embedding-004';
 const MAX_EMBEDDING_CHARS = 8192;
 // Configurable via MAX_EMBEDDINGS env var. Set to 0 or omit for unlimited.
 const MAX_EMBEDDINGS_PER_RUN = process.env.MAX_EMBEDDINGS
