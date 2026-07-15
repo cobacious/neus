@@ -7,11 +7,16 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 
-const openai = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-});
-const SUMMARY_MODEL = process.env.SUMMARY_MODEL || 'gemini-1.5-flash';
+const useGemini = !!process.env.GEMINI_API_KEY;
+const openai = useGemini
+  ? new OpenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    })
+  : new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+const SUMMARY_MODEL = process.env.SUMMARY_MODEL || (useGemini ? 'gemini-1.5-flash' : 'gpt-4o-mini');
 let totalTokensUsed = 0;
 
 export async function summarizeClusters() {
