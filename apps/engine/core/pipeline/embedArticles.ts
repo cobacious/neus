@@ -41,27 +41,12 @@ async function getGeminiEmbedding(apiKey: string, text: string): Promise<number[
   return data.embedding.values;
 }
 
-function getEmbeddingProvider() {
-  const useGemini = !!process.env.GEMINI_API_KEY;
-
-  if (useGemini) {
-    const apiKey = process.env.GEMINI_API_KEY!;
-    return {
-      provider: 'gemini (text-embedding-004)',
-      embed: (text: string) => getGeminiEmbedding(apiKey, text),
-    };
-  }
-
-  return {
-    provider: 'openai (text-embedding-3-small)',
-    embed: async (text: string) => {
-      const response = await openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: text,
-      });
-      return response.data[0].embedding as number[];
-    },
-  };
+async function getOpenAIEmbedding(text: string): Promise<number[]> {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: text,
+  });
+  return response.data[0].embedding as number[];
 }
 
 export async function embedNewArticles() {
@@ -71,14 +56,9 @@ export async function embedNewArticles() {
     ? parseInt(process.env.MAX_EMBEDDINGS, 10)
     : 0;
 
-  const { provider, embed } = getEmbeddingProvider();
-  logPipelineSection(PipelineStep.Embed, `Using ${provider} for embeddings`);
-
   const unembedded = await getUnembeddedArticles();
-
   logPipelineSection(PipelineStep.Embed, `Found ${unembedded.length} unembedded articles`);
 
-  // Apply limit if configured
   const articlesToEmbed =
     MAX_EMBEDDINGS_PER_RUN > 0 ? unembedded.slice(0, MAX_EMBEDDINGS_PER_RUN) : unembedded;
   if (MAX_EMBEDDINGS_PER_RUN > 0 && unembedded.length > MAX_EMBEDDINGS_PER_RUN) {
@@ -88,9 +68,11 @@ export async function embedNewArticles() {
     );
   }
 
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY || process.env.NODE_ENV === 'test';
+
   let embedded = 0;
   for (const article of articlesToEmbed) {
-    // Use content if available, otherwise fall back to snippet
     const textToEmbed = article.content || article.snippet || article.title;
 
     if (!textToEmbed || textToEmbed.trim().length === 0) {
@@ -101,16 +83,37 @@ export async function embedNewArticles() {
       continue;
     }
 
-    try {
-      const abridged = textToEmbed.slice(0, MAX_EMBEDDING_CHARS);
-      const embedding = await embed(abridged);
+    const abridged = textToEmbed.slice(0, MAX_EMBEDDING_CHARS);
+    let embedding: number[] | null = null;
+
+    // Try Gemini first if key is present
+    if (geminiKey) {
+      try {
+        embedding = await getGeminiEmbedding(geminiKey, abridged);
+      } catch (geminiErr: any) {
+        logger.warn(
+          `[${PipelineStep.Embed}] Gemini embedding failed for article ${article.id}, trying OpenAI fallback... Error: ${geminiErr.message || geminiErr}`
+        );
+      }
+    }
+
+    // Fallback to OpenAI if Gemini failed or key not present
+    if (!embedding && hasOpenAIKey) {
+      try {
+        embedding = await getOpenAIEmbedding(abridged);
+      } catch (openaiErr: any) {
+        logger.error(
+          `[${PipelineStep.Embed}] OpenAI embedding fallback failed for article ${article.id}:`,
+          openaiErr
+        );
+      }
+    }
+
+    if (embedding) {
       await updateArticleEmbedding(article.id, embedding);
       embedded++;
-    } catch (err) {
-      logger.error(
-        `[${PipelineStep.Embed}] Failed embedding: ${article.title} (${article.url})`,
-        err
-      );
+    } else {
+      logger.error(`[${PipelineStep.Embed}] Failed embedding for article ${article.id}`);
     }
   }
 
