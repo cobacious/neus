@@ -86,41 +86,52 @@ export async function clusterRecentArticles() {
 
   const articleMap = new Map(remainingArticles.map((a) => [a.id, a]));
 
-  const edges = remainingArticles.flatMap((a, i) =>
-    !Array.isArray(a.embedding)
-      ? []
-      : (remainingArticles
-          .slice(i + 1)
-          .filter((b) => Array.isArray(b.embedding))
-          .map((b) => {
-            const similarity = cosineSimilarity(a.embedding as number[], b.embedding as number[]);
-            return similarity > SIMILARITY_THRESHOLD
-              ? ([a.id as string, b.id as string, similarity] as [string, string, number])
-              : null;
-          })
-          .filter(Boolean) as [string, string, number][])
-  );
+  // Build Adjacency Map for fast O(1) neighbor lookup during DFS traversal
+  const adj = new Map<string, string[]>();
+  for (const a of remainingArticles) {
+    adj.set(a.id, []);
+  }
 
-  const clustered = new Set<string>(); // Tracks all articles connected in a DFS cluster
+  for (let i = 0; i < remainingArticles.length; i++) {
+    const a = remainingArticles[i];
+    if (!Array.isArray(a.embedding)) continue;
+    const embA = a.embedding as number[];
+
+    for (let j = i + 1; j < remainingArticles.length; j++) {
+      const b = remainingArticles[j];
+      if (!Array.isArray(b.embedding)) continue;
+      const embB = b.embedding as number[];
+
+      const similarity = cosineSimilarity(embA, embB);
+      if (similarity > SIMILARITY_THRESHOLD) {
+        adj.get(a.id)!.push(b.id);
+        adj.get(b.id)!.push(a.id);
+      }
+    }
+  }
+
+  // Fast linear DFS using adjacency map
+  const clustered = new Set<string>();
   const clusters: string[][] = [];
-  remainingArticles.forEach((article) => {
-    if (clustered.has(article.id)) return;
+  
+  for (const article of remainingArticles) {
+    if (clustered.has(article.id)) continue;
     const cluster: string[] = [];
     const stack: string[] = [article.id];
-    while (stack.length) {
+    while (stack.length > 0) {
       const current = stack.pop()!;
       if (clustered.has(current)) continue;
       clustered.add(current);
       cluster.push(current);
-      edges
-        .filter((e) => e[0] === current || e[1] === current)
-        .map((e) => (e[0] === current ? e[1] : e[0]))
-        .forEach((neighbor) => {
-          if (!clustered.has(neighbor)) stack.push(neighbor);
-        });
+      const neighbors = adj.get(current) || [];
+      for (const neighbor of neighbors) {
+        if (!clustered.has(neighbor)) {
+          stack.push(neighbor);
+        }
+      }
     }
     if (cluster.length > 0) clusters.push(cluster);
-  });
+  }
 
   const assignedArticles = new Set<string>();
   const filteredClusters: string[][] = [];
