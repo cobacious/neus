@@ -16,7 +16,9 @@ const openai = useGemini
   : new OpenAI({
       apiKey: process.env.OPENAI_API_KEY || 'mock-key',
     });
-const SUMMARY_MODEL = process.env.SUMMARY_MODEL || (useGemini ? 'gemini-1.5-flash' : 'gpt-4o-mini');
+
+const SUMMARY_MODEL =
+  process.env.SUMMARY_MODEL || (useGemini ? 'gemini-flash-latest' : 'gpt-4o-mini');
 let totalTokensUsed = 0;
 
 export async function summarizeClusters() {
