@@ -7,32 +7,20 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 
-function getSummarizeClient() {
-  const useGemini =
-    !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.startsWith('AIzaSy');
-  const openai = useGemini
-    ? new OpenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-      })
-    : new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-  const model =
-    process.env.SUMMARY_MODEL && useGemini
-      ? process.env.SUMMARY_MODEL
-      : useGemini
-        ? 'gemini-1.5-flash'
-        : 'gpt-4o-mini';
-  return { openai, model };
-}
-
+const useGemini = !!process.env.GEMINI_API_KEY;
+const openai = useGemini
+  ? new OpenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    })
+  : new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || 'mock-key',
+    });
+const SUMMARY_MODEL = process.env.SUMMARY_MODEL || (useGemini ? 'gemini-1.5-flash' : 'gpt-4o-mini');
 let totalTokensUsed = 0;
 
 export async function summarizeClusters() {
   logPipelineStep(PipelineStep.Summarise, 'Summarizing clusters...');
-
-  const { openai, model: SUMMARY_MODEL } = getSummarizeClient();
 
   const clusters = await getClustersToSummarize();
 

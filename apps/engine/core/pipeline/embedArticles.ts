@@ -10,22 +10,59 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 
-function getEmbeddingClient() {
-  // Prefer OpenAI for embeddings since Gemini OpenAI compatibility endpoint does not support text-embedding-004
-  const useOpenAI = !!process.env.OPENAI_API_KEY;
-  const openai = useOpenAI
-    ? new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      })
-    : new OpenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-      });
-  const model = useOpenAI ? 'text-embedding-3-small' : 'text-embedding-004';
-  return { openai, model };
+const MAX_EMBEDDING_CHARS = 8192;
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || 'mock-key',
+});
+
+async function getGeminiEmbedding(apiKey: string, text: string): Promise<number[]> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'models/text-embedding-004',
+      content: {
+        parts: [{ text }],
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
+  }
+
+  const data = (await res.json()) as { embedding?: { values?: number[] } };
+  if (!data.embedding?.values) {
+    throw new Error('Gemini embedding response missing values');
+  }
+  return data.embedding.values;
 }
 
-const MAX_EMBEDDING_CHARS = 8192;
+function getEmbeddingProvider() {
+  const useGemini = !!process.env.GEMINI_API_KEY;
+
+  if (useGemini) {
+    const apiKey = process.env.GEMINI_API_KEY!;
+    return {
+      provider: 'gemini (text-embedding-004)',
+      embed: (text: string) => getGeminiEmbedding(apiKey, text),
+    };
+  }
+
+  return {
+    provider: 'openai (text-embedding-3-small)',
+    embed: async (text: string) => {
+      const response = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: text,
+      });
+      return response.data[0].embedding as number[];
+    },
+  };
+}
 
 export async function embedNewArticles() {
   logPipelineStep(PipelineStep.Embed, 'Embedding new articles...');
@@ -34,7 +71,8 @@ export async function embedNewArticles() {
     ? parseInt(process.env.MAX_EMBEDDINGS, 10)
     : 0;
 
-  const { openai, model: EMBEDDING_MODEL } = getEmbeddingClient();
+  const { provider, embed } = getEmbeddingProvider();
+  logPipelineSection(PipelineStep.Embed, `Using ${provider} for embeddings`);
 
   const unembedded = await getUnembeddedArticles();
 
@@ -65,11 +103,7 @@ export async function embedNewArticles() {
 
     try {
       const abridged = textToEmbed.slice(0, MAX_EMBEDDING_CHARS);
-      const response = await openai.embeddings.create({
-        model: EMBEDDING_MODEL,
-        input: abridged,
-      });
-      const embedding = response.data[0].embedding as number[];
+      const embedding = await embed(abridged);
       await updateArticleEmbedding(article.id, embedding);
       embedded++;
     } catch (err) {
