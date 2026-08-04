@@ -1,6 +1,10 @@
-// dotenv loader for Neus engine
-// Loads .env file in this directory before running the rest of the pipeline
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load .env from engine directory and current working directory
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
 import { logger } from './lib/pipelineLogger';
 
 logger.info('Node env', process.env.NODE_ENV);

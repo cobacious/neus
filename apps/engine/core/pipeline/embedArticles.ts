@@ -10,24 +10,31 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 
-const useGemini = !!process.env.GEMINI_API_KEY;
-const openai = useGemini
-  ? new OpenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-    })
-  : new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-const EMBEDDING_MODEL = useGemini ? 'text-embedding-004' : 'text-embedding-3-small';
+function getEmbeddingClient() {
+  // Prefer OpenAI for embeddings since Gemini OpenAI compatibility endpoint does not support text-embedding-004
+  const useOpenAI = !!process.env.OPENAI_API_KEY;
+  const openai = useOpenAI
+    ? new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      })
+    : new OpenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      });
+  const model = useOpenAI ? 'text-embedding-3-small' : 'text-embedding-004';
+  return { openai, model };
+}
+
 const MAX_EMBEDDING_CHARS = 8192;
-// Configurable via MAX_EMBEDDINGS env var. Set to 0 or omit for unlimited.
-const MAX_EMBEDDINGS_PER_RUN = process.env.MAX_EMBEDDINGS
-  ? parseInt(process.env.MAX_EMBEDDINGS, 10)
-  : 0; // 0 = unlimited
 
 export async function embedNewArticles() {
   logPipelineStep(PipelineStep.Embed, 'Embedding new articles...');
+
+  const MAX_EMBEDDINGS_PER_RUN = process.env.MAX_EMBEDDINGS
+    ? parseInt(process.env.MAX_EMBEDDINGS, 10)
+    : 0;
+
+  const { openai, model: EMBEDDING_MODEL } = getEmbeddingClient();
 
   const unembedded = await getUnembeddedArticles();
 
