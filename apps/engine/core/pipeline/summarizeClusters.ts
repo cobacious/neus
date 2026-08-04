@@ -15,8 +15,16 @@ const openai = !useGemini
     })
   : null;
 
+function resolveGeminiSummaryModel(): string {
+  const envModel = process.env.SUMMARY_MODEL;
+  if (!envModel || envModel.includes('1.5') || envModel.includes('2.0') || envModel === 'gpt-4o-mini') {
+    return 'gemini-flash-latest';
+  }
+  return envModel;
+}
+
 async function getGeminiSummary(apiKey: string, prompt: string): Promise<{ headline: string; summary: string }> {
-  const modelName = process.env.SUMMARY_MODEL || 'gemini-flash-latest';
+  const modelName = resolveGeminiSummaryModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const res = await fetch(url, {
@@ -96,7 +104,7 @@ export async function summarizeClusters() {
   }
 
   const provider = useGemini
-    ? `gemini (${process.env.SUMMARY_MODEL || 'gemini-flash-latest'})`
+    ? `gemini (${resolveGeminiSummaryModel()})`
     : `openai (${process.env.SUMMARY_MODEL || 'gpt-4o-mini'})`;
   logPipelineSection(PipelineStep.Summarise, `Using ${provider} for summaries`);
 
