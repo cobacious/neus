@@ -17,12 +17,13 @@ const openai = new OpenAI({
 });
 
 async function getGeminiEmbedding(apiKey: string, text: string): Promise<number[]> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
+  const modelName = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'models/text-embedding-004',
+      model: `models/${modelName}`,
       content: {
         parts: [{ text }],
       },
