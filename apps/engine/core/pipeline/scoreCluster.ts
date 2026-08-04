@@ -11,15 +11,18 @@ export type ScorableCluster = {
 };
 
 const HOUR_MS = 1000 * 60 * 60;
+const HALF_LIFE_HOURS = 72; // 3-day half-life for exponential recency decay
 
-export function scoreCluster(cluster: ScorableCluster): number {
+export function scoreCluster(cluster: ScorableCluster, now: number = Date.now()): number {
   if (!cluster.articleAssignments || cluster.articleAssignments.length === 0) return 0;
 
   const latest = Math.max(
     ...cluster.articleAssignments.map((a) => a.article.publishedAt.getTime())
   );
-  const hoursSince = (Date.now() - latest) / HOUR_MS;
-  const recency = 1 / (1 + hoursSince);
+  const hoursSince = Math.max(0, (now - latest) / HOUR_MS);
+
+  // Exponential recency decay so older clusters decay smoothly towards 0
+  const recency = Math.exp(-hoursSince / HALF_LIFE_HOURS);
 
   const sourceIds = new Set(cluster.articleAssignments.map((a) => a.article.sourceId));
   const coverage = Math.sqrt(sourceIds.size);
@@ -27,8 +30,11 @@ export function scoreCluster(cluster: ScorableCluster): number {
   const trustScores = cluster.articleAssignments.map(
     (a) => a.article.sourceRel?.trustScore ?? 0
   );
-  const avgTrust = trustScores.reduce((sum, v) => sum + v, 0) / trustScores.length;
+  const avgTrust = trustScores.reduce((sum, v) => sum + v, 0) / (trustScores.length || 1);
 
-  const score = recency * 0.4 + coverage * 0.3 + avgTrust * 0.3;
-  return score;
+  // Base quality score combines source coverage breadth and source trust score
+  const baseScore = coverage * 0.5 + avgTrust * 0.5;
+
+  // Final score is base quality scaled by exponential recency decay
+  return baseScore * recency;
 }

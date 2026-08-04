@@ -149,18 +149,18 @@ neus/
 
 ## Scoring Algorithm
 
-Clusters are ranked using:
+Clusters are ranked using exponential recency decay applied to source coverage and trust:
 
 ```
-score = recency * 0.4 + coverage * 0.3 + trust * 0.3
+score = (coverage * 0.5 + trust * 0.5) * recencyDecay
 ```
 
 Where:
-- **Recency**: How recent the articles were published
-- **Coverage**: Number of distinct sources covering the story
+- **Recency Decay**: Exponential decay factor (`e^(-hoursSince / 72)` with a 3-day half-life) ensuring fresh stories always outrank stale stories from past runs
+- **Coverage**: Source breadth calculated as `sqrt(distinct_sources)`
 - **Trust**: Average trust score of sources (manually curated)
 
-No engagement metrics are considered - ranking is purely editorial.
+In addition, clusters older than 30 days are automatically archived (`archived: true`) by the pipeline, keeping the active news feed fresh while preserving permalinks for historical stories. No engagement metrics are considered - ranking is purely editorial.
 
 ## Screenshots
 
