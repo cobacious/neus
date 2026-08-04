@@ -13,7 +13,7 @@ import {
 const MAX_EMBEDDING_CHARS = 8192;
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || 'mock-key',
+  apiKey: process.env.OPENAI_API_KEY || 'mock-key',
 });
 
 async function getGeminiEmbedding(apiKey: string, text: string): Promise<number[]> {
@@ -71,6 +71,11 @@ export async function embedNewArticles() {
 
   const geminiKey = process.env.GEMINI_API_KEY;
   const hasOpenAIKey = !!process.env.OPENAI_API_KEY || process.env.NODE_ENV === 'test';
+
+  const provider = geminiKey
+    ? `gemini (${process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2'})`
+    : `openai (text-embedding-3-small)`;
+  logPipelineSection(PipelineStep.Embed, `Using ${provider} for embeddings`);
 
   let embedded = 0;
   for (const article of articlesToEmbed) {
