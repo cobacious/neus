@@ -8,6 +8,8 @@ import { scoreClusters } from './scoreClusters';
 import { summarizeClusters } from './summarizeClusters';
 import { cleanupEmptyClusters } from './cleanupEmptyClusters';
 import { archiveOldClusters } from './archiveOldClusters';
+import { pruneArchivedPayloads } from './pruneArchivedPayloads';
+import { purgeOldUnclusteredArticles } from './purgeOldUnclusteredArticles';
 import { resetPipelineLogger, logger } from '../../lib/pipelineLogger';
 
 export async function runPipeline() {
@@ -22,4 +24,6 @@ export async function runPipeline() {
   await summarizeClusters();
   await cleanupEmptyClusters();
   await archiveOldClusters();
+  await pruneArchivedPayloads();
+  await purgeOldUnclusteredArticles();
 }
