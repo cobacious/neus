@@ -29,8 +29,8 @@ Instead of sensationalized headlines and algorithmic rage-feeds, Neus groups rel
 - **Frontend**: React + TypeScript + Vite
 - **Backend API**: GraphQL (GraphQL Yoga)
 - **Engine**: Node.js pipeline for ingestion, embedding, and clustering
-- **Database**: PostgreSQL (hosted on Supabase)
-- **AI**: OpenAI embeddings (text-embedding-3-small) + GPT-4o-mini for summarization
+- **Database**: PostgreSQL (hosted on Neon)
+- **AI**: Google Gemini (gemini-embedding-2 & gemini-flash-latest, with OpenAI fallback)
 - **Deployment**: Vercel (frontend) + Railway (API)
 - **Monorepo**: pnpm workspaces
 
@@ -70,8 +70,8 @@ Uses Jaccard similarity to detect and filter near-duplicate clusters, preventing
 ### Prerequisites
 - Node.js 22+ (LTS)
 - pnpm 10+
-- PostgreSQL (or Supabase account)
-- OpenAI API key
+- PostgreSQL (or Neon account)
+- Google Gemini API key (or OpenAI API key)
 
 ### Setup
 
@@ -128,10 +128,9 @@ Visit `http://localhost:5173` (or whatever port Vite assigns)
 
 - **Frontend**: Deployed to Vercel from `apps/web`
 - **API**: Deployed to Railway from `apps/api`
-- **Database**: Hosted on Supabase (free tier)
-- **Pipeline**: Run manually as needed (cost-controlled)
+- **Database**: Hosted on Neon (free tier)
+- **Pipeline**: Automated via GitHub Actions (hourly during UK daytime/evening with overnight wire sweep)
 
-The pipeline is executed locally or via CI when data refresh is needed, typically 1-2 times per week.
 
 ## Project Structure
 

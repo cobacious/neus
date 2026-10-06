@@ -4,9 +4,12 @@ on:
   # Manual trigger from GitHub UI
   workflow_dispatch:
 
-  # Scheduled run once a week (Sundays at midnight)
+  # Scheduled runs:
+  # 1. Hourly during UK daytime & evening (06:17 to 22:17 UTC)
+  # 2. Overnight sweep at 03:17 UTC for international wire stories
   schedule:
-    - cron: '0 0 * * 0'
+    - cron: '17 6-22 * * *'
+    - cron: '17 3 * * *'
 
 jobs:
   run-pipeline:
@@ -76,18 +79,27 @@ jobs:
         run: pnpm pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SUMMARY_MODEL: gemini-1.5-flash
-          # Pipeline limits (0 = unlimited)
+          SUMMARY_MODEL: gemini-flash-latest
+          # Pipeline limits (0 = unlimited to process all incoming articles without backlog)
           MAX_EMBEDDINGS: 0
           MAX_CONTENT_EXTRACTION: 0
           TOKEN_LIMIT: 0
           NODE_ENV: production
 
-      # Report pipeline completion
-      - name: Pipeline Summary
+      # Report pipeline completion & send webhook alert if configured
+      - name: Pipeline Summary & Alert
         if: always()
         run: |
           echo "Pipeline completed with status: ${{ job.status }}"
           echo "Scheduled run time: $(date -u)"
+
+          # Optional webhook alert (e.g. Discord or Slack) on failure
+          if [ "${{ job.status }}" != "success" ] && [ -n "${{ secrets.ALERT_WEBHOOK_URL }}" ]; then
+            echo "Sending failure alert to configured webhook..."
+            curl -s -X POST -H 'Content-type: application/json' \
+              --data '{"text":"⚠️ [Neus Pipeline] Scheduled run failed! Check GitHub Actions logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
+              "${{ secrets.ALERT_WEBHOOK_URL }}" || true
+          fi

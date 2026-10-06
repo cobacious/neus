@@ -23,46 +23,65 @@ function resolveGeminiSummaryModel(): string {
   return envModel;
 }
 
-async function getGeminiSummary(apiKey: string, prompt: string): Promise<{ headline: string; summary: string }> {
+async function getGeminiSummaryWithRetry(
+  apiKey: string,
+  prompt: string,
+  maxRetries = 3
+): Promise<{ headline: string; summary: string }> {
   const modelName = resolveGeminiSummaryModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: 'You are a neutral news editor. Return JSON only with keys "headline" and "summary".' }],
-      },
-      contents: [
-        {
-          parts: [{ text: prompt }],
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: 'You are a neutral news editor. Return JSON only with keys "headline" and "summary".' }],
         },
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.4,
-        maxOutputTokens: 1024,
-      },
-    }),
-  });
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.4,
+          maxOutputTokens: 1024,
+        },
+      }),
+    });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Gemini summary API error (${res.status}): ${errorText}`);
+    if (res.status === 429) {
+      const backoffMs = Math.pow(2, attempt) * 2500;
+      logger.warn(
+        `[${PipelineStep.Summarise}] Gemini rate limit (429) on attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
+      );
+      if (process.env.NODE_ENV !== 'test') {
+        await new Promise((r) => setTimeout(r, backoffMs));
+      }
+      continue;
+    }
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Gemini summary API error (${res.status}): ${errorText}`);
+    }
+
+    const data = (await res.json()) as any;
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) {
+      throw new Error('Gemini summary response missing text');
+    }
+
+    const parsed = JSON.parse(content);
+    if (!parsed.headline || !parsed.summary) {
+      throw new Error('Gemini summary missing headline or summary field');
+    }
+    return { headline: parsed.headline, summary: parsed.summary };
   }
 
-  const data = (await res.json()) as any;
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!content) {
-    throw new Error('Gemini summary response missing text');
-  }
-
-  const parsed = JSON.parse(content);
-  if (!parsed.headline || !parsed.summary) {
-    throw new Error('Gemini summary missing headline or summary field');
-  }
-  return { headline: parsed.headline, summary: parsed.summary };
+  throw new Error(`Exhausted ${maxRetries} retries for Gemini summary`);
 }
 
 async function getOpenAISummary(prompt: string): Promise<{ headline: string; summary: string }> {
@@ -136,7 +155,10 @@ export async function summarizeClusters() {
     try {
       let result: { headline: string; summary: string };
       if (useGemini && geminiKey) {
-        result = await getGeminiSummary(geminiKey, prompt);
+        result = await getGeminiSummaryWithRetry(geminiKey, prompt);
+        if (process.env.NODE_ENV !== 'test') {
+          await new Promise((r) => setTimeout(r, 1200));
+        }
       } else {
         result = await getOpenAISummary(prompt);
       }

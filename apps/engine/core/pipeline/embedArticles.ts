@@ -16,30 +16,50 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'mock-key',
 });
 
-async function getGeminiEmbedding(apiKey: string, text: string): Promise<number[]> {
+async function getGeminiEmbeddingWithRetry(
+  apiKey: string,
+  text: string,
+  maxRetries = 3
+): Promise<number[]> {
   const modelName = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: `models/${modelName}`,
-      content: {
-        parts: [{ text }],
-      },
-    }),
-  });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: `models/${modelName}`,
+        content: {
+          parts: [{ text }],
+        },
+      }),
+    });
+
+    if (res.status === 429) {
+      const backoffMs = Math.pow(2, attempt) * 2000;
+      logger.warn(
+        `[${PipelineStep.Embed}] Gemini rate limit (429) on attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
+      );
+      if (process.env.NODE_ENV !== 'test') {
+        await new Promise((r) => setTimeout(r, backoffMs));
+      }
+      continue;
+    }
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
+    }
+
+    const data = (await res.json()) as { embedding?: { values?: number[] } };
+    if (!data.embedding?.values) {
+      throw new Error('Gemini embedding response missing values');
+    }
+    return data.embedding.values;
   }
 
-  const data = (await res.json()) as { embedding?: { values?: number[] } };
-  if (!data.embedding?.values) {
-    throw new Error('Gemini embedding response missing values');
-  }
-  return data.embedding.values;
+  throw new Error(`Exhausted ${maxRetries} retries for Gemini embedding`);
 }
 
 async function getOpenAIEmbedding(text: string): Promise<number[]> {
@@ -95,7 +115,10 @@ export async function embedNewArticles() {
     // Try Gemini first if key is present
     if (geminiKey) {
       try {
-        embedding = await getGeminiEmbedding(geminiKey, abridged);
+        embedding = await getGeminiEmbeddingWithRetry(geminiKey, abridged);
+        if (process.env.NODE_ENV !== 'test') {
+          await new Promise((r) => setTimeout(r, 1200));
+        }
       } catch (geminiErr: any) {
         logger.warn(
           `[${PipelineStep.Embed}] Gemini embedding failed for article ${article.id}, trying OpenAI fallback... Error: ${geminiErr.message || geminiErr}`
