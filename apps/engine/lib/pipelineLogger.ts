@@ -44,4 +44,27 @@ export function resetPipelineLogger() {
   step = 1;
 }
 
+/**
+ * Emits a GitHub Actions workflow annotation (visual banner in GitHub UI)
+ * while also logging to the Pino structured logger.
+ */
+export function emitWorkflowAnnotation(
+  level: 'warning' | 'error' | 'notice',
+  message: string,
+  title?: string
+) {
+  if (level === 'error') {
+    logger.error(message);
+  } else if (level === 'warning') {
+    logger.warn(message);
+  } else {
+    logger.info(message);
+  }
+
+  if (process.env.GITHUB_ACTIONS) {
+    const titleAttr = title ? ` title=${title}` : '';
+    process.stdout.write(`::${level}${titleAttr}::${message}\n`);
+  }
+}
+
 export { logger };
