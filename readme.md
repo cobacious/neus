@@ -68,8 +68,8 @@ Uses Jaccard similarity to detect and filter near-duplicate clusters, preventing
 ## Local Development
 
 ### Prerequisites
-- Node.js 18+
-- pnpm 8+
+- Node.js 22+ (LTS)
+- pnpm 10+
 - PostgreSQL (or Supabase account)
 - OpenAI API key
 
