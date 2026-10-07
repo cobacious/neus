@@ -1,6 +1,6 @@
 // storeArticles.ts
-// Store articles in the database, deduplicating by id (url)
-import { upsertArticle } from '@neus/db';
+// Store articles in the database only if they don't already exist or have changed
+import { syncArticles } from '@neus/db';
 import {
   logger,
   logPipelineStep,
@@ -11,37 +11,42 @@ import { RssArticle } from '../ingestion/articleIngestion';
 
 export async function storeArticles(articles: RssArticle[]) {
   logPipelineStep(PipelineStep.Store, 'Storing articles in the database...');
-  let stored = 0;
-  for (const article of articles) {
-    try {
+
+  const validArticles = articles
+    .filter((article) => {
       if (!article.url || !article.title) {
         logPipelineSection(
           PipelineStep.Store,
           `Skipping article with missing url or title:`,
           article
         );
-        continue;
+        return false;
       }
-      await upsertArticle({
-        url: article.url,
-        title: article.title,
-        source: article.source,
-        sourceId: article.sourceId!,
-        publishedAt: new Date(article.publishedAt),
-        updatedAt: article.updatedAt ? new Date(article.updatedAt) : undefined,
-        snippet: article.snippet,
-        content: article.content,
-        author: article.author,
-        categories: article.categories?.join(',') ?? undefined,
-      });
-      logger.debug(`[${PipelineStep.Store}] Upserted article: ${article.title} (${article.url})`);
-      stored++;
-    } catch (err) {
-      logger.warn(
-        `[${PipelineStep.Store}] Failed to upsert article: ${article.title} (${article.url})`,
-        err
-      );
-    }
+      return true;
+    })
+    .map((article) => ({
+      url: article.url,
+      title: article.title,
+      source: article.source,
+      sourceId: article.sourceId!,
+      publishedAt: new Date(article.publishedAt),
+      updatedAt: article.updatedAt ? new Date(article.updatedAt) : undefined,
+      snippet: article.snippet,
+      content: article.content,
+      author: article.author,
+      categories: article.categories?.join(',') ?? undefined,
+    }));
+
+  try {
+    const { created, updated, unchanged } = await syncArticles(validArticles);
+    logPipelineSection(
+      PipelineStep.Store,
+      `Article sync complete: ${created} new, ${updated} updated, ${unchanged} unchanged (skipped)`
+    );
+  } catch (err: any) {
+    logger.warn(
+      `[${PipelineStep.Store}] Failed to sync articles: ${err.message || err}`,
+      err
+    );
   }
-  logPipelineSection(PipelineStep.Store, `Stored/updated ${stored} articles in the database.`);
 }

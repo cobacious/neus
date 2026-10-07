@@ -36,8 +36,8 @@ export function logPipelineStep(label: PipelineStep, message: string) {
   step++;
 }
 
-export function logPipelineSection(label: PipelineStep, message: string, args?: any) {
-  logger.info(`[${label}] ${message}`, ...(args ?? []));
+export function logPipelineSection(label: PipelineStep, message: string, ...args: any[]) {
+  logger.info(`[${label}] ${message}`, ...args);
 }
 
 export function resetPipelineLogger() {

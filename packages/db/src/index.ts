@@ -6,6 +6,7 @@ export * from './articles/getUnembeddedArticles';
 export * from './articles/updateArticleContent';
 export * from './articles/updateArticleEmbedding';
 export * from './articles/upsertArticle';
+export * from './articles/syncArticles';
 export * from './clusters/countClusters';
 export * from './clusters/createArticleAssignments';
 export type { ClusterAssignment } from './clusters/createArticleAssignments';
