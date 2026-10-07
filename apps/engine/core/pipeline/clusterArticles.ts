@@ -113,6 +113,7 @@ export async function clusterRecentArticles() {
   // Fast linear DFS using adjacency map
   const clustered = new Set<string>();
   const clusters: string[][] = [];
+  const minClusterSize = ALLOW_SINGLE_ARTICLE_CLUSTERS ? 1 : 2;
   
   for (const article of remainingArticles) {
     if (clustered.has(article.id)) continue;
@@ -130,7 +131,7 @@ export async function clusterRecentArticles() {
         }
       }
     }
-    if (cluster.length > 0) clusters.push(cluster);
+    if (cluster.length >= minClusterSize) clusters.push(cluster);
   }
 
   const assignedArticles = new Set<string>();
@@ -140,7 +141,7 @@ export async function clusterRecentArticles() {
 
   for (const cluster of clusters) {
     const unique = cluster.filter((id) => !assignedArticles.has(id));
-    if (unique.length > 0) {
+    if (unique.length >= minClusterSize) {
       const isDuplicate = filteredClusters.some((existing) => jaccard(existing, unique) > 0.8);
       if (!isDuplicate) {
         unique.forEach((id) => assignedArticles.add(id));
@@ -158,7 +159,7 @@ export async function clusterRecentArticles() {
 
   if (ALLOW_SINGLE_ARTICLE_CLUSTERS) {
     remainingArticles.forEach((article) => {
-      if (!clustered.has(article.id) && !assignedArticles.has(article.id)) {
+      if (!assignedArticles.has(article.id)) {
         assignedArticles.add(article.id);
         filteredClusters.push([article.id]);
       }

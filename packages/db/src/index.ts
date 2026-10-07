@@ -29,5 +29,7 @@ export * from './sources/getActiveSources';
 export * from './sources/getSources';
 export * from './sources/createSource';
 export * from './sources/updateSource';
+export * from './clusters/disbandSingleArticleClusters';
+export * from './maintenance/vacuumDatabase';
 export * from './metrics/getDatabaseUsageMetrics';
 export type { Source, Cluster } from '@prisma/client';

@@ -7,9 +7,11 @@ import { clusterRecentArticles } from './clusterArticles';
 import { scoreClusters } from './scoreClusters';
 import { summarizeClusters } from './summarizeClusters';
 import { cleanupEmptyClusters } from './cleanupEmptyClusters';
+import { disbandSingleClusters } from './disbandSingleClusters';
 import { archiveOldClusters } from './archiveOldClusters';
 import { pruneArchivedPayloads } from './pruneArchivedPayloads';
 import { purgeOldUnclusteredArticles } from './purgeOldUnclusteredArticles';
+import { vacuumDb } from './vacuumDb';
 import { resetPipelineLogger, logger, PipelineStep, emitWorkflowAnnotation } from '../../lib/pipelineLogger';
 import fs from 'fs';
 
@@ -25,9 +27,11 @@ export async function runPipeline() {
   await scoreClusters();
   await summarizeClusters();
   await cleanupEmptyClusters();
+  await disbandSingleClusters();
   await archiveOldClusters();
   await pruneArchivedPayloads();
   await purgeOldUnclusteredArticles();
+  await vacuumDb();
 
   const durationSec = Math.round((Date.now() - startTime) / 1000);
   const metrics = await getDatabaseUsageMetrics();

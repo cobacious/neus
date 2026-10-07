@@ -62,4 +62,19 @@ describe('clusterRecentArticles', () => {
       ])
     );
   });
+
+  it('does not create clusters for isolated single articles when ALLOW_SINGLE_ARTICLE_CLUSTERS is false', async () => {
+    // Two articles with orthogonal embeddings (similarity = 0)
+    mockDb.getUnclusteredArticles.mockResolvedValue([
+      { id: 'a1', embedding: [1, 0, 0] },
+      { id: 'a2', embedding: [0, 1, 0] },
+    ]);
+    mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([]);
+
+    await clusterRecentArticles();
+
+    expect(mockDb.createCluster).not.toHaveBeenCalled();
+    expect(mockDb.createArticleAssignments).not.toHaveBeenCalled();
+    expect(mockDb.updateClusterEmbedding).not.toHaveBeenCalled();
+  });
 });
