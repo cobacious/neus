@@ -25,6 +25,13 @@ export async function getArticlesMissingContent() {
       createdAt: {
         gte: sevenDaysAgo,
       },
+      clusterAssignments: {
+        none: {
+          cluster: {
+            archived: true,
+          },
+        },
+      },
     },
     orderBy: {
       createdAt: 'desc',
