@@ -5,11 +5,10 @@ on:
   workflow_dispatch:
 
   # Scheduled runs:
-  # 1. Hourly during UK daytime & evening (06:17 to 22:17 UTC)
-  # 2. Overnight sweep at 03:17 UTC for international wire stories
+  # Combines overnight sweep (03:17 UTC) and daytime hourly runs (06:17 to 22:17 UTC)
+  # into a single standard POSIX cron expression to avoid multi-cron parser quirks in GitHub Actions.
   schedule:
-    - cron: '17 6-22 * * *'
-    - cron: '17 3 * * *'
+    - cron: '17 3,6-22 * * *'
 
 jobs:
   run-pipeline:
