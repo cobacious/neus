@@ -4,11 +4,9 @@ on:
   # Manual trigger from GitHub UI
   workflow_dispatch:
 
-  # Scheduled runs:
-  # Combines overnight sweep (03:17 UTC) and daytime hourly runs (06:17 to 22:17 UTC)
-  # into a single standard POSIX cron expression to avoid multi-cron parser quirks in GitHub Actions.
+  # Scheduled runs: Hourly at 17 minutes past every hour (24/7)
   schedule:
-    - cron: '17 3,6-22 * * *'
+    - cron: '17 * * * *'
 
 jobs:
   run-pipeline:
