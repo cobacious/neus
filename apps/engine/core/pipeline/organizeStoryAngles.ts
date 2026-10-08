@@ -49,7 +49,8 @@ export type NeighborhoodStory = {
 
 export type NeighborhoodEvaluation = {
   merges: NeighborhoodMerge[];
-  story: NeighborhoodStory | null;
+  stories?: NeighborhoodStory[];
+  story?: NeighborhoodStory | null;
 };
 
 export type CandidateStory = {
@@ -77,7 +78,8 @@ export type ClusterWithEmbedding = {
  */
 export function buildNeighborhoods<T extends ClusterWithEmbedding>(
   clusters: T[],
-  similarityThreshold: number = 0.78
+  similarityThreshold: number = 0.78,
+  maxNeighborhoodSize: number = 6
 ): T[][] {
   const validClusters = clusters.filter(
     (c) => Array.isArray(c.embedding) && (c.embedding as number[]).length > 0
@@ -124,7 +126,24 @@ export function buildNeighborhoods<T extends ClusterWithEmbedding>(
     }
 
     if (componentIndices.length >= 2) {
-      neighborhoods.push(componentIndices.map((idx) => validClusters[idx]));
+      const component = componentIndices.map((idx) => validClusters[idx]);
+      if (component.length > maxNeighborhoodSize && similarityThreshold < 0.86) {
+        // Tighten similarity threshold to break transitive chaining across distinct stories
+        const subComponents = buildNeighborhoods(
+          component,
+          similarityThreshold + 0.04,
+          maxNeighborhoodSize
+        );
+        neighborhoods.push(...subComponents);
+      } else if (component.length > maxNeighborhoodSize) {
+        // Slice into chunks of maxNeighborhoodSize
+        for (let s = 0; s < component.length; s += maxNeighborhoodSize) {
+          const chunk = component.slice(s, s + maxNeighborhoodSize);
+          if (chunk.length >= 2) neighborhoods.push(chunk);
+        }
+      } else {
+        neighborhoods.push(component);
+      }
     }
   }
 
@@ -262,18 +281,20 @@ Return JSON with this exact schema:
       "sourceClusterIds": string[]
     }
   ],
-  "story": {
-    "existingStoryId": string | null,
-    "storyTitle": string,
-    "status": "breaking" | "developing",
-    "overview": string,
-    "angles": [
-      {
-        "clusterId": string,
-        "angle": string
-      }
-    ]
-  } | null
+  "stories": [
+    {
+      "existingStoryId": string | null,
+      "storyTitle": string,
+      "status": "breaking" | "developing",
+      "overview": string,
+      "angles": [
+        {
+          "clusterId": string,
+          "angle": string
+        }
+      ]
+    }
+  ]
 }
 `;
 
@@ -290,6 +311,47 @@ Return JSON with this exact schema:
           responseMimeType: 'application/json',
           temperature: 0.1,
           maxOutputTokens: 4096,
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              merges: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    targetClusterId: { type: 'STRING' },
+                    sourceClusterIds: { type: 'ARRAY', items: { type: 'STRING' } },
+                  },
+                  required: ['targetClusterId', 'sourceClusterIds'],
+                },
+              },
+              stories: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    existingStoryId: { type: 'STRING', nullable: true },
+                    storyTitle: { type: 'STRING' },
+                    status: { type: 'STRING', enum: ['breaking', 'developing'] },
+                    overview: { type: 'STRING' },
+                    angles: {
+                      type: 'ARRAY',
+                      items: {
+                        type: 'OBJECT',
+                        properties: {
+                          clusterId: { type: 'STRING' },
+                          angle: { type: 'STRING' },
+                        },
+                        required: ['clusterId', 'angle'],
+                      },
+                    },
+                  },
+                  required: ['storyTitle', 'status', 'overview', 'angles'],
+                },
+              },
+            },
+            required: ['merges', 'stories'],
+          },
         },
       }),
     });
@@ -460,35 +522,41 @@ export async function organizeStoryAngles() {
     }
 
     // 2. Process story grouping & reactivation
-    if (evalResult.story && Array.isArray(evalResult.story.angles)) {
-      const survivingAngles = evalResult.story.angles.filter(
-        (a) => !mergedSourceIds.has(a.clusterId) && neighborhoodClusterIds.has(a.clusterId)
-      );
+    const storiesToSync =
+      evalResult.stories ||
+      (evalResult.story ? [evalResult.story] : []);
 
-      if (survivingAngles.length >= 2) {
-        const survivingClusters = neighborhood.filter((c) =>
-          survivingAngles.some((a) => a.clusterId === c.id)
+    for (const storyItem of storiesToSync) {
+      if (Array.isArray(storyItem.angles)) {
+        const survivingAngles = storyItem.angles.filter(
+          (a) => !mergedSourceIds.has(a.clusterId) && neighborhoodClusterIds.has(a.clusterId)
         );
-        const storyEmbedding = computeCentroidEmbedding(survivingClusters);
 
-        const targetStoryId =
-          evalResult.story.existingStoryId ||
-          neighborhood.find((c) => c.storyId)?.storyId;
+        if (survivingAngles.length >= 2) {
+          const survivingClusters = neighborhood.filter((c) =>
+            survivingAngles.some((a) => a.clusterId === c.id)
+          );
+          const storyEmbedding = computeCentroidEmbedding(survivingClusters);
 
-        await syncStoryWithAngles({
-          existingStoryId: targetStoryId || undefined,
-          storyTitle: evalResult.story.storyTitle,
-          status: evalResult.story.status || 'developing',
-          overview: evalResult.story.overview,
-          embedding: storyEmbedding,
-          angles: survivingAngles,
-        });
-        totalStoriesSynced++;
-        logger.info(
-          `[${PipelineStep.Cluster}] Grouped ${survivingAngles.length} angles under story: "${evalResult.story.storyTitle}"${
-            targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
-          }`
-        );
+          const targetStoryId =
+            storyItem.existingStoryId ||
+            neighborhood.find((c) => c.storyId)?.storyId;
+
+          await syncStoryWithAngles({
+            existingStoryId: targetStoryId || undefined,
+            storyTitle: storyItem.storyTitle,
+            status: storyItem.status || 'developing',
+            overview: storyItem.overview,
+            embedding: storyEmbedding,
+            angles: survivingAngles,
+          });
+          totalStoriesSynced++;
+          logger.info(
+            `[${PipelineStep.Cluster}] Grouped ${survivingAngles.length} angles under story: "${storyItem.storyTitle}"${
+              targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
+            }`
+          );
+        }
       }
     }
   }
