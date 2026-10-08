@@ -35,13 +35,40 @@ describe('getStoryWithClusters', () => {
 
     const res = await getStoryById('s1');
     expect(res?.id).toBe('s1');
-    expect(mockPrisma.story.findUnique).toHaveBeenCalledWith({
-      where: { id: 's1' },
-      include: {
-        clusters: {
-          orderBy: { createdAt: 'asc' },
+    const expectedInclude = {
+      clusters: {
+        where: { archived: false },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          articleAssignments: {
+            select: {
+              createdAt: true,
+              article: {
+                select: {
+                  id: true,
+                  url: true,
+                  title: true,
+                  source: true,
+                  publishedAt: true,
+                  author: true,
+                  sourceRel: {
+                    select: {
+                      id: true,
+                      name: true,
+                      faviconUrl: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
+    };
+
+    expect(mockPrisma.story.findUnique).toHaveBeenCalledWith({
+      where: { id: 's1' },
+      include: expectedInclude,
     });
   });
 
@@ -57,7 +84,32 @@ describe('getStoryWithClusters', () => {
       where: { slug: 'story-1' },
       include: {
         clusters: {
+          where: { archived: false },
           orderBy: { createdAt: 'asc' },
+          include: {
+            articleAssignments: {
+              select: {
+                createdAt: true,
+                article: {
+                  select: {
+                    id: true,
+                    url: true,
+                    title: true,
+                    source: true,
+                    publishedAt: true,
+                    author: true,
+                    sourceRel: {
+                      select: {
+                        id: true,
+                        name: true,
+                        faviconUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
@@ -80,7 +132,32 @@ describe('getStoryWithClusters', () => {
         story: {
           include: {
             clusters: {
+              where: { archived: false },
               orderBy: { createdAt: 'asc' },
+              include: {
+                articleAssignments: {
+                  select: {
+                    createdAt: true,
+                    article: {
+                      select: {
+                        id: true,
+                        url: true,
+                        title: true,
+                        source: true,
+                        publishedAt: true,
+                        author: true,
+                        sourceRel: {
+                          select: {
+                            id: true,
+                            name: true,
+                            faviconUrl: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
