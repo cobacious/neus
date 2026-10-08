@@ -95,14 +95,13 @@ describe('syncStoryWithAngles', () => {
       id: 'existing-story-id',
       title: 'Updated Story Title',
       overview: 'Updated overview',
-      status: 'evolving',
+      status: 'developing',
     } as any);
 
     (mockPrisma.cluster.update as jest.Mock).mockResolvedValue({} as any);
 
     const result = await syncStoryWithAngles({
       storyTitle: 'Updated Story Title',
-      status: 'evolving',
       overview: 'Updated overview',
       angles: [
         { clusterId: 'c1', angle: 'The Attempt' },
@@ -117,7 +116,7 @@ describe('syncStoryWithAngles', () => {
       data: {
         title: 'Updated Story Title',
         overview: 'Updated overview',
-        status: 'evolving',
+        status: 'developing',
       },
     });
     expect(mockPrisma.story.create).not.toHaveBeenCalled();
@@ -127,5 +126,35 @@ describe('syncStoryWithAngles', () => {
       where: { id: 'c3' },
       data: { storyId: 'existing-story-id', storyAngle: 'Hospital Recovery' },
     });
+  });
+
+  it('updates an existing story when existingStoryId is explicitly provided with embedding', async () => {
+    (mockPrisma.story.update as jest.Mock).mockResolvedValue({
+      id: 'dormant-story-id',
+      title: 'Reactivated Story',
+      status: 'developing',
+    } as any);
+
+    (mockPrisma.cluster.update as jest.Mock).mockResolvedValue({} as any);
+
+    const result = await syncStoryWithAngles({
+      existingStoryId: 'dormant-story-id',
+      storyTitle: 'Reactivated Story',
+      status: 'developing',
+      embedding: [0.1, 0.2],
+      angles: [{ clusterId: 'c9', angle: 'New Angle' }],
+    });
+
+    expect(result?.id).toBe('dormant-story-id');
+    expect(mockPrisma.story.update).toHaveBeenCalledWith({
+      where: { id: 'dormant-story-id' },
+      data: {
+        title: 'Reactivated Story',
+        overview: undefined,
+        status: 'developing',
+        embedding: [0.1, 0.2],
+      },
+    });
+    expect(mockPrisma.cluster.findMany).not.toHaveBeenCalled();
   });
 });

@@ -31,7 +31,8 @@ model Story {
   title     String
   slug      String    @unique
   overview  String?
-  status    String    @default("evolving")
+  status    String    @default("developing")
+  embedding Json?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   clusters  Cluster[]

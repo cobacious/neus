@@ -36,6 +36,8 @@ export * from './stories/syncStoryWithAngles';
 export type { StoryInput, StoryAngleInput } from './stories/syncStoryWithAngles';
 export * from './stories/getStoryWithClusters';
 export * from './stories/getActiveClustersForStories';
+export * from './stories/markDormantStories';
+export * from './stories/getStoriesForMatching';
 export * from './maintenance/vacuumDatabase';
 export * from './metrics/getDatabaseUsageMetrics';
 export type { Source, Cluster, Story } from '@prisma/client';
