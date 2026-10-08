@@ -282,11 +282,6 @@ export default function ClusterDetailPage() {
                       >
                         {angleName}
                       </span>
-                      {c.id === cluster.id && (
-                        <span className="text-[11px] text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200 font-medium">
-                          Viewing Angle
-                        </span>
-                      )}
                     </div>
                     <span className="text-xs text-gray-500 font-medium">
                       {angleArticles.length} {angleArticles.length === 1 ? 'article' : 'articles'}
