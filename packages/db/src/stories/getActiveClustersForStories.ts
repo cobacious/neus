@@ -3,9 +3,9 @@ import { prisma } from '../client';
 /**
  * Fetches active, summarized clusters from the past N days to evaluate for multi-angle story grouping.
  *
- * @param daysBack - Number of days to look back (default: 7)
+ * @param daysBack - Number of days to look back (default: 30)
  */
-export async function getActiveClustersForStories(daysBack: number = 7) {
+export async function getActiveClustersForStories(daysBack: number = 30) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysBack);
 

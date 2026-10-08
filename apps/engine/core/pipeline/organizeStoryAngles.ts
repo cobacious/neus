@@ -3,6 +3,8 @@ import {
   getActiveClustersForStories,
   syncStoryWithAngles,
   mergeClusters,
+  getStoriesForMatching,
+  markDormantStories,
 } from '@neus/db';
 import type { StoryInput } from '@neus/db';
 import { cosineSimilarity } from './utils';
@@ -35,8 +37,9 @@ export type NeighborhoodMerge = {
 };
 
 export type NeighborhoodStory = {
+  existingStoryId?: string | null;
   storyTitle: string;
-  status: 'breaking' | 'evolving' | 'developing';
+  status: 'breaking' | 'developing' | 'dormant';
   overview: string;
   angles: Array<{
     clusterId: string;
@@ -49,11 +52,20 @@ export type NeighborhoodEvaluation = {
   story: NeighborhoodStory | null;
 };
 
+export type CandidateStory = {
+  id: string;
+  title: string;
+  status: string;
+  overview: string | null;
+};
+
 export type ClusterWithEmbedding = {
   id: string;
   headline?: string | null;
   summary?: string | null;
   createdAt: Date;
+  storyId?: string | null;
+  storyAngle?: string | null;
   embedding?: unknown;
   _count?: { articleAssignments: number };
   [key: string]: any;
@@ -119,6 +131,80 @@ export function buildNeighborhoods<T extends ClusterWithEmbedding>(
   return neighborhoods;
 }
 
+export function computeCentroidEmbedding(clusters: ClusterWithEmbedding[]): number[] | null {
+  const validEmbeddings = clusters
+    .map((c) => c.embedding)
+    .filter((e): e is number[] => Array.isArray(e) && e.length > 0);
+
+  if (validEmbeddings.length === 0) return null;
+
+  const dim = validEmbeddings[0].length;
+  const centroid = new Array(dim).fill(0);
+
+  for (const emb of validEmbeddings) {
+    for (let i = 0; i < dim; i++) {
+      centroid[i] += emb[i];
+    }
+  }
+
+  for (let i = 0; i < dim; i++) {
+    centroid[i] /= validEmbeddings.length;
+  }
+
+  return centroid;
+}
+
+export function findCandidateStoriesForNeighborhood(
+  neighborhood: ClusterWithEmbedding[],
+  existingStories: Array<{
+    id: string;
+    title: string;
+    status: string;
+    overview: string | null;
+    embedding?: unknown;
+  }>
+): CandidateStory[] {
+  const candidateMap = new Map<string, CandidateStory>();
+
+  // 1. Check if any cluster in neighborhood already belongs to a story
+  for (const c of neighborhood) {
+    if (c.storyId) {
+      const match = existingStories.find((s) => s.id === c.storyId);
+      if (match) {
+        candidateMap.set(match.id, {
+          id: match.id,
+          title: match.title,
+          status: match.status,
+          overview: match.overview,
+        });
+      }
+    }
+  }
+
+  // 2. Vector search: check if any cluster centroid has cosine similarity >= 0.74 with an existing story embedding
+  for (const story of existingStories) {
+    if (candidateMap.has(story.id)) continue;
+    if (!Array.isArray(story.embedding) || (story.embedding as number[]).length === 0) continue;
+
+    for (const c of neighborhood) {
+      if (Array.isArray(c.embedding) && (c.embedding as number[]).length > 0) {
+        const sim = cosineSimilarity(c.embedding as number[], story.embedding as number[]);
+        if (sim >= 0.74) {
+          candidateMap.set(story.id, {
+            id: story.id,
+            title: story.title,
+            status: story.status,
+            overview: story.overview,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  return Array.from(candidateMap.values());
+}
+
 function cleanJsonResponse<T>(text: string): T {
   const cleaned = text
     .trim()
@@ -132,6 +218,7 @@ function cleanJsonResponse<T>(text: string): T {
 async function evaluateNeighborhoodWithGemini(
   apiKey: string,
   clusters: Array<{ id: string; headline: string | null; summary: string | null; date: string; articleCount?: number }>,
+  candidateStories?: CandidateStory[],
   maxRetries = 3
 ): Promise<NeighborhoodEvaluation> {
   const modelName = resolveGeminiModel();
@@ -150,14 +237,23 @@ Analyze these clusters and determine:
    - "sourceClusterIds" are the duplicate clusters that will be absorbed into target and deleted.
 2. STORY (Multi-angle saga): After accounting for any merges, do 2 or more distinct remaining clusters represent DIFFERENT ANGLES, chronological developments, or sub-stories of the SAME overarching news saga?
    - If yes, provide:
+     - "existingStoryId": If this saga matches or develops an EXISTING STORY listed in the CANDIDATE STORIES below, specify its id. Otherwise null.
      - "storyTitle": A concise, neutral title for the overarching saga.
-     - "status": One of "breaking" (first 24-48h), "evolving" (active developments over days), or "developing" (ongoing legal/political aftermath).
+     - "status": One of "breaking" (first 24-48h of fast-moving breaking news) or "developing" (active ongoing developments/fallout over days/weeks).
      - "overview": A neutral 2-sentence macro-summary synthesizing the whole saga across all its angles.
      - "angles": Array of member clusters with:
        - "clusterId": The cluster id (must NOT be a merged source cluster)
        - "angle": A 2-5 word description of this cluster's specific angle/development (e.g. "Hospital Awakening", "Warden Resignation", "Legal Inquiry").
    - If no (e.g., they are all duplicates of a single event, or they are unrelated events that share coincidental keywords), return null for "story".
-
+${
+  candidateStories && candidateStories.length > 0
+    ? `\nCANDIDATE STORIES IN DATABASE (active or dormant sagas that may match this neighborhood):\n${JSON.stringify(
+        candidateStories,
+        null,
+        2
+      )}\n`
+    : ''
+}
 Return JSON with this exact schema:
 {
   "merges": [
@@ -167,8 +263,9 @@ Return JSON with this exact schema:
     }
   ],
   "story": {
+    "existingStoryId": string | null,
     "storyTitle": string,
-    "status": "breaking" | "evolving" | "developing",
+    "status": "breaking" | "developing",
     "overview": string,
     "angles": [
       {
@@ -235,10 +332,15 @@ Return JSON with this exact schema:
 }
 
 async function evaluateNeighborhoodWithOpenAI(
-  clusters: Array<{ id: string; headline: string | null; summary: string | null; date: string; articleCount?: number }>
+  clusters: Array<{ id: string; headline: string | null; summary: string | null; date: string; articleCount?: number }>,
+  candidateStories?: CandidateStory[]
 ): Promise<NeighborhoodEvaluation> {
   const model = process.env.SUMMARY_MODEL || 'gpt-4o-mini';
-  const prompt = `Analyze this candidate neighborhood of clusters. Identify any duplicate clusters to merge, and whether distinct remaining clusters form a multi-angle story:\n${JSON.stringify(clusters, null, 2)}`;
+  const prompt = `Analyze this candidate neighborhood of clusters. Identify any duplicate clusters to merge, and whether distinct remaining clusters form a multi-angle story:\n${JSON.stringify(clusters, null, 2)}${
+    candidateStories && candidateStories.length > 0
+      ? `\nCandidate Existing Stories:\n${JSON.stringify(candidateStories, null, 2)}`
+      : ''
+  }`;
 
   const completion = await openai!.chat.completions.create({
     model,
@@ -246,7 +348,7 @@ async function evaluateNeighborhoodWithOpenAI(
       {
         role: 'system',
         content:
-          'You are an objective news taxonomist. Return JSON with keys "merges" (array of {targetClusterId, sourceClusterIds: string[]}) and "story" ({storyTitle, status, overview, angles: [{clusterId, angle}]} or null).',
+          'You are an objective news taxonomist. Return JSON with keys "merges" (array of {targetClusterId, sourceClusterIds: string[]}) and "story" ({existingStoryId: string | null, storyTitle, status, overview, angles: [{clusterId, angle}]} or null).',
       },
       { role: 'user', content: prompt },
     ],
@@ -263,7 +365,7 @@ async function evaluateNeighborhoodWithOpenAI(
 export async function organizeStoryAngles() {
   logPipelineStep(PipelineStep.Cluster, 'Organizing clusters into story angles & merging duplicates...');
 
-  const activeClusters = await getActiveClustersForStories(7);
+  const activeClusters = await getActiveClustersForStories(30);
 
   if (activeClusters.length < 2) {
     logPipelineSection(
@@ -272,6 +374,8 @@ export async function organizeStoryAngles() {
     );
     return;
   }
+
+  const existingStories = await getStoriesForMatching();
 
   const similarityThreshold = process.env.STORY_SIMILARITY_THRESHOLD
     ? parseFloat(process.env.STORY_SIMILARITY_THRESHOLD)
@@ -288,6 +392,13 @@ export async function organizeStoryAngles() {
     logger.info(
       `[${PipelineStep.Cluster}] No cluster neighborhoods detected above threshold. All clusters are standalone.`
     );
+    // Still perform dormancy sweep even if no new neighborhoods formed
+    const dormantCount = await markDormantStories(7);
+    if (dormantCount > 0) {
+      logger.info(
+        `[${PipelineStep.Cluster}] Marked ${dormantCount} inactive stories as dormant (no updates in 7+ days)`
+      );
+    }
     return;
   }
 
@@ -297,6 +408,8 @@ export async function organizeStoryAngles() {
 
   for (let i = 0; i < neighborhoods.length; i++) {
     const neighborhood = neighborhoods[i];
+    const candidateStories = findCandidateStoriesForNeighborhood(neighborhood, existingStories);
+
     const clustersForPrompt = neighborhood.map((c) => ({
       id: c.id,
       headline: c.headline,
@@ -308,9 +421,9 @@ export async function organizeStoryAngles() {
     let evalResult: NeighborhoodEvaluation;
     try {
       if (geminiKey) {
-        evalResult = await evaluateNeighborhoodWithGemini(geminiKey, clustersForPrompt);
+        evalResult = await evaluateNeighborhoodWithGemini(geminiKey, clustersForPrompt, candidateStories);
       } else if (openai) {
-        evalResult = await evaluateNeighborhoodWithOpenAI(clustersForPrompt);
+        evalResult = await evaluateNeighborhoodWithOpenAI(clustersForPrompt, candidateStories);
       } else {
         logger.warn(`[${PipelineStep.Cluster}] No Gemini or OpenAI API key available for neighborhood evaluation.`);
         return;
@@ -346,29 +459,50 @@ export async function organizeStoryAngles() {
       }
     }
 
-    // 2. Process story grouping
+    // 2. Process story grouping & reactivation
     if (evalResult.story && Array.isArray(evalResult.story.angles)) {
       const survivingAngles = evalResult.story.angles.filter(
         (a) => !mergedSourceIds.has(a.clusterId) && neighborhoodClusterIds.has(a.clusterId)
       );
 
       if (survivingAngles.length >= 2) {
+        const survivingClusters = neighborhood.filter((c) =>
+          survivingAngles.some((a) => a.clusterId === c.id)
+        );
+        const storyEmbedding = computeCentroidEmbedding(survivingClusters);
+
+        const targetStoryId =
+          evalResult.story.existingStoryId ||
+          neighborhood.find((c) => c.storyId)?.storyId;
+
         await syncStoryWithAngles({
+          existingStoryId: targetStoryId || undefined,
           storyTitle: evalResult.story.storyTitle,
-          status: evalResult.story.status,
+          status: evalResult.story.status || 'developing',
           overview: evalResult.story.overview,
+          embedding: storyEmbedding,
           angles: survivingAngles,
         });
         totalStoriesSynced++;
         logger.info(
-          `[${PipelineStep.Cluster}] Grouped ${survivingAngles.length} angles under story: "${evalResult.story.storyTitle}"`
+          `[${PipelineStep.Cluster}] Grouped ${survivingAngles.length} angles under story: "${evalResult.story.storyTitle}"${
+            targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
+          }`
         );
       }
     }
   }
 
+  // 3. Mark inactive stories as dormant (no updates in past 7 days)
+  const dormantCount = await markDormantStories(7);
+  if (dormantCount > 0) {
+    logger.info(
+      `[${PipelineStep.Cluster}] Marked ${dormantCount} inactive stories as dormant (no updates in 7+ days)`
+    );
+  }
+
   logPipelineSection(
     PipelineStep.Cluster,
-    `Story organization complete. Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-angle stories.`
+    `Story organization complete. Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-angle stories, ${dormantCount} stories dormant.`
   );
 }
