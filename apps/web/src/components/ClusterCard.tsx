@@ -1,4 +1,8 @@
 import { Link } from 'react-router-dom';
+import StatusBadge, { resolveStoryStatus } from './StatusBadge';
+import StoryAnglePills, { AngleItem } from './StoryAnglePills';
+import ArticleTimelineSparkline, { TimelineArticle } from './ArticleTimelineSparkline';
+import { createAngleColorMap } from '../utils/angleColors';
 
 interface Source {
   id: string;
@@ -8,79 +12,170 @@ interface Source {
 
 interface Article {
   id: string;
-  url: string;
-  sourceRel: Source;
+  url?: string;
+  title?: string;
+  source?: string;
+  publishedAt?: string;
+  sourceRel?: Source | null;
 }
 
-interface Cluster {
+interface SiblingCluster {
+  id: string;
+  headline?: string | null;
+  slug?: string | null;
+  storyAngle?: string | null;
+  createdAt?: string | number | null;
+  articles?: Article[];
+}
+
+interface Story {
+  id: string;
+  title: string;
+  slug?: string | null;
+  status?: string | null;
+  clusters?: SiblingCluster[];
+}
+
+export interface Cluster {
   id: string;
   headline: string;
   slug: string | null;
   summary: string;
-  createdAt: string;
-  lastUpdatedAt?: string | null;
+  createdAt: string | number;
+  lastUpdatedAt?: string | number | null;
   origin: string;
+  storyId?: string | null;
+  storyAngle?: string | null;
+  story?: Story | null;
   articles: Article[];
 }
 
 export default function ClusterCard({ cluster }: { cluster: Cluster }) {
-  // Helper function to format relative dates
-  const formatRelativeDate = (timestamp: number | string | null | undefined): string => {
-    if (!timestamp) return 'N/A';
-    const date = new Date(Number(timestamp));
-    if (isNaN(date.getTime())) return 'Invalid Date';
+  const story = cluster.story;
+  const status = resolveStoryStatus(story?.status, cluster);
 
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  // If part of a multi-angle story, aggregate all sibling clusters
+  const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
+  // Extract angles
+  const angles: AngleItem[] = isMultiAngleStory && story?.clusters
+    ? story.clusters.map((c) => ({
+        id: c.id,
+        name: c.storyAngle || c.headline || 'Angle',
+        articleCount: c.articles ? c.articles.length : undefined,
+      }))
+    : [];
 
-  const firstSeen = formatRelativeDate(cluster.createdAt);
-  const lastUpdated = cluster.lastUpdatedAt
-    ? formatRelativeDate(cluster.lastUpdatedAt)
-    : firstSeen;
+  const colorMap = createAngleColorMap(angles);
 
-  const sourcesMap = new Map(cluster.articles.map((a) => [a.sourceRel.id, a.sourceRel]));
+  // Aggregate articles for the timeline sparkline
+  let timelineArticles: TimelineArticle[] = [];
+  let sourcesMap = new Map<string, Source>();
+
+  if (isMultiAngleStory && story?.clusters) {
+    story.clusters.forEach((c) => {
+      const angleId = c.id;
+      const angleName = c.storyAngle || c.headline || undefined;
+      (c.articles || []).forEach((a) => {
+        timelineArticles.push({
+          id: a.id,
+          title: a.title,
+          publishedAt: a.publishedAt,
+          source: a.source,
+          sourceRel: a.sourceRel,
+          angleId,
+          angleName,
+        });
+        if (a.sourceRel?.id) {
+          sourcesMap.set(a.sourceRel.id, a.sourceRel);
+        }
+      });
+    });
+  } else {
+    timelineArticles = cluster.articles.map((a) => {
+      if (a.sourceRel?.id) {
+        sourcesMap.set(a.sourceRel.id, a.sourceRel);
+      }
+      return {
+        id: a.id,
+        title: a.title,
+        publishedAt: a.publishedAt,
+        source: a.source,
+        sourceRel: a.sourceRel,
+        angleId: cluster.id,
+        angleName: cluster.storyAngle || undefined,
+      };
+    });
+  }
+
   const sources = Array.from(sourcesMap.values());
-  const visible = sources.slice(0, 5);
-  const extra = sources.length - visible.length;
+  const visibleSources = sources.slice(0, 5);
+  const extraSources = sources.length - visibleSources.length;
 
   return (
     <Link
       to={`/${cluster.slug || cluster.id}`}
-      className="block bg-white border border-gray-200 shadow-sm hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
+      className="block bg-white border border-gray-200 shadow-xs hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
     >
-      <h2 className="text-xl font-bold text-gray-900 mb-2">{cluster.headline}</h2>
-      <p className="text-gray-700 mb-3 line-clamp-3">{cluster.summary}</p>
-      <div className="text-sm text-gray-500 mb-3">
-        <span className="font-medium">First seen:</span> {firstSeen}
-        {' • '}
-        <span className="font-medium">Last updated:</span> {lastUpdated}
+      {/* Top Header: Context Eyebrow & Status */}
+      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+        {story ? (
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider truncate max-w-[80%]">
+            Story: <span className="text-gray-700 normal-case font-medium">{story.title}</span>
+          </div>
+        ) : (
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            Report
+          </div>
+        )}
+        <StatusBadge status={status} size="sm" />
       </div>
-      <div className="flex items-center gap-2 flex-wrap">
+
+      {/* Main Headline */}
+      <h2 className="text-xl font-bold text-gray-900 mb-2 leading-snug">
+        {cluster.headline}
+      </h2>
+
+      {/* Summary */}
+      <p className="text-gray-700 mb-3 line-clamp-3 text-sm leading-relaxed">
+        {cluster.summary}
+      </p>
+
+      {/* Representation of angles on multi-angle stories */}
+      {angles.length > 1 && (
+        <div className="mb-3">
+          <StoryAnglePills angles={angles} colorMap={colorMap} size="sm" />
+        </div>
+      )}
+
+      {/* Timeline Sparkline replacing old text */}
+      <div className="mb-3 pt-1 border-t border-gray-100">
+        <ArticleTimelineSparkline
+          articles={timelineArticles}
+          colorMap={colorMap}
+          fallbackFirstSeen={cluster.createdAt}
+          fallbackLastUpdated={cluster.lastUpdatedAt}
+        />
+      </div>
+
+      {/* Footer: Article count & Sources */}
+      <div className="flex items-center gap-2 flex-wrap pt-1">
         <span className="text-xs text-gray-600 font-medium">
-          {cluster.articles.length} {cluster.articles.length === 1 ? 'article' : 'articles'}
+          {timelineArticles.length} {timelineArticles.length === 1 ? 'article' : 'articles'}
+          {angles.length > 1 && ` across ${angles.length} angles`}
         </span>
-        <span className="text-xs text-gray-500">•</span>
+        <span className="text-xs text-gray-300">•</span>
         <span className="text-xs text-gray-600 font-medium">Sources:</span>
-        {visible.map((source) => (
+        {visibleSources.map((source) => (
           <img
             key={source.id}
             src={source.faviconUrl || ''}
             alt={source.name}
             title={source.name}
-            className="w-6 h-6 rounded-sm"
+            className="w-5 h-5 rounded-xs"
           />
         ))}
-        {extra > 0 && <span className="text-xs text-gray-500">+{extra}</span>}
+        {extraSources > 0 && <span className="text-xs text-gray-500">+{extraSources}</span>}
       </div>
     </Link>
   );
