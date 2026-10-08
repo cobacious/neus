@@ -23,6 +23,7 @@ export async function getActiveClustersForStories(daysBack: number = 7) {
       createdAt: true,
       storyId: true,
       storyAngle: true,
+      embedding: true,
       _count: {
         select: { articleAssignments: true },
       },
