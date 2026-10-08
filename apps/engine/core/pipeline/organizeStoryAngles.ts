@@ -192,7 +192,7 @@ Return JSON with this exact schema:
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.1,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 4096,
         },
       }),
     });
@@ -219,7 +219,16 @@ Return JSON with this exact schema:
       throw new Error('Gemini neighborhood evaluation response missing text');
     }
 
-    return cleanJsonResponse<NeighborhoodEvaluation>(content);
+    try {
+      return cleanJsonResponse<NeighborhoodEvaluation>(content);
+    } catch (parseErr: any) {
+      logger.warn(
+        `[${PipelineStep.Cluster}] Failed to parse JSON response on attempt ${attempt}/${maxRetries}: ${parseErr.message}`
+      );
+      if (attempt === maxRetries) {
+        throw parseErr;
+      }
+    }
   }
 
   throw new Error(`Exhausted ${maxRetries} retries for Gemini neighborhood evaluation`);
