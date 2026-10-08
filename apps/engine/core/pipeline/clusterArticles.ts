@@ -14,7 +14,9 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 
-const SIMILARITY_THRESHOLD = 0.85;
+const SIMILARITY_THRESHOLD = process.env.CLUSTER_SIMILARITY_THRESHOLD
+  ? parseFloat(process.env.CLUSTER_SIMILARITY_THRESHOLD)
+  : 0.88;
 const ALLOW_SINGLE_ARTICLE_CLUSTERS = false; // Set to false to skip single article clusters
 
 export async function clusterRecentArticles() {

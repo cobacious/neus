@@ -6,6 +6,8 @@ const mockDb = {
   mergeClusters: jest.fn(),
   getStoriesForMatching: jest.fn(),
   markDormantStories: jest.fn(),
+  getStoryArticlesForRealignment: jest.fn(),
+  realignStoryArticles: jest.fn(),
 };
 
 jest.unstable_mockModule('@neus/db', () => mockDb);
@@ -93,6 +95,8 @@ describe('organizeStoryAngles', () => {
     jest.resetAllMocks();
     (mockDb.getStoriesForMatching as jest.Mock).mockResolvedValue([]);
     (mockDb.markDormantStories as jest.Mock).mockResolvedValue(0);
+    (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([]);
+    (mockDb.realignStoryArticles as jest.Mock).mockResolvedValue({ updatedCount: 0, affectedClusters: [] });
   });
 
   it('skips processing if fewer than 2 active clusters are found', async () => {
@@ -230,5 +234,85 @@ describe('organizeStoryAngles', () => {
     expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
     expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
     expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
+  });
+
+  it('realigns misclassified articles across story angles when LLM returns updated assignments', async () => {
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      { id: 'c1', headline: 'Corrections Chief Resigns', summary: 'Resignation', embedding: [1, 0], createdAt: new Date() },
+      { id: 'c2', headline: 'Inmate Hospitalized', summary: 'Recovery in ICU', embedding: [1, 0], createdAt: new Date() },
+    ]);
+
+    const mockEvaluationResponse = {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: JSON.stringify({
+                  merges: [],
+                  story: {
+                    storyTitle: 'Christa Pike Aftermath',
+                    status: 'developing',
+                    overview: 'Botched execution saga',
+                    angles: [
+                      { clusterId: 'c1', angle: 'Chief Resignation' },
+                      { clusterId: 'c2', angle: 'Hospital Recovery' },
+                    ],
+                  },
+                }),
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const mockRealignmentResponse = {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: JSON.stringify({
+                  assignments: [
+                    { articleId: 'art-1', targetClusterId: 'c1' },
+                    { articleId: 'art-2', targetClusterId: 'c2' }, // misclassified article moved from c1 to c2
+                  ],
+                }),
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockEvaluationResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockRealignmentResponse,
+      });
+
+    (mockDb.syncStoryWithAngles as jest.Mock).mockResolvedValue({ id: 'story-1' });
+    (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([
+      { articleId: 'art-1', currentClusterId: 'c1', title: 'Chief steps down' },
+      { articleId: 'art-2', currentClusterId: 'c1', title: 'Pike on ventilator in ICU' },
+    ]);
+    (mockDb.realignStoryArticles as jest.Mock).mockResolvedValue({
+      updatedCount: 1,
+      affectedClusters: ['c1', 'c2'],
+    });
+
+    await organizeStoryAngles();
+
+    expect(mockDb.getStoryArticlesForRealignment).toHaveBeenCalledWith(['c1', 'c2']);
+    expect(mockDb.realignStoryArticles).toHaveBeenCalledWith([
+      { articleId: 'art-2', targetClusterId: 'c2' },
+    ]);
   });
 });

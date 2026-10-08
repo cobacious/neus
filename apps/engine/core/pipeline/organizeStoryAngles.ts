@@ -1,10 +1,11 @@
-import OpenAI from 'openai';
 import {
   getActiveClustersForStories,
   syncStoryWithAngles,
   mergeClusters,
   getStoriesForMatching,
   markDormantStories,
+  getStoryArticlesForRealignment,
+  realignStoryArticles,
 } from '@neus/db';
 import type { StoryInput } from '@neus/db';
 import { cosineSimilarity } from './utils';
@@ -14,22 +15,7 @@ import {
   logPipelineSection,
   PipelineStep,
 } from '../../lib/pipelineLogger';
-
-const useGemini = !!process.env.GEMINI_API_KEY;
-
-const openai = !useGemini
-  ? new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || 'mock-key',
-    })
-  : null;
-
-function resolveGeminiModel(): string {
-  const envModel = process.env.SUMMARY_MODEL;
-  if (!envModel || envModel.includes('1.5') || envModel.includes('2.0') || envModel === 'gpt-4o-mini') {
-    return 'gemini-flash-latest';
-  }
-  return envModel;
-}
+import { generateStructuredJson } from '../../lib/aiClient';
 
 export type NeighborhoodMerge = {
   targetClusterId: string;
@@ -224,25 +210,10 @@ export function findCandidateStoriesForNeighborhood(
   return Array.from(candidateMap.values());
 }
 
-function cleanJsonResponse<T>(text: string): T {
-  const cleaned = text
-    .trim()
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/```$/i, '')
-    .trim();
-  return JSON.parse(cleaned);
-}
-
-async function evaluateNeighborhoodWithGemini(
-  apiKey: string,
+async function evaluateNeighborhood(
   clusters: Array<{ id: string; headline: string | null; summary: string | null; date: string; articleCount?: number }>,
-  candidateStories?: CandidateStory[],
-  maxRetries = 3
+  candidateStories?: CandidateStory[]
 ): Promise<NeighborhoodEvaluation> {
-  const modelName = resolveGeminiModel();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-
   const prompt = `
 You are an expert news editor and taxonomist.
 
@@ -298,130 +269,120 @@ Return JSON with this exact schema:
 }
 `;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: 'You are an objective news taxonomist. Return strict JSON only.' }],
-        },
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-          maxOutputTokens: 4096,
-          responseSchema: {
+  return generateStructuredJson<NeighborhoodEvaluation>({
+    prompt,
+    systemInstruction: 'You are an objective news taxonomist. Return strict JSON only.',
+    step: PipelineStep.Cluster,
+    schema: {
+      type: 'OBJECT',
+      properties: {
+        merges: {
+          type: 'ARRAY',
+          items: {
             type: 'OBJECT',
             properties: {
-              merges: {
+              targetClusterId: { type: 'STRING' },
+              sourceClusterIds: { type: 'ARRAY', items: { type: 'STRING' } },
+            },
+            required: ['targetClusterId', 'sourceClusterIds'],
+          },
+        },
+        stories: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              existingStoryId: { type: 'STRING', nullable: true },
+              storyTitle: { type: 'STRING' },
+              status: { type: 'STRING', enum: ['breaking', 'developing'] },
+              overview: { type: 'STRING' },
+              angles: {
                 type: 'ARRAY',
                 items: {
                   type: 'OBJECT',
                   properties: {
-                    targetClusterId: { type: 'STRING' },
-                    sourceClusterIds: { type: 'ARRAY', items: { type: 'STRING' } },
+                    clusterId: { type: 'STRING' },
+                    angle: { type: 'STRING' },
                   },
-                  required: ['targetClusterId', 'sourceClusterIds'],
-                },
-              },
-              stories: {
-                type: 'ARRAY',
-                items: {
-                  type: 'OBJECT',
-                  properties: {
-                    existingStoryId: { type: 'STRING', nullable: true },
-                    storyTitle: { type: 'STRING' },
-                    status: { type: 'STRING', enum: ['breaking', 'developing'] },
-                    overview: { type: 'STRING' },
-                    angles: {
-                      type: 'ARRAY',
-                      items: {
-                        type: 'OBJECT',
-                        properties: {
-                          clusterId: { type: 'STRING' },
-                          angle: { type: 'STRING' },
-                        },
-                        required: ['clusterId', 'angle'],
-                      },
-                    },
-                  },
-                  required: ['storyTitle', 'status', 'overview', 'angles'],
+                  required: ['clusterId', 'angle'],
                 },
               },
             },
-            required: ['merges', 'stories'],
+            required: ['storyTitle', 'status', 'overview', 'angles'],
           },
         },
-      }),
+      },
+      required: ['merges', 'stories'],
+    },
+  });
+}
+
+export async function classifyArticleAngles(
+  storyTitle: string,
+  angles: Array<{ clusterId: string; angle: string; headline?: string | null }>,
+  articles: Array<{ articleId: string; currentClusterId: string; title: string }>
+): Promise<Array<{ articleId: string; targetClusterId: string }>> {
+  if (angles.length < 2 || articles.length === 0) return [];
+
+  const BATCH_SIZE = 10;
+  const allAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+
+  for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+    const batch = articles.slice(i, i + BATCH_SIZE);
+    const batchIndex = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(articles.length / BATCH_SIZE);
+
+    logger.info(
+      `[${PipelineStep.Cluster}] Classifying batch ${batchIndex}/${totalBatches} (${batch.length} articles) for "${storyTitle}"...`
+    );
+
+    const prompt = `You are an objective news editor organizing a multi-angle story.
+Story: "${storyTitle}"
+
+Defined Angles in this Story:
+${angles.map((a) => `- ID: "${a.clusterId}" | Angle: "${a.angle}"${a.headline ? ` | Headline: "${a.headline}"` : ''}`).join('\n')}
+
+Articles to assign:
+${batch.map((a, idx) => `${idx + 1}. ID: "${a.articleId}" | Title: "${a.title}"`).join('\n')}
+
+TASK:
+For each article, determine which angle ID it most accurately represents based on its headline and core event.
+Assign every article to the single best-matching angle cluster ID.
+
+Return JSON with key "assignments": Array<{ articleId: string, targetClusterId: string }>`;
+
+    const parsed = await generateStructuredJson<{
+      assignments: Array<{ articleId: string; targetClusterId: string }>;
+    }>({
+      prompt,
+      systemInstruction:
+        'You are an objective news editor. Assign articles to their most accurate angle. Return strict JSON only.',
+      step: PipelineStep.Cluster,
+      schema: {
+        type: 'OBJECT',
+        properties: {
+          assignments: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                articleId: { type: 'STRING' },
+                targetClusterId: { type: 'STRING' },
+              },
+              required: ['articleId', 'targetClusterId'],
+            },
+          },
+        },
+        required: ['assignments'],
+      },
     });
 
-    if (res.status === 429) {
-      const backoffMs = Math.pow(2, attempt) * 2000;
-      logger.warn(
-        `[${PipelineStep.Cluster}] Gemini rate limit (429) on attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
-      );
-      if (process.env.NODE_ENV !== 'test') {
-        await new Promise((r) => setTimeout(r, backoffMs));
-      }
-      continue;
-    }
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Gemini neighborhood evaluation API error (${res.status}): ${errorText}`);
-    }
-
-    const data = (await res.json()) as any;
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) {
-      throw new Error('Gemini neighborhood evaluation response missing text');
-    }
-
-    try {
-      return cleanJsonResponse<NeighborhoodEvaluation>(content);
-    } catch (parseErr: any) {
-      logger.warn(
-        `[${PipelineStep.Cluster}] Failed to parse JSON response on attempt ${attempt}/${maxRetries}: ${parseErr.message}`
-      );
-      if (attempt === maxRetries) {
-        throw parseErr;
-      }
+    if (Array.isArray(parsed.assignments)) {
+      allAssignments.push(...parsed.assignments);
     }
   }
 
-  throw new Error(`Exhausted ${maxRetries} retries for Gemini neighborhood evaluation`);
-}
-
-async function evaluateNeighborhoodWithOpenAI(
-  clusters: Array<{ id: string; headline: string | null; summary: string | null; date: string; articleCount?: number }>,
-  candidateStories?: CandidateStory[]
-): Promise<NeighborhoodEvaluation> {
-  const model = process.env.SUMMARY_MODEL || 'gpt-4o-mini';
-  const prompt = `Analyze this candidate neighborhood of clusters. Identify any duplicate clusters to merge, and whether distinct remaining clusters form a multi-angle story:\n${JSON.stringify(clusters, null, 2)}${
-    candidateStories && candidateStories.length > 0
-      ? `\nCandidate Existing Stories:\n${JSON.stringify(candidateStories, null, 2)}`
-      : ''
-  }`;
-
-  const completion = await openai!.chat.completions.create({
-    model,
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are an objective news taxonomist. Return JSON with keys "merges" (array of {targetClusterId, sourceClusterIds: string[]}) and "story" ({existingStoryId: string | null, storyTitle, status, overview, angles: [{clusterId, angle}]} or null).',
-      },
-      { role: 'user', content: prompt },
-    ],
-    response_format: { type: 'json_object' },
-    max_tokens: 2048,
-    temperature: 0.1,
-  });
-
-  const content = completion.choices[0].message.content;
-  if (!content) throw new Error('OpenAI neighborhood evaluation returned empty response');
-  return cleanJsonResponse<NeighborhoodEvaluation>(content);
+  return allAssignments;
 }
 
 export async function organizeStoryAngles() {
@@ -464,7 +425,6 @@ export async function organizeStoryAngles() {
     return;
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY;
   let totalMerged = 0;
   let totalStoriesSynced = 0;
 
@@ -482,14 +442,7 @@ export async function organizeStoryAngles() {
 
     let evalResult: NeighborhoodEvaluation;
     try {
-      if (geminiKey) {
-        evalResult = await evaluateNeighborhoodWithGemini(geminiKey, clustersForPrompt, candidateStories);
-      } else if (openai) {
-        evalResult = await evaluateNeighborhoodWithOpenAI(clustersForPrompt, candidateStories);
-      } else {
-        logger.warn(`[${PipelineStep.Cluster}] No Gemini or OpenAI API key available for neighborhood evaluation.`);
-        return;
-      }
+      evalResult = await evaluateNeighborhood(clustersForPrompt, candidateStories);
     } catch (err: any) {
       logger.error(
         `[${PipelineStep.Cluster}] Failed evaluating neighborhood ${i + 1}/${neighborhoods.length}: ${err.message || err}`
@@ -556,6 +509,48 @@ export async function organizeStoryAngles() {
               targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
             }`
           );
+
+          // Realign articles across story angles to correct misclassifications
+          try {
+            const angleClusterIds = survivingAngles.map((a) => a.clusterId);
+            const storyArticles = await getStoryArticlesForRealignment(angleClusterIds);
+
+            if (storyArticles.length > 0) {
+              const anglesWithHeadlines = survivingAngles.map((a) => ({
+                clusterId: a.clusterId,
+                angle: a.angle,
+                headline: survivingClusters.find((c) => c.id === a.clusterId)?.headline ?? null,
+              }));
+
+              const assignments = await classifyArticleAngles(
+                storyItem.storyTitle,
+                anglesWithHeadlines,
+                storyArticles
+              );
+
+              const validClusterIdSet = new Set(angleClusterIds);
+              const validReassignments = assignments.filter(
+                (r) =>
+                  validClusterIdSet.has(r.targetClusterId) &&
+                  storyArticles.some(
+                    (a) => a.articleId === r.articleId && a.currentClusterId !== r.targetClusterId
+                  )
+              );
+
+              if (validReassignments.length > 0) {
+                const { updatedCount } = await realignStoryArticles(validReassignments);
+                if (updatedCount > 0) {
+                  logger.info(
+                    `[${PipelineStep.Cluster}] Realigned ${updatedCount} article(s) across angles for story "${storyItem.storyTitle}"`
+                  );
+                }
+              }
+            }
+          } catch (realignErr: any) {
+            logger.warn(
+              `[${PipelineStep.Cluster}] Article realignment skipped for "${storyItem.storyTitle}": ${realignErr.message || realignErr}`
+            );
+          }
         }
       }
     }
