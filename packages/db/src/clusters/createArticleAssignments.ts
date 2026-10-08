@@ -8,5 +8,8 @@ export type ClusterAssignment = {
 };
 
 export async function createArticleAssignments(assignments: ClusterAssignment[]) {
-  await prisma.articleClusterAssignment.createMany({ data: assignments });
+  await prisma.articleClusterAssignment.createMany({
+    data: assignments,
+    skipDuplicates: true,
+  });
 }

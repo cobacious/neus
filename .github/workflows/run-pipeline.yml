@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '17 * * * *'
 
+# Ensure only one pipeline run executes at a time; subsequent runs queue sequentially
+concurrency:
+  group: neus-pipeline
+  cancel-in-progress: false
+
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
