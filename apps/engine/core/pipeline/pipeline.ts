@@ -6,6 +6,7 @@ import { embedNewArticles } from './embedArticles';
 import { clusterRecentArticles } from './clusterArticles';
 import { scoreClusters } from './scoreClusters';
 import { summarizeClusters } from './summarizeClusters';
+import { organizeStoryAngles } from './organizeStoryAngles';
 import { cleanupEmptyClusters } from './cleanupEmptyClusters';
 import { disbandSingleClusters } from './disbandSingleClusters';
 import { archiveOldClusters } from './archiveOldClusters';
@@ -26,6 +27,7 @@ export async function runPipeline() {
   await clusterRecentArticles();
   await scoreClusters();
   await summarizeClusters();
+  await organizeStoryAngles();
   await cleanupEmptyClusters();
   await disbandSingleClusters();
   await archiveOldClusters();
