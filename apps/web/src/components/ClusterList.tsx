@@ -20,6 +20,7 @@ const CLUSTERS_QUERY = `
         id
         title
         slug
+        overview
         status
         clusters {
           id

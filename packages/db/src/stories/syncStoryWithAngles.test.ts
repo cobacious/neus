@@ -4,6 +4,7 @@ const mockPrisma = {
   cluster: {
     findMany: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
     findUnique: jest.fn(),
   },
   story: {
@@ -156,5 +157,33 @@ describe('syncStoryWithAngles', () => {
       },
     });
     expect(mockPrisma.cluster.findMany).not.toHaveBeenCalled();
+  });
+
+  it('detaches clusters that were previously in the story but are not in the new angles', async () => {
+    (mockPrisma.story.update as jest.Mock).mockResolvedValue({
+      id: 'story-existing',
+      title: 'Updated Story',
+      status: 'developing',
+    } as any);
+
+    (mockPrisma.cluster.update as jest.Mock).mockResolvedValue({} as any);
+    (mockPrisma.cluster.updateMany as jest.Mock).mockResolvedValue({ count: 1 } as any);
+
+    await syncStoryWithAngles({
+      existingStoryId: 'story-existing',
+      storyTitle: 'Updated Story',
+      angles: [{ clusterId: 'c1', angle: 'Angle 1' }],
+    });
+
+    expect(mockPrisma.cluster.updateMany).toHaveBeenCalledWith({
+      where: {
+        storyId: 'story-existing',
+        id: { notIn: ['c1'] },
+      },
+      data: {
+        storyId: null,
+        storyAngle: null,
+      },
+    });
   });
 });

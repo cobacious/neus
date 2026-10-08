@@ -32,6 +32,7 @@ interface Story {
   id: string;
   title: string;
   slug?: string | null;
+  overview?: string | null;
   status?: string | null;
   clusters?: SiblingCluster[];
 }
@@ -119,26 +120,20 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
     >
       {/* Top Header: Context Eyebrow & Status */}
       <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-        {story ? (
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider truncate max-w-[80%]">
-            Story: <span className="text-gray-700 normal-case font-medium">{story.title}</span>
-          </div>
-        ) : (
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Report
-          </div>
-        )}
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider truncate max-w-[80%]">
+          {isMultiAngleStory ? 'Story' : 'Report'}
+        </div>
         <StatusBadge status={status} size="sm" />
       </div>
 
       {/* Main Headline */}
       <h2 className="text-xl font-bold text-gray-900 mb-2 leading-snug">
-        {cluster.headline}
+        {isMultiAngleStory && story ? story.title : cluster.headline}
       </h2>
 
       {/* Summary */}
       <p className="text-gray-700 mb-3 line-clamp-3 text-sm leading-relaxed">
-        {cluster.summary}
+        {isMultiAngleStory && story?.overview ? story.overview : cluster.summary}
       </p>
 
       {/* Representation of angles on multi-angle stories */}

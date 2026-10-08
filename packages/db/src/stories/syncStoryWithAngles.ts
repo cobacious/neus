@@ -79,5 +79,17 @@ export async function syncStoryWithAngles(input: StoryInput) {
     });
   }
 
+  // 3. Detach any clusters previously assigned to this story that are not in the new angles
+  await prisma.cluster.updateMany({
+    where: {
+      storyId: story.id,
+      id: { notIn: clusterIds },
+    },
+    data: {
+      storyId: null,
+      storyAngle: null,
+    },
+  });
+
   return story;
 }

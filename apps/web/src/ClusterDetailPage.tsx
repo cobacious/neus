@@ -197,9 +197,9 @@ export default function ClusterDetailPage() {
 
       {/* Story Context Eyebrow & Status Badge (Feature 1) */}
       <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
-        {story ? (
+        {isMultiAngleStory && story ? (
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Story: <span className="text-gray-800 normal-case font-medium">{story.title}</span>
+            Story Overview
           </div>
         ) : (
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -211,7 +211,7 @@ export default function ClusterDetailPage() {
 
       {/* Main Headline */}
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 my-2 leading-tight">
-        {cluster.headline}
+        {isMultiAngleStory && story ? story.title : cluster.headline}
       </h1>
 
       {/* Angle pills (Feature 2) */}
@@ -226,7 +226,7 @@ export default function ClusterDetailPage() {
 
       {/* Main Summary */}
       <p className="text-gray-700 my-4 text-base leading-relaxed">
-        {cluster.summary}
+        {isMultiAngleStory && story?.overview ? story.overview : cluster.summary}
       </p>
 
       {/* Timeline Sparkline (Feature 5) */}
@@ -289,12 +289,12 @@ export default function ClusterDetailPage() {
                   </div>
 
                   {/* Angle Headline & Summary */}
-                  {c.headline && c.headline !== cluster.headline && (
+                  {c.headline && (
                     <h4 className="text-base font-bold text-gray-900 mt-2 mb-1">
                       {c.headline}
                     </h4>
                   )}
-                  {c.summary && c.summary !== cluster.summary && (
+                  {c.summary && (
                     <p className="text-sm text-gray-600 mb-4 line-clamp-2">
                       {c.summary}
                     </p>

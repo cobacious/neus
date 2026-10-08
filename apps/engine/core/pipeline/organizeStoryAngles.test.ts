@@ -8,6 +8,8 @@ const mockDb = {
   markDormantStories: jest.fn(),
   getStoryArticlesForRealignment: jest.fn(),
   realignStoryArticles: jest.fn(),
+  dissociateClusters: jest.fn(),
+  disbandUnderpopulatedStories: jest.fn(),
 };
 
 jest.unstable_mockModule('@neus/db', () => mockDb);
@@ -97,6 +99,11 @@ describe('organizeStoryAngles', () => {
     (mockDb.markDormantStories as jest.Mock).mockResolvedValue(0);
     (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([]);
     (mockDb.realignStoryArticles as jest.Mock).mockResolvedValue({ updatedCount: 0, affectedClusters: [] });
+    (mockDb.dissociateClusters as jest.Mock).mockResolvedValue({ count: 0 });
+    (mockDb.disbandUnderpopulatedStories as jest.Mock).mockResolvedValue({
+      disbandedStoriesCount: 0,
+      dissociatedClustersCount: 0,
+    });
   });
 
   it('skips processing if fewer than 2 active clusters are found', async () => {
@@ -314,5 +321,65 @@ describe('organizeStoryAngles', () => {
     expect(mockDb.realignStoryArticles).toHaveBeenCalledWith([
       { articleId: 'art-2', targetClusterId: 'c2' },
     ]);
+  });
+
+  it('dissociates clusters when candidate clusters previously in a story are evaluated as standalone', async () => {
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      {
+        id: 'c-badenoch-scrutiny',
+        headline: 'Kemi Badenoch Faces Scrutiny Ahead of Conservative Party Conference',
+        summary: 'General party conference profile',
+        embedding: [1, 0],
+        createdAt: new Date(),
+        storyId: 'story-badenoch-general',
+      },
+      {
+        id: 'c-badenoch-tax',
+        headline: 'Badenoch Pledges to Scrap Inheritance Tax on Family Homes at Tory Conference',
+        summary: 'Specific policy proposal',
+        embedding: [1, 0],
+        createdAt: new Date(),
+        storyId: 'story-badenoch-general',
+      },
+    ]);
+
+    const mockStandaloneEvaluationResponse = {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: JSON.stringify({
+                  merges: [],
+                  stories: [],
+                }),
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockStandaloneEvaluationResponse,
+    });
+
+    (mockDb.dissociateClusters as jest.Mock).mockResolvedValue({ count: 2 });
+    (mockDb.disbandUnderpopulatedStories as jest.Mock).mockResolvedValue({
+      disbandedStoriesCount: 1,
+      dissociatedClustersCount: 0,
+    });
+
+    await organizeStoryAngles();
+
+    // Both clusters should be dissociated since they had storyIds but were not included in any story angles
+    expect(mockDb.dissociateClusters).toHaveBeenCalledWith([
+      'c-badenoch-scrutiny',
+      'c-badenoch-tax',
+    ]);
+    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+    expect(mockDb.disbandUnderpopulatedStories).toHaveBeenCalled();
   });
 });
