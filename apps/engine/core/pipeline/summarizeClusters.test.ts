@@ -1,5 +1,4 @@
 import { jest } from '@jest/globals';
-import OpenAI from 'openai';
 
 const mockDb = {
   getClustersToSummarize: jest.fn(),
@@ -8,11 +7,9 @@ const mockDb = {
 
 jest.unstable_mockModule('@neus/db', () => mockDb);
 
-const chatCreateMock = jest.fn();
-jest.unstable_mockModule('openai', () => ({
-  default: jest.fn().mockImplementation(() => ({
-    chat: { completions: { create: chatCreateMock } },
-  })),
+const mockGenerateStructuredJson = jest.fn();
+jest.unstable_mockModule('../../lib/aiClient', () => ({
+  generateStructuredJson: mockGenerateStructuredJson,
 }));
 
 let summarizeClusters: typeof import('./summarizeClusters').summarizeClusters;
@@ -26,18 +23,18 @@ describe('summarizeClusters', () => {
     jest.resetAllMocks();
   });
 
-  it('calls OpenAI and updates cluster summary', async () => {
-    mockDb.getClustersToSummarize.mockResolvedValue([
+  it('calls generateStructuredJson and updates cluster summary', async () => {
+    (mockDb.getClustersToSummarize as jest.Mock).mockResolvedValue([
       { id: 'c1', articleAssignments: [{ article: { title: 't1', snippet: 's1' } }] },
     ]);
-    chatCreateMock.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify({ headline: 'H', summary: 'S' }) } }],
-      usage: { total_tokens: 5 },
+    mockGenerateStructuredJson.mockResolvedValue({
+      headline: 'H',
+      summary: 'S',
     });
 
     await summarizeClusters();
 
-    expect(chatCreateMock).toHaveBeenCalled();
+    expect(mockGenerateStructuredJson).toHaveBeenCalled();
     expect(mockDb.updateClusterSummary).toHaveBeenCalledWith('c1', 'H', 'S');
   });
 });

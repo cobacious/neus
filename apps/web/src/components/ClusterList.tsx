@@ -14,9 +14,39 @@ const CLUSTERS_QUERY = `
       createdAt
       lastUpdatedAt
       origin
+      storyId
+      storyAngle
+      story {
+        id
+        title
+        slug
+        overview
+        status
+        clusters {
+          id
+          headline
+          slug
+          storyAngle
+          createdAt
+          articles {
+            id
+            title
+            publishedAt
+            source
+            sourceRel {
+              id
+              name
+              faviconUrl
+            }
+          }
+        }
+      }
       articles {
         id
         url
+        title
+        publishedAt
+        source
         sourceRel {
           id
           name
@@ -28,7 +58,7 @@ const CLUSTERS_QUERY = `
   }
 `;
 
-const CLUSTERS_PER_PAGE = 10;
+const CLUSTERS_PER_PAGE = 15;
 
 export default function ClusterList() {
   const [displayedClusters, setDisplayedClusters] = useState<any[]>([]);
@@ -43,16 +73,16 @@ export default function ClusterList() {
   // Update displayed clusters when new data arrives
   useEffect(() => {
     if (result.data && !result.fetching) {
-      const newClusters = result.data.clusters;
+      const rawClusters = result.data.clusters || [];
       if (offset === 0) {
         // Initial load
-        setDisplayedClusters(newClusters);
-      } else if (newClusters.length > 0) {
-        // Loading more - append new clusters
+        setDisplayedClusters(rawClusters);
+      } else if (rawClusters.length > 0) {
+        // Loading more - append new clusters avoiding duplicate IDs across pages
         setDisplayedClusters((prev) => {
-          const existingIds = new Set(prev.map((c: any) => c.id));
-          const uniqueNewClusters = newClusters.filter((c: any) => !existingIds.has(c.id));
-          return uniqueNewClusters.length > 0 ? [...prev, ...uniqueNewClusters] : prev;
+          const existingIds = new Set(prev.map((c) => c.id));
+          const nextItems = rawClusters.filter((c: any) => !existingIds.has(c.id));
+          return [...prev, ...nextItems];
         });
       }
     }
@@ -65,7 +95,7 @@ export default function ClusterList() {
   // Initial loading state
   if (result.fetching && displayedClusters.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         {[...Array(5)].map((_, i) => (
           <ClusterCardSkeleton key={i} />
         ))}
@@ -81,7 +111,7 @@ export default function ClusterList() {
   const hasMore = displayedClusters.length < totalClusters;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {displayedClusters.map((cluster: any) => (
         <ClusterCard key={cluster.id} cluster={cluster} />
       ))}

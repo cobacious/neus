@@ -13,10 +13,34 @@ import {
   getRankedClusters,
   getClusterById,
   getClusterBySlug,
+  getStoryById,
+  getStoryBySlug,
+  getStories,
   getSources,
   createSource,
   updateSource,
 } from '@neus/db';
+
+const Story = objectType({
+  name: 'Story',
+  definition(t) {
+    t.string('id');
+    t.string('title');
+    t.string('slug');
+    t.nullable.string('overview');
+    t.string('status');
+    t.float('createdAt', {
+      resolve: (story: any) => new Date(story.createdAt).getTime(),
+    });
+    t.float('updatedAt', {
+      resolve: (story: any) => new Date(story.updatedAt).getTime(),
+    });
+    t.list.field('clusters', {
+      type: 'Cluster',
+      resolve: (story: any) => story.clusters ?? [],
+    });
+  },
+});
 
 const Cluster = objectType({
   name: 'Cluster',
@@ -26,6 +50,12 @@ const Cluster = objectType({
     t.nullable.string('slug');
     t.nullable.string('summary');
     t.string('origin');
+    t.nullable.string('storyId');
+    t.nullable.string('storyAngle');
+    t.nullable.field('story', {
+      type: 'Story',
+      resolve: (cluster: any) => cluster.story ?? null,
+    });
     t.float('createdAt', {
       resolve: (cluster: any) => new Date(cluster.createdAt).getTime(),
     });
@@ -104,6 +134,30 @@ const Query = queryType({
       args: { id: nonNull(stringArg()) },
       resolve: async (_, { id }) => getClusterById(id),
     });
+    t.field('story', {
+      type: Story,
+      args: { slug: nonNull(stringArg()) },
+      resolve: async (_, { slug }) => getStoryBySlug(slug),
+    });
+    t.field('storyById', {
+      type: Story,
+      args: { id: nonNull(stringArg()) },
+      resolve: async (_, { id }) => getStoryById(id),
+    });
+    t.list.field('stories', {
+      type: Story,
+      args: {
+        status: stringArg(),
+        limit: intArg(),
+        offset: intArg(),
+      },
+      resolve: async (_, { status, limit, offset }) =>
+        getStories({
+          status: status ?? undefined,
+          limit: limit ?? undefined,
+          offset: offset ?? undefined,
+        }),
+    });
     t.int('clusterCount', {
       resolve: async () => countClusters(),
     });
@@ -141,6 +195,6 @@ const Mutation = mutationType({
 });
 
 export const schema = makeSchema({
-  types: [Query, Mutation, Cluster, ArticleSummary, Source],
+  types: [Query, Mutation, Cluster, ArticleSummary, Source, Story],
   outputs: false,
 });

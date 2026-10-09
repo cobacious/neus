@@ -36,7 +36,9 @@ export async function fillMissingContent() {
     if (!article.url || !article.source || (article.content && article.content.trim().length > 0))
       continue;
     try {
-      const res = await fetch(article.url);
+      const res = await fetch(article.url, {
+        signal: AbortSignal.timeout(10000),
+      });
       const html = await res.text();
       const result = await extractFromHtml(html, article.url);
 

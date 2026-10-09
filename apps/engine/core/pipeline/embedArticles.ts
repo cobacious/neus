@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import {
   getUnembeddedArticles,
   updateArticleEmbedding,
@@ -9,66 +8,9 @@ import {
   logPipelineStep,
   PipelineStep,
 } from '../../lib/pipelineLogger';
+import { generateEmbedding, resolveEmbeddingModel } from '../../lib/aiClient';
 
 const MAX_EMBEDDING_CHARS = 8192;
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'mock-key',
-});
-
-async function getGeminiEmbeddingWithRetry(
-  apiKey: string,
-  text: string,
-  maxRetries = 3
-): Promise<number[]> {
-  const modelName = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent?key=${apiKey}`;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: `models/${modelName}`,
-        content: {
-          parts: [{ text }],
-        },
-      }),
-    });
-
-    if (res.status === 429) {
-      const backoffMs = Math.pow(2, attempt) * 2000;
-      logger.warn(
-        `[${PipelineStep.Embed}] Gemini rate limit (429) on attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
-      );
-      if (process.env.NODE_ENV !== 'test') {
-        await new Promise((r) => setTimeout(r, backoffMs));
-      }
-      continue;
-    }
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
-    }
-
-    const data = (await res.json()) as { embedding?: { values?: number[] } };
-    if (!data.embedding?.values) {
-      throw new Error('Gemini embedding response missing values');
-    }
-    return data.embedding.values;
-  }
-
-  throw new Error(`Exhausted ${maxRetries} retries for Gemini embedding`);
-}
-
-async function getOpenAIEmbedding(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text,
-  });
-  return response.data[0].embedding as number[];
-}
 
 export async function embedNewArticles() {
   logPipelineStep(PipelineStep.Embed, 'Embedding new articles...');
@@ -89,13 +31,8 @@ export async function embedNewArticles() {
     );
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY || process.env.NODE_ENV === 'test';
-
-  const provider = geminiKey
-    ? `gemini (${process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2'})`
-    : `openai (text-embedding-3-small)`;
-  logPipelineSection(PipelineStep.Embed, `Using ${provider} for embeddings`);
+  const model = resolveEmbeddingModel();
+  logPipelineSection(PipelineStep.Embed, `Using ${model} for embeddings`);
 
   let embedded = 0;
   for (const article of articlesToEmbed) {
@@ -110,39 +47,21 @@ export async function embedNewArticles() {
     }
 
     const abridged = textToEmbed.slice(0, MAX_EMBEDDING_CHARS);
-    let embedding: number[] | null = null;
 
-    // Try Gemini first if key is present
-    if (geminiKey) {
-      try {
-        embedding = await getGeminiEmbeddingWithRetry(geminiKey, abridged);
-        if (process.env.NODE_ENV !== 'test') {
-          await new Promise((r) => setTimeout(r, 1200));
-        }
-      } catch (geminiErr: any) {
-        logger.warn(
-          `[${PipelineStep.Embed}] Gemini embedding failed for article ${article.id}, trying OpenAI fallback... Error: ${geminiErr.message || geminiErr}`
-        );
+    try {
+      const embedding = await generateEmbedding(abridged);
+
+      if (process.env.GEMINI_API_KEY && process.env.NODE_ENV !== 'test') {
+        await new Promise((r) => setTimeout(r, 1200));
       }
-    }
 
-    // Fallback to OpenAI if Gemini failed or key not present
-    if (!embedding && hasOpenAIKey) {
-      try {
-        embedding = await getOpenAIEmbedding(abridged);
-      } catch (openaiErr: any) {
-        logger.error(
-          `[${PipelineStep.Embed}] OpenAI embedding fallback failed for article ${article.id}:`,
-          openaiErr
-        );
-      }
-    }
-
-    if (embedding) {
       await updateArticleEmbedding(article.id, embedding);
       embedded++;
-    } else {
-      logger.error(`[${PipelineStep.Embed}] Failed embedding for article ${article.id}`);
+    } catch (err: any) {
+      logger.error(
+        `[${PipelineStep.Embed}] Failed embedding for article ${article.id}:`,
+        err.message || err
+      );
     }
   }
 

@@ -26,6 +26,20 @@ model Article {
   clusterAssignments ArticleClusterAssignment[]
 }
 
+model Story {
+  id        String    @id @default(cuid())
+  title     String
+  slug      String    @unique
+  overview  String?
+  status    String    @default("developing")
+  embedding Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  clusters  Cluster[]
+
+  @@index([status])
+}
+
 model Cluster {
   id                 String                     @id @default(cuid())
   createdAt          DateTime                   @default(now())
@@ -37,12 +51,16 @@ model Cluster {
   embedding          Json?
   score              Float?                     @default(0)
   archived           Boolean                    @default(false)
+  storyId            String?
+  storyAngle         String?
+  story              Story?                     @relation(fields: [storyId], references: [id], onDelete: SetNull)
   articleAssignments ArticleClusterAssignment[]
 
   @@index([headline])
   @@index([score])
   @@index([summary])
   @@index([archived])
+  @@index([storyId])
 }
 
 model Source {

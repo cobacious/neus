@@ -21,3 +21,6 @@ package-lock.json
 # AI tool caches
 **/.claude/
 **/.openai/
+
+# Screengrabs & temporary debug assets
+*.png
