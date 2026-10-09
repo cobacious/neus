@@ -58,6 +58,8 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Sparkline tooltip collision**: Prevent tooltips on closely clustered timeline markers from bunching/overlapping.
 - [x] **"Breaking" status decay**: Review criteria so stories active for multiple days transition appropriately to "Developing".
 - [x] **Histogram adaptive bucketing**: Dynamic 15m/30m/1h/2h/1d binning so rapid breaking news stories distribute chronologically instead of collapsing into a single 6h bar.
+- [ ] **Angle summary truncation**: Remove 2-line truncation (`line-clamp-2`) on angle summaries in cluster detail view so the full summary is visible.
+- [ ] **Mobile source logo flex wrapping**: In cluster card footers, ensure wrapping occurs between the article/angle count element and the source icons group, preventing source icons from breaking across lines on mobile.
 
 ### Track 2: Editorial Source Quality (`packages/db`)
 - [x] **Drop The Sun**: Deactivated in both local dev and production database sources, and removed from active seed list.
@@ -70,6 +72,9 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Content extraction failure loop**: Stop retrying failed article URL fetches in `fillMissingContent.ts` by marking failed extractions, and cap/parallelize fetches. (See detailed handoff in [`docs/handoffs/pipeline-performance-optimization.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/pipeline-performance-optimization.md))
 - [x] **Paywalled feed skip**: Mark paywalled feeds (The Times, FT, Telegraph, etc.) with a `paywalled: true` flag on `Source` (or skip list) so the extractor never attempts HTTP scraping and relies directly on RSS title/snippet.
 - [x] **Unclustered lookback window**: Shorten lookback window in `getUnclusteredArticles.ts` from 7 days to 2–3 days to prevent $O(N^2)$ quadratic slowdown over 1,860+ solitary articles.
+
+### Track 5: CI/CD & Testing Automation (`.github/workflows`)
+- [ ] **PR test & build gating CI**: Add a GitHub Actions CI workflow that runs `pnpm test`, typecheck, and build on pull requests and gates merging into `main`.
 
 ## Preferences & Strict Rules
 
