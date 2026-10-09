@@ -13,9 +13,9 @@ const feeds = [
   },
   {
     name: 'The Times',
-    homepageUrl: 'https://www.thetimes.co.uk',
-    rssFeedUrl: 'https://www.thetimes.co.uk/rss',
-    active: false,
+    homepageUrl: 'https://www.thetimes.com',
+    rssFeedUrl: 'https://news.google.com/rss/search?q=when:24h+site:thetimes.com&hl=en-GB&gl=GB&ceid=GB:en',
+    active: true,
   },
   {
     name: 'The Independent UK',
@@ -67,6 +67,16 @@ const feeds = [
     name: 'Channel 4 News',
     homepageUrl: 'https://www.channel4.com/news',
     rssFeedUrl: 'https://www.channel4.com/news/feed',
+  },
+  {
+    name: 'Evening Standard',
+    homepageUrl: 'https://www.standard.co.uk',
+    rssFeedUrl: 'https://www.standard.co.uk/news/rss',
+  },
+  {
+    name: 'The Scotsman',
+    homepageUrl: 'https://www.scotsman.com',
+    rssFeedUrl: 'https://www.scotsman.com/news/rss',
   },
   {
     name: 'Politico Europe',

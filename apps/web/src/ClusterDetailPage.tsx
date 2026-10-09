@@ -7,6 +7,7 @@ import ArticleTimelineSparkline, { TimelineArticle } from './components/ArticleT
 import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHistogram';
 import { createAngleColorMap, DEFAULT_ANGLE_COLOR } from './utils/angleColors';
 import { parseDate, formatRelativeTime, formatDateHeader } from './utils/dateUtils';
+import { isPaywalled } from './utils/paywallUtils';
 
 const CLUSTER_QUERY = `
   query Cluster($slug: String!) {
@@ -319,6 +320,15 @@ export default function ClusterDetailPage() {
                             </div>
                             <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                               <span>{article.sourceRel?.name || article.source}</span>
+                              {isPaywalled(article.sourceRel || article.source) && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-full"
+                                  title="Subscription required"
+                                >
+                                  <span>🔒</span>
+                                  <span>Subscription</span>
+                                </span>
+                              )}
                               {article.publishedAt && (
                                 <>
                                   <span>•</span>
@@ -365,6 +375,15 @@ export default function ClusterDetailPage() {
                           </div>
                           <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                             <span>{article.sourceRel?.name || article.source}</span>
+                            {isPaywalled(article.sourceRel || article.source) && (
+                              <span
+                                className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-full"
+                                title="Subscription required"
+                              >
+                                <span>🔒</span>
+                                <span>Subscription</span>
+                              </span>
+                            )}
                             {article.publishedAt && (
                               <>
                                 <span>•</span>

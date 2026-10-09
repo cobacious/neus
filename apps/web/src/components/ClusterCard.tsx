@@ -4,6 +4,7 @@ import StoryAnglePills, { AngleItem } from './StoryAnglePills';
 import ArticleTimelineSparkline, { TimelineArticle } from './ArticleTimelineSparkline';
 import { createAngleColorMap } from '../utils/angleColors';
 import { parseDate } from '../utils/dateUtils';
+import { isPaywalled } from '../utils/paywallUtils';
 
 interface Source {
   id: string;
@@ -182,15 +183,27 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
         </span>
         <span className="text-xs text-gray-300">•</span>
         <span className="text-xs text-gray-600 font-medium">Sources:</span>
-        {visibleSources.map((source) => (
-          <img
-            key={source.id}
-            src={source.faviconUrl || ''}
-            alt={source.name}
-            title={source.name}
-            className="w-5 h-5 rounded-xs"
-          />
-        ))}
+        {visibleSources.map((source) => {
+          const paywalled = isPaywalled(source);
+          return (
+            <div key={source.id} className="relative inline-flex items-center">
+              <img
+                src={source.faviconUrl || ''}
+                alt={source.name}
+                title={`${source.name}${paywalled ? ' (Subscription required)' : ''}`}
+                className="w-5 h-5 rounded-xs"
+              />
+              {paywalled && (
+                <span
+                  className="absolute -top-1 -right-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold shadow-xs select-none"
+                  title={`${source.name} (Subscription required)`}
+                >
+                  🔒
+                </span>
+              )}
+            </div>
+          );
+        })}
         {extraSources > 0 && <span className="text-xs text-gray-500">+{extraSources}</span>}
       </div>
     </Link>
