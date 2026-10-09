@@ -27,6 +27,11 @@ export async function getActiveClustersForStories(daysBack: number = 30) {
       _count: {
         select: { articleAssignments: true },
       },
+      articleAssignments: {
+        select: { createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
     },
     orderBy: { createdAt: 'desc' },
   });

@@ -22,6 +22,7 @@ let organizeStoryAngles: typeof import('./organizeStoryAngles').organizeStoryAng
 let buildNeighborhoods: typeof import('./organizeStoryAngles').buildNeighborhoods;
 let computeCentroidEmbedding: typeof import('./organizeStoryAngles').computeCentroidEmbedding;
 let findCandidateStoriesForNeighborhood: typeof import('./organizeStoryAngles').findCandidateStoriesForNeighborhood;
+let isSettledNeighborhood: typeof import('./organizeStoryAngles').isSettledNeighborhood;
 
 beforeAll(async () => {
   process.env.GEMINI_API_KEY = 'mock-gemini-key';
@@ -31,6 +32,7 @@ beforeAll(async () => {
     buildNeighborhoods,
     computeCentroidEmbedding,
     findCandidateStoriesForNeighborhood,
+    isSettledNeighborhood,
   } = await import('./organizeStoryAngles'));
 });
 
@@ -382,4 +384,133 @@ describe('organizeStoryAngles', () => {
     expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
     expect(mockDb.disbandUnderpopulatedStories).toHaveBeenCalled();
   });
+
+  it('skips settled neighborhoods without invoking LLM or mutating database', async () => {
+    const oldDate = new Date(Date.now() - 72 * 60 * 60 * 1000); // 3 days ago
+
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      {
+        id: 'c1',
+        headline: 'Historic Angle 1',
+        summary: 'Summary 1',
+        embedding: [1, 0],
+        createdAt: oldDate,
+        storyId: 'story-settled',
+        storyAngle: 'Angle One',
+        articleAssignments: [{ createdAt: oldDate }],
+      },
+      {
+        id: 'c2',
+        headline: 'Historic Angle 2',
+        summary: 'Summary 2',
+        embedding: [1, 0],
+        createdAt: oldDate,
+        storyId: 'story-settled',
+        storyAngle: 'Angle Two',
+        articleAssignments: [{ createdAt: oldDate }],
+      },
+    ]);
+
+    (mockDb.getStoriesForMatching as jest.Mock).mockResolvedValue([
+      {
+        id: 'story-settled',
+        title: 'Settled Historic Story',
+        status: 'developing',
+        overview: 'Overview',
+        _count: { clusters: 2 },
+      },
+    ]);
+
+    await organizeStoryAngles();
+
+    // LLM must NOT be called for settled stories
+    expect(mockFetch).not.toHaveBeenCalled();
+    // syncStoryWithAngles must NOT be called (preserving updatedAt)
+    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+    // No clusters merged
+    expect(mockDb.mergeClusters).not.toHaveBeenCalled();
+    // Realignment not invoked
+    expect(mockDb.realignStoryArticles).not.toHaveBeenCalled();
+  });
 });
+
+describe('isSettledNeighborhood', () => {
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const oldDate = new Date(Date.now() - 72 * 60 * 60 * 1000);
+  const recentDate = new Date();
+
+  const stories = [
+    {
+      id: 's1',
+      title: 'Story 1',
+      status: 'developing',
+      overview: 'Overview 1',
+      _count: { clusters: 2 },
+    },
+  ];
+
+  it('returns true when all clusters belong to same story, have angles, and are older than cutoff', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+    ];
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
+    expect(res.settled).toBe(true);
+    expect(res.storyTitle).toBe('Story 1');
+  });
+
+  it('returns false when any cluster lacks storyId', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
+      { id: 'c2', storyId: null, storyAngle: null, createdAt: oldDate },
+    ];
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
+    expect(res.settled).toBe(false);
+  });
+
+  it('returns false when clusters belong to different stories', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
+      { id: 'c2', storyId: 's2', storyAngle: 'A2', createdAt: oldDate },
+    ];
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
+    expect(res.settled).toBe(false);
+  });
+
+  it('returns false when any cluster is missing storyAngle', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
+      { id: 'c2', storyId: 's1', storyAngle: null, createdAt: oldDate },
+    ];
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
+    expect(res.settled).toBe(false);
+  });
+
+  it('returns false when a cluster was created recently', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
+      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: recentDate },
+    ];
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
+    expect(res.settled).toBe(false);
+  });
+
+  it('returns false when a cluster received a new article assignment recently', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: recentDate }] },
+    ];
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
+    expect(res.settled).toBe(false);
+  });
+
+  it('returns false when the story has more clusters in the DB than in this neighborhood', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+    ];
+    // DB story has 2 clusters, but neighborhood only has 1
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
+    expect(res.settled).toBe(false);
+  });
+});
+

@@ -38,12 +38,12 @@ export async function runPipeline() {
   const durationSec = Math.round((Date.now() - startTime) / 1000);
   const metrics = await getDatabaseUsageMetrics();
 
-  logger.info(`[${PipelineStep.Score}] Pipeline execution finished in ${durationSec}s`);
-  logger.info(`[${PipelineStep.Score}] Database Storage: ${metrics.storageFormatted}`);
-  logger.info(`[${PipelineStep.Score}] Database Egress: ${metrics.egressFormatted}`);
-  logger.info(`[${PipelineStep.Score}] Database Compute: ${metrics.computeFormatted}`);
+  logger.info(`[${PipelineStep.Summary}] Pipeline execution finished in ${durationSec}s`);
+  logger.info(`[${PipelineStep.Summary}] Database Storage: ${metrics.storageFormatted}`);
+  logger.info(`[${PipelineStep.Summary}] Database Egress: ${metrics.egressFormatted}`);
+  logger.info(`[${PipelineStep.Summary}] Database Compute: ${metrics.computeFormatted}`);
   logger.info(
-    `[${PipelineStep.Score}] Articles: ${metrics.totalArticles} total (${metrics.unclusteredArticles} unclustered) | Clusters: ${metrics.activeClusters} active, ${metrics.archivedClusters} archived`
+    `[${PipelineStep.Summary}] Articles: ${metrics.totalArticles} total (${metrics.unclusteredArticles} unclustered) | Clusters: ${metrics.activeClusters} active, ${metrics.archivedClusters} archived`
   );
 
   if (metrics.storageBytes > 750 * 1024 * 1024) {

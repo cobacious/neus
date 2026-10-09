@@ -8,8 +8,16 @@ export enum PipelineStep {
   Fetch = 'FETCH',
   Embed = 'EMBED',
   Cluster = 'CLUSTER',
-  Summarise = 'SUMMARISE',
   Score = 'SCORE',
+  Summarise = 'SUMMARISE',
+  Organize = 'ORGANIZE',
+  Cleanup = 'CLEANUP',
+  Disband = 'DISBAND',
+  Archive = 'ARCHIVE',
+  Prune = 'PRUNE',
+  Purge = 'PURGE',
+  Vacuum = 'VACUUM',
+  Summary = 'SUMMARY',
 }
 
 const logger = pino({

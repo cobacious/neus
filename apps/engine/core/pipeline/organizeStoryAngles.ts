@@ -46,6 +46,7 @@ export type CandidateStory = {
   title: string;
   status: string;
   overview: string | null;
+  _count?: { clusters: number };
 };
 
 export type ClusterWithEmbedding = {
@@ -57,8 +58,76 @@ export type ClusterWithEmbedding = {
   storyAngle?: string | null;
   embedding?: unknown;
   _count?: { articleAssignments: number };
+  articleAssignments?: Array<{ createdAt: Date }>;
   [key: string]: any;
 };
+
+/**
+ * Checks whether a candidate neighborhood represents an already-settled story.
+ * If all clusters already belong to the same existing story, have assigned angles,
+ * and haven't had new clusters or articles added in the past RECENT_ACTIVITY_HOURS,
+ * LLM evaluation and realignment can be safely skipped.
+ */
+export function isSettledNeighborhood<T extends ClusterWithEmbedding>(
+  neighborhood: T[],
+  existingStories: Array<{
+    id: string;
+    title: string;
+    status: string;
+    overview: string | null;
+    _count?: { clusters: number };
+  }>,
+  activityCutoff: Date
+): { settled: boolean; storyTitle?: string } {
+  if (neighborhood.length < 2) return { settled: false };
+
+  // All clusters in the candidate neighborhood must already belong to a story
+  if (!neighborhood.every((c) => Boolean(c.storyId))) {
+    return { settled: false };
+  }
+
+  // All clusters must belong to the exact same story
+  const targetStoryId = neighborhood[0].storyId!;
+  if (!neighborhood.every((c) => c.storyId === targetStoryId)) {
+    return { settled: false };
+  }
+
+  // All clusters must already have an assigned storyAngle
+  if (!neighborhood.every((c) => Boolean(c.storyAngle))) {
+    return { settled: false };
+  }
+
+  // Verify the story exists in existingStories
+  const matchedStory = existingStories.find((s) => s.id === targetStoryId);
+  if (!matchedStory) {
+    return { settled: false };
+  }
+
+  // If the story has more clusters in the database than are present in this neighborhood,
+  // do not treat as settled (an angle might be dissociated or split)
+  if (matchedStory._count && matchedStory._count.clusters > neighborhood.length) {
+    return { settled: false };
+  }
+
+  // Check if any cluster in the neighborhood was created recently (< 48h)
+  const hasRecentlyCreatedCluster = neighborhood.some(
+    (c) => new Date(c.createdAt) >= activityCutoff
+  );
+  if (hasRecentlyCreatedCluster) {
+    return { settled: false };
+  }
+
+  // Check if any cluster in the neighborhood received a new article assignment recently (< 48h)
+  const hasRecentlyAssignedArticle = neighborhood.some((c) => {
+    const latestArticleAt = c.articleAssignments?.[0]?.createdAt;
+    return latestArticleAt && new Date(latestArticleAt) >= activityCutoff;
+  });
+  if (hasRecentlyAssignedArticle) {
+    return { settled: false };
+  }
+
+  return { settled: true, storyTitle: matchedStory.title };
+}
 
 /**
  * Groups clusters into candidate neighborhoods using vector similarity and connected components.
@@ -183,6 +252,7 @@ export function findCandidateStoriesForNeighborhood(
           title: match.title,
           status: match.status,
           overview: match.overview,
+          _count: (match as any)._count,
         });
       }
     }
@@ -202,6 +272,7 @@ export function findCandidateStoriesForNeighborhood(
             title: story.title,
             status: story.status,
             overview: story.overview,
+            _count: (story as any)._count,
           });
           break;
         }
@@ -289,7 +360,7 @@ Return JSON with this exact schema:
   return generateStructuredJson<NeighborhoodEvaluation>({
     prompt,
     systemInstruction: 'You are an objective news taxonomist. Return strict JSON only.',
-    step: PipelineStep.Cluster,
+    step: PipelineStep.Organize,
     schema: {
       type: 'OBJECT',
       properties: {
@@ -341,7 +412,7 @@ export async function classifyArticleAngles(
 ): Promise<Array<{ articleId: string; targetClusterId: string }>> {
   if (angles.length < 2 || articles.length === 0) return [];
 
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 25;
   const allAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
 
   for (let i = 0; i < articles.length; i += BATCH_SIZE) {
@@ -350,7 +421,7 @@ export async function classifyArticleAngles(
     const totalBatches = Math.ceil(articles.length / BATCH_SIZE);
 
     logger.info(
-      `[${PipelineStep.Cluster}] Classifying batch ${batchIndex}/${totalBatches} (${batch.length} articles) for "${storyTitle}"...`
+      `[${PipelineStep.Organize}] Classifying batch ${batchIndex}/${totalBatches} (${batch.length} articles) for "${storyTitle}"...`
     );
 
     const prompt = `You are an objective news editor organizing a multi-angle story.
@@ -374,7 +445,7 @@ Return JSON with key "assignments": Array<{ articleId: string, targetClusterId: 
       prompt,
       systemInstruction:
         'You are an objective news editor. Assign articles to their most accurate angle. Return strict JSON only.',
-      step: PipelineStep.Cluster,
+      step: PipelineStep.Organize,
       schema: {
         type: 'OBJECT',
         properties: {
@@ -403,13 +474,13 @@ Return JSON with key "assignments": Array<{ articleId: string, targetClusterId: 
 }
 
 export async function organizeStoryAngles() {
-  logPipelineStep(PipelineStep.Cluster, 'Organizing clusters into story angles & merging duplicates...');
+  logPipelineStep(PipelineStep.Organize, 'Organizing clusters into story angles & merging duplicates...');
 
   const activeClusters = await getActiveClustersForStories(30);
 
   if (activeClusters.length < 2) {
     logPipelineSection(
-      PipelineStep.Cluster,
+      PipelineStep.Organize,
       `Not enough active clusters to evaluate stories (${activeClusters.length} found). Skipping.`
     );
     return;
@@ -424,20 +495,20 @@ export async function organizeStoryAngles() {
   const neighborhoods = buildNeighborhoods(activeClusters, similarityThreshold);
 
   logPipelineSection(
-    PipelineStep.Cluster,
+    PipelineStep.Organize,
     `Evaluated ${activeClusters.length} clusters: found ${neighborhoods.length} candidate neighborhoods (threshold >= ${similarityThreshold})`
   );
 
   if (neighborhoods.length === 0) {
     logger.info(
-      `[${PipelineStep.Cluster}] No cluster neighborhoods detected above threshold. All clusters are standalone.`
+      `[${PipelineStep.Organize}] No cluster neighborhoods detected above threshold. All clusters are standalone.`
     );
     await disbandUnderpopulatedStories();
     // Still perform dormancy sweep even if no new neighborhoods formed
     const dormantCount = await markDormantStories(7);
     if (dormantCount > 0) {
       logger.info(
-        `[${PipelineStep.Cluster}] Marked ${dormantCount} inactive stories as dormant (no updates in 7+ days)`
+        `[${PipelineStep.Organize}] Marked ${dormantCount} inactive stories as dormant (no updates in 7+ days)`
       );
     }
     return;
@@ -445,9 +516,25 @@ export async function organizeStoryAngles() {
 
   let totalMerged = 0;
   let totalStoriesSynced = 0;
+  let totalSkippedSettled = 0;
+
+  const RECENT_ACTIVITY_HOURS = 48;
+  const activityCutoff = new Date(Date.now() - RECENT_ACTIVITY_HOURS * 60 * 60 * 1000);
 
   for (let i = 0; i < neighborhoods.length; i++) {
     const neighborhood = neighborhoods[i];
+
+    // Skip settled neighborhoods where all clusters already belong to the same existing story,
+    // angles are assigned, and no new clusters or articles arrived in the past RECENT_ACTIVITY_HOURS
+    const settledCheck = isSettledNeighborhood(neighborhood, existingStories, activityCutoff);
+    if (settledCheck.settled) {
+      totalSkippedSettled++;
+      logger.info(
+        `[${PipelineStep.Organize}] Skipping settled story neighborhood for "${settledCheck.storyTitle}" (no new clusters or articles in past ${RECENT_ACTIVITY_HOURS}h)`
+      );
+      continue;
+    }
+
     const candidateStories = findCandidateStoriesForNeighborhood(neighborhood, existingStories);
 
     const clustersForPrompt = neighborhood.map((c) => ({
@@ -463,7 +550,7 @@ export async function organizeStoryAngles() {
       evalResult = await evaluateNeighborhood(clustersForPrompt, candidateStories);
     } catch (err: any) {
       logger.error(
-        `[${PipelineStep.Cluster}] Failed evaluating neighborhood ${i + 1}/${neighborhoods.length}: ${err.message || err}`
+        `[${PipelineStep.Organize}] Failed evaluating neighborhood ${i + 1}/${neighborhoods.length}: ${err.message || err}`
       );
       continue;
     }
@@ -486,7 +573,7 @@ export async function organizeStoryAngles() {
           validSources.forEach((id) => mergedSourceIds.add(id));
           totalMerged += validSources.length;
           logger.info(
-            `[${PipelineStep.Cluster}] Merged ${validSources.length} duplicate cluster(s) into ${m.targetClusterId}`
+            `[${PipelineStep.Organize}] Merged ${validSources.length} duplicate cluster(s) into ${m.targetClusterId}`
           );
         }
       }
@@ -526,7 +613,7 @@ export async function organizeStoryAngles() {
           });
           totalStoriesSynced++;
           logger.info(
-            `[${PipelineStep.Cluster}] Grouped ${survivingAngles.length} angles under story: "${storyItem.storyTitle}"${
+            `[${PipelineStep.Organize}] Grouped ${survivingAngles.length} angles under story: "${storyItem.storyTitle}"${
               targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
             }`
           );
@@ -536,7 +623,27 @@ export async function organizeStoryAngles() {
             const angleClusterIds = survivingAngles.map((a) => a.clusterId);
             const storyArticles = await getStoryArticlesForRealignment(angleClusterIds);
 
-            if (storyArticles.length > 0) {
+            // Only run article classification if:
+            // 1. Angle count/membership changed, OR
+            // 2. Any cluster in this story received new articles or was created in the last 48h
+            const hasRecentActivity = survivingClusters.some((c) => {
+              const latest = (c as any).articleAssignments?.[0]?.createdAt;
+              return (
+                (latest && new Date(latest) >= activityCutoff) ||
+                new Date(c.createdAt) >= activityCutoff
+              );
+            });
+            const existingStoryClusterCount = targetStoryId
+              ? existingStories.find((s) => s.id === targetStoryId)?._count?.clusters
+              : undefined;
+            const hasAngleCountChange =
+              existingStoryClusterCount !== undefined &&
+              existingStoryClusterCount !== survivingAngles.length;
+
+            if (
+              storyArticles.length > 0 &&
+              (hasRecentActivity || hasAngleCountChange || !targetStoryId)
+            ) {
               const anglesWithHeadlines = survivingAngles.map((a) => ({
                 clusterId: a.clusterId,
                 angle: a.angle,
@@ -562,14 +669,14 @@ export async function organizeStoryAngles() {
                 const { updatedCount } = await realignStoryArticles(validReassignments);
                 if (updatedCount > 0) {
                   logger.info(
-                    `[${PipelineStep.Cluster}] Realigned ${updatedCount} article(s) across angles for story "${storyItem.storyTitle}"`
+                    `[${PipelineStep.Organize}] Realigned ${updatedCount} article(s) across angles for story "${storyItem.storyTitle}"`
                   );
                 }
               }
             }
           } catch (realignErr: any) {
             logger.warn(
-              `[${PipelineStep.Cluster}] Article realignment skipped for "${storyItem.storyTitle}": ${realignErr.message || realignErr}`
+              `[${PipelineStep.Organize}] Article realignment skipped for "${storyItem.storyTitle}": ${realignErr.message || realignErr}`
             );
           }
         }
@@ -585,7 +692,7 @@ export async function organizeStoryAngles() {
       const clusterIdsToDissociate = unassignedNeighborhoodClusters.map((c) => c.id);
       await dissociateClusters(clusterIdsToDissociate);
       logger.info(
-        `[${PipelineStep.Cluster}] Dissociated ${clusterIdsToDissociate.length} cluster(s) from story (evaluated as standalone): ${clusterIdsToDissociate.join(', ')}`
+        `[${PipelineStep.Organize}] Dissociated ${clusterIdsToDissociate.length} cluster(s) from story (evaluated as standalone): ${clusterIdsToDissociate.join(', ')}`
       );
     }
   }
@@ -594,7 +701,7 @@ export async function organizeStoryAngles() {
   const { disbandedStoriesCount, dissociatedClustersCount } = await disbandUnderpopulatedStories();
   if (disbandedStoriesCount > 0) {
     logger.info(
-      `[${PipelineStep.Cluster}] Disbanded ${disbandedStoriesCount} underpopulated story/stories (dissociated ${dissociatedClustersCount} single cluster(s))`
+      `[${PipelineStep.Organize}] Disbanded ${disbandedStoriesCount} underpopulated story/stories (dissociated ${dissociatedClustersCount} single cluster(s))`
     );
   }
 
@@ -602,12 +709,12 @@ export async function organizeStoryAngles() {
   const dormantCount = await markDormantStories(7);
   if (dormantCount > 0) {
     logger.info(
-      `[${PipelineStep.Cluster}] Marked ${dormantCount} inactive stories as dormant (no updates in 7+ days)`
+      `[${PipelineStep.Organize}] Marked ${dormantCount} inactive stories as dormant (no updates in 7+ days)`
     );
   }
 
   logPipelineSection(
-    PipelineStep.Cluster,
-    `Story organization complete. Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-angle stories, ${disbandedStoriesCount} disbanded, ${dormantCount} stories dormant.`
+    PipelineStep.Organize,
+    `Story organization complete. Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-angle stories, skipped ${totalSkippedSettled} settled stories, ${disbandedStoriesCount} disbanded, ${dormantCount} stories dormant.`
   );
 }
