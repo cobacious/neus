@@ -22,11 +22,6 @@ const feeds = [
     rssFeedUrl: 'https://www.independent.co.uk/news/rss',
   },
   {
-    name: 'The Sun',
-    homepageUrl: 'https://www.thesun.co.uk',
-    rssFeedUrl: 'https://www.thesun.co.uk/news/feed/',
-  },
-  {
     name: 'Daily Express',
     homepageUrl: 'https://www.express.co.uk',
     rssFeedUrl: 'https://www.express.co.uk/news/rss',
