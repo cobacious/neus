@@ -5,9 +5,9 @@ import { resolve } from 'path';
 const config: JestConfigWithTsJest = {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
-  extensionsToTreatAsEsm: ['.ts'],
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   transform: {
-    '^.+\\.ts$': [
+    '^.+\\.(ts|tsx)$': [
       'ts-jest',
       {
         useESM: true,
@@ -16,7 +16,7 @@ const config: JestConfigWithTsJest = {
       },
     ],
   },
-  moduleFileExtensions: ['ts', 'js', 'json'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   testMatch: ['**/*.test.ts', '**/*.spec.ts'],
   roots: ['<rootDir>/apps', '<rootDir>/packages'],
 };

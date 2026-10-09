@@ -1,11 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
-import StatusBadge, { resolveStoryStatus } from './components/StatusBadge';
+import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './components/StatusBadge';
 import StoryAnglePills, { AngleItem } from './components/StoryAnglePills';
 import ArticleTimelineSparkline, { TimelineArticle } from './components/ArticleTimelineSparkline';
 import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHistogram';
 import { createAngleColorMap, DEFAULT_ANGLE_COLOR } from './utils/angleColors';
+import { parseDate, formatRelativeTime, formatDateHeader } from './utils/dateUtils';
 
 const CLUSTER_QUERY = `
   query Cluster($slug: String!) {
@@ -63,24 +64,6 @@ const CLUSTER_QUERY = `
   }
 `;
 
-function formatRelativeDate(timestamp: number | string | null | undefined): string {
-  if (!timestamp) return 'N/A';
-  const date = new Date(Number(timestamp));
-  if (isNaN(date.getTime())) return 'Invalid Date';
-
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
 export default function ClusterDetailPage() {
   const { slug } = useParams();
   const [result] = useQuery({ query: CLUSTER_QUERY, variables: { slug } });
@@ -100,7 +83,25 @@ export default function ClusterDetailPage() {
   const cluster = result.data.cluster;
   const story = cluster.story;
   const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
-  const status = resolveStoryStatus(story?.status, cluster);
+
+  let earliestCreatedAt = cluster.createdAt;
+  if (isMultiAngleStory && story?.clusters) {
+    story.clusters.forEach((c: any) => {
+      if (c.createdAt) {
+        const cTime = parseDate(c.createdAt)?.getTime();
+        const curTime = parseDate(earliestCreatedAt)?.getTime();
+        if (cTime && (!curTime || cTime < curTime)) {
+          earliestCreatedAt = c.createdAt;
+        }
+      }
+    });
+  }
+
+  const status = resolveStoryStatus(story?.status, {
+    createdAt: earliestCreatedAt,
+    lastUpdatedAt: cluster.lastUpdatedAt,
+    isMultiAngle: isMultiAngleStory,
+  });
 
   // 1. Gather all angles
   const angles: AngleItem[] = isMultiAngleStory && story?.clusters
@@ -156,8 +157,8 @@ export default function ClusterDetailPage() {
 
   // Fallback for standalone: group articles by publication date
   const sortedStandaloneArticles = [...cluster.articles].sort((a: any, b: any) => {
-    const dateA = new Date(a.publishedAt).getTime();
-    const dateB = new Date(b.publishedAt).getTime();
+    const dateA = parseDate(a.publishedAt)?.getTime() ?? NaN;
+    const dateB = parseDate(b.publishedAt)?.getTime() ?? NaN;
     if (isNaN(dateA) && isNaN(dateB)) return 0;
     if (isNaN(dateA)) return 1;
     if (isNaN(dateB)) return -1;
@@ -166,18 +167,27 @@ export default function ClusterDetailPage() {
 
   const standaloneArticlesByDate: { [date: string]: any[] } = {};
   sortedStandaloneArticles.forEach((article: any) => {
-    const articleDate = new Date(article.publishedAt);
-    const date = isNaN(articleDate.getTime())
-      ? 'Unknown Date'
-      : articleDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const date = formatDateHeader(article.publishedAt);
     if (!standaloneArticlesByDate[date]) {
       standaloneArticlesByDate[date] = [];
     }
     standaloneArticlesByDate[date].push(article);
   });
 
+  const statusConfig = status ? STATUS_CONFIG[status] : null;
+
   return (
-    <div className="bg-white shadow-xs border border-gray-200 p-6 rounded-lg">
+    <div
+      className="relative bg-white shadow-xs border border-gray-200 p-6 rounded-lg"
+      style={statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined}
+    >
+      {/* Straddling Top-Border Status Badge */}
+      {status && (
+        <div className="absolute right-6 top-0 -translate-y-1/2 z-10">
+          <StatusBadge status={status} size="md" />
+        </div>
+      )}
+
       {/* Back button */}
       <Link
         to="/"
@@ -194,20 +204,6 @@ export default function ClusterDetailPage() {
           </p>
         </div>
       )}
-
-      {/* Story Context Eyebrow & Status Badge (Feature 1) */}
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
-        {isMultiAngleStory && story ? (
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Story Overview
-          </div>
-        ) : (
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Report
-          </div>
-        )}
-        <StatusBadge status={status} size="md" />
-      </div>
 
       {/* Main Headline */}
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 my-2 leading-tight">
@@ -326,7 +322,7 @@ export default function ClusterDetailPage() {
                               {article.publishedAt && (
                                 <>
                                   <span>•</span>
-                                  <span>{formatRelativeDate(article.publishedAt)}</span>
+                                  <span>{formatRelativeTime(article.publishedAt)}</span>
                                 </>
                               )}
                             </div>
@@ -372,7 +368,7 @@ export default function ClusterDetailPage() {
                             {article.publishedAt && (
                               <>
                                 <span>•</span>
-                                <span>{formatRelativeDate(article.publishedAt)}</span>
+                                <span>{formatRelativeTime(article.publishedAt)}</span>
                               </>
                             )}
                           </div>

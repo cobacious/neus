@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AngleColorStyle, DEFAULT_ANGLE_COLOR } from '../utils/angleColors';
+import { parseDate, formatRelativeTime } from '../utils/dateUtils';
 
 export interface TimelineArticle {
   id: string;
@@ -15,62 +16,78 @@ export interface TimelineArticle {
   angleName?: string | null;
 }
 
-interface ArticleTimelineSparklineProps {
-  articles: TimelineArticle[];
+export interface TimelineMarker {
+  id: string;
+  pct: number;
+  color: string;
+  angleStyle: AngleColorStyle;
+  time: number;
+  article: TimelineArticle;
+}
+
+export interface SparklineLayout {
+  minTime: number;
+  maxTime: number;
+  spanMs: number;
+  firstSeenLabel: string;
+  lastUpdatedLabel: string;
+  validArticles: (TimelineArticle & { time: number })[];
+  markers: TimelineMarker[];
+  // Backwards compatibility alias for tests
+  markerGroups?: any[];
+}
+
+export interface ArticleTimelineSparklineProps {
+  articles?: TimelineArticle[];
   colorMap?: Map<string, AngleColorStyle>;
   fallbackFirstSeen?: number | string | null;
   fallbackLastUpdated?: number | string | null;
   className?: string;
 }
 
-function formatRelativeTime(ts: number): string {
-  if (isNaN(ts)) return 'N/A';
-  const diffMs = Date.now() - ts;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+/**
+ * Computes timeline markers along a clean, flat single horizontal rail.
+ * - Every article has its own individual dot on the rail.
+ * - Every dot strictly displays its angle's palette color.
+ * - First seen is anchored at 0%, last updated is anchored at 100%.
+ */
+export function buildTimelineMarkers(
+  articles: TimelineArticle[] = [],
+  options?: {
+    colorMap?: Map<string, AngleColorStyle>;
+    fallbackFirstSeen?: number | string | null;
+    fallbackLastUpdated?: number | string | null;
+  }
+): SparklineLayout | null {
+  const { colorMap, fallbackFirstSeen, fallbackLastUpdated } = options || {};
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-export default function ArticleTimelineSparkline({
-  articles = [],
-  colorMap,
-  fallbackFirstSeen,
-  fallbackLastUpdated,
-  className = '',
-}: ArticleTimelineSparklineProps) {
-  const [hoveredArticle, setHoveredArticle] = useState<{
-    article: TimelineArticle;
-    pct: number;
-    color: string;
-  } | null>(null);
-
-  // Extract valid timestamps
+  // 1. Extract valid timestamps safely via parseDate
   const validArticles = articles
     .map((a) => {
-      const time = a.publishedAt ? new Date(a.publishedAt).getTime() : NaN;
+      const parsed = parseDate(a.publishedAt);
+      const time = parsed ? parsed.getTime() : NaN;
       return { ...a, time };
     })
     .filter((a) => !isNaN(a.time))
     .sort((a, b) => a.time - b.time);
 
+  // 2. Determine timeline bounds
+  const parsedFallbackFirst = parseDate(fallbackFirstSeen);
+  const parsedFallbackLast = parseDate(fallbackLastUpdated);
+
   let minTime = validArticles.length > 0 ? validArticles[0].time : NaN;
   let maxTime = validArticles.length > 0 ? validArticles[validArticles.length - 1].time : NaN;
 
-  if (fallbackFirstSeen) {
-    const f = new Date(Number(fallbackFirstSeen)).getTime();
-    if (!isNaN(f) && (isNaN(minTime) || f < minTime)) minTime = f;
+  if (isNaN(minTime) && parsedFallbackFirst) {
+    minTime = parsedFallbackFirst.getTime();
+  }
+  if (isNaN(maxTime) && parsedFallbackLast) {
+    maxTime = parsedFallbackLast.getTime();
   }
 
-  if (fallbackLastUpdated) {
-    const l = new Date(Number(fallbackLastUpdated)).getTime();
-    if (!isNaN(l) && (isNaN(maxTime) || l > maxTime)) maxTime = l;
-  }
+  // If still missing bounds, fallback mutually
+  if (isNaN(minTime) && !isNaN(maxTime)) minTime = maxTime;
+  if (isNaN(maxTime) && !isNaN(minTime)) maxTime = minTime;
 
   if (isNaN(minTime) || isNaN(maxTime)) {
     return null;
@@ -80,6 +97,72 @@ export default function ArticleTimelineSparkline({
   const firstSeenLabel = formatRelativeTime(minTime);
   const lastUpdatedLabel = formatRelativeTime(maxTime);
 
+  // 3. Compute markers anchored at 0% and 100%
+  const markers: TimelineMarker[] = validArticles.map((article, index) => {
+    const isFirstArticle = index === 0;
+    const isLastArticle = index === validArticles.length - 1;
+    const rawPct = spanMs > 0 ? ((article.time - minTime) / spanMs) * 100 : 100;
+    const pct =
+      isFirstArticle && spanMs > 0
+        ? 0
+        : isLastArticle && spanMs > 0
+        ? 100
+        : Math.max(0, Math.min(100, rawPct));
+
+    const angleStyle =
+      (article.angleId && colorMap?.get(article.angleId)) ||
+      (article.angleName && colorMap?.get(article.angleName)) ||
+      DEFAULT_ANGLE_COLOR;
+
+    return {
+      id: article.id,
+      pct,
+      color: angleStyle.color,
+      angleStyle,
+      time: article.time,
+      article,
+    };
+  });
+
+  return {
+    minTime,
+    maxTime,
+    spanMs,
+    firstSeenLabel,
+    lastUpdatedLabel,
+    validArticles,
+    markers,
+    markerGroups: markers.map((m) => ({ ...m, articles: [m.article] })),
+  };
+}
+
+export const buildMarkerGroups = buildTimelineMarkers;
+
+export default function ArticleTimelineSparkline({
+  articles = [],
+  colorMap,
+  fallbackFirstSeen,
+  fallbackLastUpdated,
+  className = '',
+}: ArticleTimelineSparklineProps) {
+  const [hoveredMarker, setHoveredMarker] = useState<TimelineMarker | null>(null);
+
+  const layout = useMemo(
+    () =>
+      buildTimelineMarkers(articles, {
+        colorMap,
+        fallbackFirstSeen,
+        fallbackLastUpdated,
+      }),
+    [articles, colorMap, fallbackFirstSeen, fallbackLastUpdated]
+  );
+
+  if (!layout) {
+    return null;
+  }
+
+  const { firstSeenLabel, lastUpdatedLabel, validArticles, markers } = layout;
+
   return (
     <div
       className={`relative py-1.5 ${className}`}
@@ -88,41 +171,47 @@ export default function ArticleTimelineSparkline({
     >
       <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
         {/* Left: First seen */}
-        <span className="flex-shrink-0 text-[11px] text-gray-500 font-sans whitespace-nowrap" title={`First seen: ${firstSeenLabel}`}>
+        <span
+          className="flex-shrink-0 text-[11px] text-gray-500 font-sans whitespace-nowrap"
+          title={`First seen: ${firstSeenLabel}`}
+        >
           {firstSeenLabel}
         </span>
 
-        {/* Central rail track */}
+        {/* Central rail track with anchored endpoint terminals */}
         <div className="relative flex-1 h-[3px] bg-gray-200 rounded-full mx-1">
-          {validArticles.map((article) => {
-            const pct = spanMs > 0 ? ((article.time - minTime) / spanMs) * 100 : 50;
-            const clampedPct = Math.max(1, Math.min(99, pct));
+          {/* Subtle rail anchor terminals at both ends */}
+          <div
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-gray-300 pointer-events-none"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute left-full top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-gray-300 pointer-events-none"
+            aria-hidden="true"
+          />
 
-            const style =
-              (article.angleId && colorMap?.get(article.angleId)) ||
-              (article.angleName && colorMap?.get(article.angleName)) ||
-              DEFAULT_ANGLE_COLOR;
-
-            const isHovered = hoveredArticle?.article.id === article.id;
+          {/* Interactive timeline markers on single flat rail */}
+          {markers.map((marker) => {
+            const isHovered = hoveredMarker?.id === marker.id;
 
             return (
               <button
-                key={article.id}
+                key={marker.id}
                 type="button"
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group p-1 focus:outline-none focus:ring-2 focus:ring-gray-400 rounded-full"
-                style={{ left: `${clampedPct}%` }}
-                onMouseEnter={() =>
-                  setHoveredArticle({ article, pct: clampedPct, color: style.color })
-                }
-                onMouseLeave={() => setHoveredArticle(null)}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 p-1 focus:outline-none focus:ring-1 focus:ring-gray-400 rounded-full transition-transform duration-100"
+                style={{
+                  left: `${marker.pct}%`,
+                  transform: `translate(-50%, -50%) ${isHovered ? 'scale(1.35)' : 'scale(1)'}`,
+                  zIndex: isHovered ? 30 : 10,
+                }}
+                onMouseEnter={() => setHoveredMarker(marker)}
+                onMouseLeave={() => setHoveredMarker(null)}
                 onClick={(e) => e.stopPropagation()}
-                aria-label={`${article.title || 'Article'} (${formatRelativeTime(article.time)})`}
+                aria-label={`${marker.article.title || 'Article'} (${formatRelativeTime(marker.time)})`}
               >
                 <span
-                  className={`block rounded-full ring-1 ring-white transition-all duration-150 ${
-                    isHovered ? 'w-3 h-3 scale-125 z-20' : 'w-2 h-2 opacity-90 hover:opacity-100 z-10'
-                  }`}
-                  style={{ backgroundColor: style.color }}
+                  className="block w-2 h-2 rounded-full ring-1 ring-white shadow-2xs"
+                  style={{ backgroundColor: marker.color }}
                 />
               </button>
             );
@@ -130,42 +219,67 @@ export default function ArticleTimelineSparkline({
         </div>
 
         {/* Right: Last updated */}
-        <span className="flex-shrink-0 text-[11px] text-gray-500 font-sans whitespace-nowrap" title={`Last updated: ${lastUpdatedLabel}`}>
+        <span
+          className="flex-shrink-0 text-[11px] text-gray-500 font-sans whitespace-nowrap"
+          title={`Last updated: ${lastUpdatedLabel}`}
+        >
           {lastUpdatedLabel}
         </span>
       </div>
 
-      {/* Floating Hover Tooltip */}
-      {hoveredArticle && (
+      {/* Floating Hover Tooltip: Wide, comfortable (w-64) with intelligent boundary anchoring */}
+      {hoveredMarker && (
         <div
-          className="absolute bottom-full mb-2 z-30 pointer-events-none transform -translate-x-1/2 bg-gray-900 text-white rounded px-2.5 py-1.5 text-xs shadow-lg max-w-xs transition-opacity duration-150"
-          style={{
-            left: `${Math.max(15, Math.min(85, hoveredArticle.pct))}%`,
-          }}
+          className={`absolute bottom-full mb-2 z-30 pointer-events-none bg-gray-900 text-white rounded-md p-3 text-xs shadow-xl w-64 max-w-[calc(100vw-32px)] transition-all duration-150 border border-gray-800 ${
+            hoveredMarker.pct < 20
+              ? 'left-0 translate-x-0'
+              : hoveredMarker.pct > 80
+              ? 'left-full -translate-x-full'
+              : '-translate-x-1/2'
+          }`}
+          style={
+            hoveredMarker.pct >= 20 && hoveredMarker.pct <= 80
+              ? { left: `${hoveredMarker.pct}%` }
+              : undefined
+          }
         >
-          <div className="flex items-center gap-1.5 mb-0.5 text-[10px] text-gray-300">
-            {hoveredArticle.article.sourceRel?.faviconUrl && (
+          {/* Header: Source favicon, name, and relative time */}
+          <div className="flex items-center gap-1.5 mb-1.5 text-[10px] text-gray-300">
+            {hoveredMarker.article.sourceRel?.faviconUrl && (
               <img
-                src={hoveredArticle.article.sourceRel.faviconUrl}
+                src={hoveredMarker.article.sourceRel.faviconUrl}
                 alt=""
-                className="w-3.5 h-3.5 rounded-sm"
+                className="w-3.5 h-3.5 rounded-xs"
               />
             )}
-            <span className="font-medium text-gray-200">
-              {hoveredArticle.article.sourceRel?.name ||
-                hoveredArticle.article.source ||
+            <span className="font-semibold text-gray-200">
+              {hoveredMarker.article.sourceRel?.name ||
+                hoveredMarker.article.source ||
                 'News Source'}
             </span>
             <span>•</span>
-            <span>{formatRelativeTime((hoveredArticle.article as any).time)}</span>
+            <span>{formatRelativeTime(hoveredMarker.time)}</span>
           </div>
-          {hoveredArticle.article.angleName && (
-            <div className="text-[10px] font-medium mb-1" style={{ color: '#E4DFDA' }}>
-              Angle: {hoveredArticle.article.angleName}
+
+          {/* Angle Tag Pill */}
+          {hoveredMarker.article.angleName && (
+            <div className="mb-1.5">
+              <span
+                className="inline-block px-1.5 py-0.5 rounded-xs text-[9px] font-semibold border uppercase tracking-wider"
+                style={{
+                  backgroundColor: hoveredMarker.angleStyle.bg,
+                  borderColor: hoveredMarker.angleStyle.border,
+                  color: hoveredMarker.angleStyle.text,
+                }}
+              >
+                {hoveredMarker.article.angleName}
+              </span>
             </div>
           )}
-          <div className="line-clamp-2 text-[11px] text-gray-100 font-sans">
-            {hoveredArticle.article.title}
+
+          {/* Headline */}
+          <div className="line-clamp-2 text-[11px] text-gray-100 font-sans leading-relaxed">
+            {hoveredMarker.article.title}
           </div>
         </div>
       )}

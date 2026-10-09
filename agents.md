@@ -45,10 +45,10 @@ Backend logic lives primarily in `apps/engine` with database helpers in `package
 When starting a session or subagent, select from these decoupled tracks:
 
 ### Track 1: Frontend UI Polish (`apps/web`)
-- [ ] **"Invalid date" display bug**: Fix instances where "Invalid date" renders instead of formatted dates.
-- [ ] **Sparkline endpoints**: Ensure sparklines visually anchor dots at both ends (first seen and latest updated) rather than floating.
-- [ ] **Sparkline tooltip collision**: Prevent tooltips on closely clustered timeline markers from bunching/overlapping.
-- [ ] **"Breaking" status decay**: Review criteria so stories active for multiple days transition appropriately to "Developing".
+- [x] **"Invalid date" display bug**: Fix instances where "Invalid date" renders instead of formatted dates.
+- [x] **Sparkline endpoints**: Ensure sparklines visually anchor dots at both ends (first seen and latest updated) rather than floating.
+- [x] **Sparkline tooltip collision**: Prevent tooltips on closely clustered timeline markers from bunching/overlapping.
+- [x] **"Breaking" status decay**: Review criteria so stories active for multiple days transition appropriately to "Developing".
 
 ### Track 2: Editorial Source Quality (`packages/db`)
 - [ ] **Drop The Sun**: Deactivate or remove *The Sun* from active RSS feeds and seed lists.

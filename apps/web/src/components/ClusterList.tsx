@@ -119,7 +119,7 @@ export default function ClusterList() {
   // Initial loading state
   if (result.fetching && displayedClusters.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         {[...Array(5)].map((_, i) => (
           <ClusterCardSkeleton key={i} />
         ))}
@@ -135,7 +135,7 @@ export default function ClusterList() {
   const hasMore = displayedClusters.length < totalClusters;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {displayedClusters.map((cluster: any) => (
         <ClusterCard key={cluster.id} cluster={cluster} />
       ))}

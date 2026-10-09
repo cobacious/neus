@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import StatusBadge, { resolveStoryStatus } from './StatusBadge';
+import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './StatusBadge';
 import StoryAnglePills, { AngleItem } from './StoryAnglePills';
 import ArticleTimelineSparkline, { TimelineArticle } from './ArticleTimelineSparkline';
 import { createAngleColorMap } from '../utils/angleColors';
+import { parseDate } from '../utils/dateUtils';
 
 interface Source {
   id: string;
@@ -53,10 +54,28 @@ export interface Cluster {
 
 export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   const story = cluster.story;
-  const status = resolveStoryStatus(story?.status, cluster);
-
   // If part of a multi-angle story, aggregate all sibling clusters
   const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
+
+  // Compute story-level inception to ensure multi-day stories decay from breaking to developing
+  let earliestCreatedAt = cluster.createdAt;
+  if (isMultiAngleStory && story?.clusters) {
+    story.clusters.forEach((c) => {
+      if (c.createdAt) {
+        const cTime = parseDate(c.createdAt)?.getTime();
+        const curTime = parseDate(earliestCreatedAt)?.getTime();
+        if (cTime && (!curTime || cTime < curTime)) {
+          earliestCreatedAt = c.createdAt;
+        }
+      }
+    });
+  }
+
+  const status = resolveStoryStatus(story?.status, {
+    createdAt: earliestCreatedAt,
+    lastUpdatedAt: cluster.lastUpdatedAt,
+    isMultiAngle: isMultiAngleStory,
+  });
 
   // Extract angles
   const angles: AngleItem[] = isMultiAngleStory && story?.clusters
@@ -113,18 +132,20 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   const visibleSources = sources.slice(0, 5);
   const extraSources = sources.length - visibleSources.length;
 
+  const statusConfig = status ? STATUS_CONFIG[status] : null;
+
   return (
     <Link
       to={`/${cluster.slug || cluster.id}`}
-      className="block bg-white border border-gray-200 shadow-xs hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
+      className="relative block bg-white border border-gray-200 shadow-xs hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
+      style={statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined}
     >
-      {/* Top Header: Context Eyebrow & Status */}
-      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider truncate max-w-[80%]">
-          {isMultiAngleStory ? 'Story' : 'Report'}
+      {/* Straddling Top-Border Status Badge */}
+      {status && (
+        <div className="absolute right-4 top-0 -translate-y-1/2 z-10">
+          <StatusBadge status={status} size="sm" />
         </div>
-        <StatusBadge status={status} size="sm" />
-      </div>
+      )}
 
       {/* Main Headline */}
       <h2 className="text-xl font-bold text-gray-900 mb-2 leading-snug">

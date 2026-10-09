@@ -27,7 +27,7 @@ export type NeighborhoodMerge = {
 export type NeighborhoodStory = {
   existingStoryId?: string | null;
   storyTitle: string;
-  status: 'breaking' | 'developing' | 'dormant';
+  status: 'breaking' | 'developing';
   overview: string;
   angles: Array<{
     clusterId: string;
@@ -231,7 +231,7 @@ Analyze these clusters and determine:
    - If yes, provide for each story:
      - "existingStoryId": If this saga matches or develops an EXISTING STORY listed in the CANDIDATE STORIES below, specify its id. Otherwise null.
      - "storyTitle": A concise, neutral title for the overarching saga.
-     - "status": One of "breaking" (first 24-48h of fast-moving breaking news) or "developing" (active ongoing developments/fallout over days/weeks).
+     - "status": One of "breaking" (first 12-24h of newly emerging breaking news where details are still arriving) or "developing" (multi-angle saga actively expanding in scope with related spin-offs/fallout).
      - "overview": A neutral 2-sentence macro-summary synthesizing the whole saga across all its angles.
      - "angles": Array of member clusters with:
        - "clusterId": The cluster id (must NOT be a merged source cluster)

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AngleColorStyle, DEFAULT_ANGLE_COLOR } from '../utils/angleColors';
+import { parseDate } from '../utils/dateUtils';
 
 export interface HistogramArticle {
   id: string;
@@ -50,7 +51,8 @@ export default function StoryAngleHistogram({
   const validArticles = useMemo(() => {
     return articles
       .map((a) => {
-        const time = a.publishedAt ? new Date(a.publishedAt).getTime() : NaN;
+        const parsed = parseDate(a.publishedAt);
+        const time = parsed ? parsed.getTime() : NaN;
         return { ...a, time };
       })
       .filter((a) => !isNaN(a.time))
