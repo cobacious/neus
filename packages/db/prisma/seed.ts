@@ -15,6 +15,7 @@ const feeds = [
     name: 'The Times',
     homepageUrl: 'https://www.thetimes.co.uk',
     rssFeedUrl: 'https://www.thetimes.co.uk/rss',
+    active: false,
   },
   {
     name: 'The Independent UK',
@@ -24,7 +25,12 @@ const feeds = [
   {
     name: 'Daily Express',
     homepageUrl: 'https://www.express.co.uk',
-    rssFeedUrl: 'https://www.express.co.uk/news/rss',
+    rssFeedUrl: 'https://www.express.co.uk/posts/rss/1/news',
+  },
+  {
+    name: 'The i Paper',
+    homepageUrl: 'https://inews.co.uk',
+    rssFeedUrl: 'https://inews.co.uk/feed',
   },
   {
     name: 'Metro UK',
@@ -40,6 +46,7 @@ const feeds = [
     name: 'ITV News UK',
     homepageUrl: 'https://www.itv.com/news',
     rssFeedUrl: 'https://www.itv.com/news/feeds/rss/uk/',
+    active: false,
   },
   {
     name: 'Financial Times',
@@ -94,12 +101,17 @@ async function main() {
     const domain = url.hostname.replace(/^www\./, '');
     await prisma.source.upsert({
       where: { rssFeedUrl: feed.rssFeedUrl },
-      update: {},
+      update: {
+        name: feed.name,
+        homepageUrl: feed.homepageUrl,
+        active: (feed as any).active ?? true,
+      },
       create: {
         name: feed.name,
         rssFeedUrl: feed.rssFeedUrl,
         homepageUrl: feed.homepageUrl,
         domain,
+        active: (feed as any).active ?? true,
         faviconUrl: `https://icon.horse/icon/${domain}`,
       },
     });
