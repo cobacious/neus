@@ -63,8 +63,8 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Drop The Sun**: Deactivated in both local dev and production database sources, and removed from active seed list.
 
 ### Track 3: Ranking & Taxonomy Analysis (`apps/engine`, `packages/db`)
-- [ ] **Feed ranking & sorting**: Review and tune the scoring formula in `scoreCluster.ts` and `getRankedClusters.ts`.
-- [ ] **French Protests angle alignment**: Investigate article-to-angle assignments for the French education protests story.
+- [ ] **Feed ranking & sorting**: Review and tune the scoring formula in `scoreCluster.ts` and `getRankedClusters.ts`. (See detailed handoff in [`docs/handoffs/ranking-algorithm-review.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/ranking-algorithm-review.md))
+- [ ] **French Protests angle alignment**: Investigate article-to-angle assignments for the French education protests story. (See detailed handoff in [`docs/handoffs/french-protests-angle-grouping.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/french-protests-angle-grouping.md))
 
 ## Preferences & Strict Rules
 
