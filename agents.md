@@ -57,6 +57,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Sparkline endpoints**: Ensure sparklines visually anchor dots at both ends (first seen and latest updated) rather than floating.
 - [x] **Sparkline tooltip collision**: Prevent tooltips on closely clustered timeline markers from bunching/overlapping.
 - [x] **"Breaking" status decay**: Review criteria so stories active for multiple days transition appropriately to "Developing".
+- [x] **Histogram adaptive bucketing**: Dynamic 15m/30m/1h/2h/1d binning so rapid breaking news stories distribute chronologically instead of collapsing into a single 6h bar.
 
 ### Track 2: Editorial Source Quality (`packages/db`)
 - [ ] **Drop The Sun**: Deactivate or remove *The Sun* from active RSS feeds and seed lists.
