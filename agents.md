@@ -33,36 +33,37 @@ Neus is a news aggregation platform with an emphasis on **neutrality, trust, and
 
 Backend logic lives primarily in `apps/engine` with database helpers in `packages/db`.
 
-## Short-Term Goals
+## Current State & Architecture (v1 - `feat/story-angles`)
 
-- ✅ Set up `pnpm` monorepo with TypeScript
-- ✅ Scaffold the `backend` package
-- ✅ Set up initial article ingestion (via RSS or scraping)
-- 🔜 Use LLM API to:
-  - Compare new articles with existing clusters
-  - Group into existing or new "stories"
-  - Generate a neutral headline + summary
-- 🔜 Store results in a structured format (DB or in-memory first)
+- **Multi-Angle Stories**: A `Story` acts as an overarching umbrella (e.g. *2026 Conservative Party Conference* or *Christa Pike Botched Execution*). Member `Cluster`s serve as specific story angles (`cluster.storyAngle`).
+- **AI Client Abstraction**: All LLM calls route through `apps/engine/lib/aiClient.ts` with Gemini as primary (`gemini-flash-latest`), automatic fallback to OpenAI (`gpt-4o-mini`), 45s AbortSignal timeout, and structured JSON parsing.
+- **Story Organization**: `apps/engine/core/pipeline/organizeStoryAngles.ts` organizes clusters into stories, disbands underpopulated stories (< 2 angles), and realigns articles across angles.
+- **Frontend Presentation**: `apps/web` renders the overarching story title and macro-overview at the top of multi-angle stories, with individual angle headlines, sparklines, histograms, and articles nested underneath.
 
-## Key Entities (v0)
+## Active Backlog & Workstreams
 
-- `Article`: raw input with metadata (title, source, timestamp, full text, etc.)
-- `Story`: cluster of related articles with shared topic
-- `Summary`: AI-generated neutral version of the story
-- `SourceLink`: optional link to press release, report, or transcript
+When starting a session or subagent, select from these decoupled tracks:
 
-## Preferences
+### Track 1: Frontend UI Polish (`apps/web`)
+- [ ] **"Invalid date" display bug**: Fix instances where "Invalid date" renders instead of formatted dates.
+- [ ] **Sparkline endpoints**: Ensure sparklines visually anchor dots at both ends (first seen and latest updated) rather than floating.
+- [ ] **Sparkline tooltip collision**: Prevent tooltips on closely clustered timeline markers from bunching/overlapping.
+- [ ] **"Breaking" status decay**: Review criteria so stories active for multiple days transition appropriately to "Developing".
 
-- All code in TypeScript
-- Prefer modular, composable design
-- Avoid overengineering — move fast, iterate
-- Prioritise simplicity, clarity, and readability
-- Be generous with `README.md` and inline comments
-- Include TODOs or FIXME markers where appropriate
-- Copilot: Suggest utility functions for clustering, text cleaning, LLM prompts
-- **Apps must not import from `@prisma/client` or access the Prisma client
-  directly.** All database interactions should go through the exported helpers
-  in `@neus/db` so that the underlying implementation remains encapsulated.
+### Track 2: Editorial Source Quality (`packages/db`)
+- [ ] **Drop The Sun**: Deactivate or remove *The Sun* from active RSS feeds and seed lists.
+
+### Track 3: Ranking & Taxonomy Analysis (`apps/engine`, `packages/db`)
+- [ ] **Feed ranking & sorting**: Review and tune the scoring formula in `scoreCluster.ts` and `getRankedClusters.ts`.
+- [ ] **French Protests angle alignment**: Investigate article-to-angle assignments for the French education protests story.
+
+## Preferences & Strict Rules
+
+- All code in TypeScript.
+- **Apps must not import from `@prisma/client` or access the Prisma client directly.** All database interactions must go through the exported helpers in `@neus/db`.
+- Prefer modular, composable design.
+- Avoid overengineering — move fast, iterate.
+- Run `pnpm test` and `pnpm build` before committing.
 
 ---
 
