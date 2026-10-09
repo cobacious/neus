@@ -58,21 +58,6 @@ const CLUSTERS_QUERY = `
   }
 `;
 
-function deduplicateClustersByStory(clusters: any[]): any[] {
-  const seenStoryIds = new Set<string>();
-  const result: any[] = [];
-  for (const c of clusters) {
-    if (c.storyId) {
-      if (seenStoryIds.has(c.storyId)) {
-        continue;
-      }
-      seenStoryIds.add(c.storyId);
-    }
-    result.push(c);
-  }
-  return result;
-}
-
 const CLUSTERS_PER_PAGE = 15;
 
 export default function ClusterList() {
@@ -91,22 +76,13 @@ export default function ClusterList() {
       const rawClusters = result.data.clusters || [];
       if (offset === 0) {
         // Initial load
-        setDisplayedClusters(deduplicateClustersByStory(rawClusters));
+        setDisplayedClusters(rawClusters);
       } else if (rawClusters.length > 0) {
-        // Loading more - append new clusters and deduplicate
+        // Loading more - append new clusters avoiding duplicate IDs across pages
         setDisplayedClusters((prev) => {
-          const combined = [...prev, ...rawClusters];
-          const existingIds = new Set<string>();
-          const seenStoryIds = new Set<string>();
-          const deduped: any[] = [];
-          for (const c of combined) {
-            if (existingIds.has(c.id)) continue;
-            if (c.storyId && seenStoryIds.has(c.storyId)) continue;
-            existingIds.add(c.id);
-            if (c.storyId) seenStoryIds.add(c.storyId);
-            deduped.push(c);
-          }
-          return deduped;
+          const existingIds = new Set(prev.map((c) => c.id));
+          const nextItems = rawClusters.filter((c: any) => !existingIds.has(c.id));
+          return [...prev, ...nextItems];
         });
       }
     }

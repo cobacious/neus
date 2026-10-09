@@ -39,6 +39,14 @@ Backend logic lives primarily in `apps/engine` with database helpers in `package
 - **AI Client Abstraction**: All LLM calls route through `apps/engine/lib/aiClient.ts` with Gemini as primary (`gemini-flash-latest`), automatic fallback to OpenAI (`gpt-4o-mini`), 45s AbortSignal timeout, and structured JSON parsing.
 - **Story Organization**: `apps/engine/core/pipeline/organizeStoryAngles.ts` organizes clusters into stories, disbands underpopulated stories (< 2 angles), and realigns articles across angles.
 - **Frontend Presentation**: `apps/web` renders the overarching story title and macro-overview at the top of multi-angle stories, with individual angle headlines, sparklines, histograms, and articles nested underneath.
+- **Brand Design System Palette**: Sourced from Coolors, Neus's core 6-color editorial palette is defined canonically in `apps/web/src/utils/palette.ts`:
+  1. Blue Slate: `#4F6D7A`
+  2. Burnt Peach: `#DD6E42`
+  3. Ash Grey: `#B8C7B7`
+  4. Thistle: `#D2BFDE`
+  5. Clay Soil: `#805448`
+  6. Charcoal: `#575353`
+  Used across sparklines, charts, chips, angle pills, and badges. `angleColors.ts` delegates to `palette.ts`.
 
 ## Active Backlog & Workstreams
 

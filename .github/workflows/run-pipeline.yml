@@ -75,6 +75,11 @@ jobs:
         env:
           PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: "1"
 
+      - name: Apply Prisma Migrations
+        run: pnpm --filter @neus/db exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Build database package
         run: pnpm --filter @neus/db build
 
