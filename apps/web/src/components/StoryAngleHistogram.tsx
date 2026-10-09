@@ -23,7 +23,7 @@ interface StoryAngleHistogramProps {
   className?: string;
 }
 
-interface BinSegment {
+export interface BinSegment {
   angleId: string;
   angleName: string;
   color: string;
@@ -31,12 +31,176 @@ interface BinSegment {
   sources: string[];
 }
 
-interface TimeBin {
+export interface TimeBin {
   label: string;
+  rangeLabel: string;
   startTime: number;
   endTime: number;
   total: number;
   segments: BinSegment[];
+}
+
+export interface HistogramBinsResult {
+  bins: TimeBin[];
+  maxBinTotal: number;
+  validArticles: (HistogramArticle & { time: number })[];
+}
+
+/**
+ * Computes adaptive time bins for article publication histogram.
+ * - Granular 15m/30m/1h/2h bucketing for rapid breaking news instead of coarse 6h buckets.
+ * - Clean day transitions without redundant weekday repeats on same-day bins.
+ * - Stacked segment breakdown by story angle.
+ */
+export function buildHistogramBins(
+  articles: HistogramArticle[] = [],
+  colorMap?: Map<string, AngleColorStyle>
+): HistogramBinsResult {
+  // 1. Filter valid articles and sort chronologically
+  const validArticles = articles
+    .map((a) => {
+      const parsed = parseDate(a.publishedAt);
+      const time = parsed ? parsed.getTime() : NaN;
+      return { ...a, time };
+    })
+    .filter((a) => !isNaN(a.time))
+    .sort((a, b) => a.time - b.time);
+
+  if (validArticles.length === 0) {
+    return { bins: [], maxBinTotal: 0, validArticles: [] };
+  }
+
+  const minTime = validArticles[0].time;
+  const maxTime = validArticles[validArticles.length - 1].time;
+  const spanMs = Math.max(0, maxTime - minTime);
+  const spanHours = spanMs / (1000 * 60 * 60);
+
+  // Determine bucket size and formatting granularity
+  let bucketMs: number;
+  let isSubHour = false;
+  let isSubDay = false;
+
+  if (spanHours <= 1.5) {
+    // 15-minute buckets for fast-breaking events
+    bucketMs = 15 * 60 * 1000;
+    isSubHour = true;
+    isSubDay = true;
+  } else if (spanHours <= 4) {
+    // 30-minute buckets for breaking news unfolding over a few hours
+    bucketMs = 30 * 60 * 1000;
+    isSubHour = true;
+    isSubDay = true;
+  } else if (spanHours <= 12) {
+    // 1-hour buckets for same-day developments
+    bucketMs = 60 * 60 * 1000;
+    isSubDay = true;
+  } else if (spanHours <= 24) {
+    // 2-hour buckets for 24-hour cycles
+    bucketMs = 2 * 60 * 60 * 1000;
+    isSubDay = true;
+  } else if (spanHours <= 48) {
+    // 4-hour buckets for 2-day developments
+    bucketMs = 4 * 60 * 60 * 1000;
+    isSubDay = true;
+  } else if (spanHours <= 24 * 7) {
+    // 1-day buckets for up to 1 week
+    bucketMs = 24 * 60 * 60 * 1000;
+  } else if (spanHours <= 24 * 14) {
+    // 2-day buckets for up to 2 weeks
+    bucketMs = 2 * 24 * 60 * 60 * 1000;
+  } else {
+    // Multi-day buckets targeting ~10-14 bins for long-running stories
+    const targetDays = Math.max(3, Math.ceil(spanHours / (24 * 12)));
+    bucketMs = targetDays * 24 * 60 * 60 * 1000;
+  }
+
+  // Align start to nice boundary
+  const startAligned = Math.floor(minTime / bucketMs) * bucketMs;
+  const endAligned = Math.ceil((maxTime + 1) / bucketMs) * bucketMs;
+  const numBuckets = Math.max(1, Math.min(24, Math.round((endAligned - startAligned) / bucketMs)));
+
+  const createdBins: TimeBin[] = [];
+  let prevDay = '';
+
+  for (let i = 0; i < numBuckets; i++) {
+    const bStart = startAligned + i * bucketMs;
+    const bEnd = bStart + bucketMs;
+    const dStart = new Date(bStart);
+    const dEnd = new Date(bEnd);
+
+    let label: string;
+    let rangeLabel: string;
+
+    if (isSubDay) {
+      const curDay = dStart.toLocaleDateString(undefined, { weekday: 'short' });
+      const startHour = dStart.getHours().toString().padStart(2, '0');
+      const startMin = dStart.getMinutes().toString().padStart(2, '0');
+      const endHour = dEnd.getHours().toString().padStart(2, '0');
+      const endMin = dEnd.getMinutes().toString().padStart(2, '0');
+
+      const timeStr = isSubHour ? `${startHour}:${startMin}` : `${startHour}:00`;
+      const endTimeStr = isSubHour ? `${endHour}:${endMin}` : `${endHour}:00`;
+
+      // Show day prefix on first bin or when day transitions; subsequent bins show clean time
+      if (i === 0 || curDay !== prevDay) {
+        label = `${curDay} ${timeStr}`;
+        prevDay = curDay;
+      } else {
+        label = timeStr;
+      }
+
+      rangeLabel = `${curDay} ${timeStr} – ${endTimeStr}`;
+    } else {
+      label = dStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      rangeLabel = label;
+    }
+
+    createdBins.push({
+      label,
+      rangeLabel,
+      startTime: bStart,
+      endTime: bEnd,
+      total: 0,
+      segments: [],
+    });
+  }
+
+  // Group articles into bins
+  validArticles.forEach((article) => {
+    let bIdx = Math.floor((article.time - startAligned) / bucketMs);
+    if (bIdx < 0) bIdx = 0;
+    if (bIdx >= createdBins.length) bIdx = createdBins.length - 1;
+
+    const bin = createdBins[bIdx];
+    bin.total += 1;
+
+    const aId = article.angleId || article.angleName || 'default';
+    const aName = article.angleName || 'Articles';
+    const style =
+      (article.angleId && colorMap?.get(article.angleId)) ||
+      (article.angleName && colorMap?.get(article.angleName)) ||
+      DEFAULT_ANGLE_COLOR;
+
+    let seg = bin.segments.find((s) => s.angleId === aId);
+    if (!seg) {
+      seg = {
+        angleId: aId,
+        angleName: aName,
+        color: style.color,
+        count: 0,
+        sources: [],
+      };
+      bin.segments.push(seg);
+    }
+    seg.count += 1;
+    const srcName = article.sourceRel?.name || article.source;
+    if (srcName && !seg.sources.includes(srcName)) {
+      seg.sources.push(srcName);
+    }
+  });
+
+  const max = createdBins.reduce((acc, b) => Math.max(acc, b.total), 0);
+  return { bins: createdBins, maxBinTotal: max, validArticles };
 }
 
 export default function StoryAngleHistogram({
@@ -47,112 +211,9 @@ export default function StoryAngleHistogram({
 }: StoryAngleHistogramProps) {
   const [hoveredBinIndex, setHoveredBinIndex] = useState<number | null>(null);
 
-  // 1. Filter valid articles and sort chronologically
-  const validArticles = useMemo(() => {
-    return articles
-      .map((a) => {
-        const parsed = parseDate(a.publishedAt);
-        const time = parsed ? parsed.getTime() : NaN;
-        return { ...a, time };
-      })
-      .filter((a) => !isNaN(a.time))
-      .sort((a, b) => a.time - b.time);
-  }, [articles]);
-
-  // 2. Compute time bins
-  const { bins, maxBinTotal } = useMemo(() => {
-    if (validArticles.length === 0) {
-      return { bins: [], maxBinTotal: 0 };
-    }
-
-    const minTime = validArticles[0].time;
-    const maxTime = validArticles[validArticles.length - 1].time;
-    const spanHours = Math.max(1, (maxTime - minTime) / (1000 * 60 * 60));
-
-    // Determine bucket size
-    let bucketMs: number;
-    let formatLabel: (t: number) => string;
-
-    if (spanHours <= 36) {
-      // 6-hour buckets
-      bucketMs = 6 * 60 * 60 * 1000;
-      formatLabel = (t: number) => {
-        const d = new Date(t);
-        const day = d.toLocaleDateString(undefined, { weekday: 'short' });
-        const hour = d.getHours().toString().padStart(2, '0');
-        return `${day} ${hour}:00`;
-      };
-    } else if (spanHours <= 24 * 7) {
-      // 1-day buckets
-      bucketMs = 24 * 60 * 60 * 1000;
-      formatLabel = (t: number) => {
-        const d = new Date(t);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      };
-    } else {
-      // 2-day buckets
-      bucketMs = 48 * 60 * 60 * 1000;
-      formatLabel = (t: number) => {
-        const d = new Date(t);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      };
-    }
-
-    // Align start to nice boundary
-    const startAligned = Math.floor(minTime / bucketMs) * bucketMs;
-    const endAligned = Math.ceil((maxTime + 1) / bucketMs) * bucketMs;
-    const numBuckets = Math.max(1, Math.min(24, Math.round((endAligned - startAligned) / bucketMs)));
-
-    const createdBins: TimeBin[] = [];
-    for (let i = 0; i < numBuckets; i++) {
-      const bStart = startAligned + i * bucketMs;
-      const bEnd = bStart + bucketMs;
-      createdBins.push({
-        label: formatLabel(bStart),
-        startTime: bStart,
-        endTime: bEnd,
-        total: 0,
-        segments: [],
-      });
-    }
-
-    // Group articles into bins
-    validArticles.forEach((article) => {
-      let bIdx = Math.floor((article.time - startAligned) / bucketMs);
-      if (bIdx < 0) bIdx = 0;
-      if (bIdx >= createdBins.length) bIdx = createdBins.length - 1;
-
-      const bin = createdBins[bIdx];
-      bin.total += 1;
-
-      const aId = article.angleId || article.angleName || 'default';
-      const aName = article.angleName || 'Articles';
-      const style =
-        (article.angleId && colorMap?.get(article.angleId)) ||
-        (article.angleName && colorMap?.get(article.angleName)) ||
-        DEFAULT_ANGLE_COLOR;
-
-      let seg = bin.segments.find((s) => s.angleId === aId);
-      if (!seg) {
-        seg = {
-          angleId: aId,
-          angleName: aName,
-          color: style.color,
-          count: 0,
-          sources: [],
-        };
-        bin.segments.push(seg);
-      }
-      seg.count += 1;
-      const srcName = article.sourceRel?.name || article.source;
-      if (srcName && !seg.sources.includes(srcName)) {
-        seg.sources.push(srcName);
-      }
-    });
-
-    const max = createdBins.reduce((acc, b) => Math.max(acc, b.total), 0);
-    return { bins: createdBins, maxBinTotal: max };
-  }, [validArticles, colorMap]);
+  const { bins, maxBinTotal, validArticles } = useMemo(() => {
+    return buildHistogramBins(articles, colorMap);
+  }, [articles, colorMap]);
 
   if (validArticles.length === 0 || bins.length === 0) {
     return null;
@@ -329,45 +390,61 @@ export default function StoryAngleHistogram({
         </svg>
 
         {/* Hover Popover Tooltip */}
-        {hoveredBin && (
-          <div
-            className="absolute -top-16 z-30 pointer-events-none transform -translate-x-1/2 bg-gray-900 text-white rounded-lg px-3 py-2 text-xs shadow-xl min-w-[180px] transition-all duration-150"
-            style={{
-              left: `${
-                ((paddingLeft +
-                  (hoveredBinIndex! + 0.5) * slotWidth) /
-                  svgWidth) *
-                100
-              }%`,
-            }}
-          >
-            <div className="font-semibold text-gray-200 border-b border-gray-700 pb-1 mb-1.5 flex justify-between">
-              <span>{hoveredBin.label}</span>
-              <span className="text-gray-400 font-normal">
-                {hoveredBin.total} {hoveredBin.total === 1 ? 'article' : 'articles'}
-              </span>
-            </div>
-            <div className="space-y-1">
-              {hoveredBin.segments.map((seg) => (
-                <div
-                  key={seg.angleId}
-                  className="flex items-center justify-between gap-3 text-[11px]"
-                >
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: seg.color }}
-                    />
-                    <span className="truncate text-gray-300">{seg.angleName}</span>
-                  </div>
-                  <span className="font-semibold text-gray-100 flex-shrink-0">
-                    {seg.count}
-                  </span>
+        {hoveredBin && (() => {
+          const hoverPct =
+            hoveredBinIndex !== null
+              ? ((paddingLeft + (hoveredBinIndex + 0.5) * slotWidth) / svgWidth) * 100
+              : 50;
+
+          return (
+            <div
+              className={`absolute bottom-full mb-2 z-30 pointer-events-none bg-gray-900 text-white rounded-lg p-3 text-xs shadow-xl min-w-[190px] max-w-[calc(100vw-32px)] transition-all duration-150 border border-gray-800 ${
+                hoverPct < 20
+                  ? 'left-0 translate-x-0'
+                  : hoverPct > 80
+                  ? 'left-full -translate-x-full'
+                  : '-translate-x-1/2'
+              }`}
+              style={
+                hoverPct >= 20 && hoverPct <= 80
+                  ? { left: `${hoverPct}%` }
+                  : undefined
+              }
+            >
+              <div className="font-semibold text-gray-200 border-b border-gray-700 pb-1 mb-1.5 flex justify-between gap-4">
+                <span>{hoveredBin.rangeLabel || hoveredBin.label}</span>
+                <span className="text-gray-400 font-normal whitespace-nowrap">
+                  {hoveredBin.total} {hoveredBin.total === 1 ? 'article' : 'articles'}
+                </span>
+              </div>
+              {hoveredBin.segments.length > 0 ? (
+                <div className="space-y-1">
+                  {hoveredBin.segments.map((seg) => (
+                    <div
+                      key={seg.angleId}
+                      className="flex items-center justify-between gap-3 text-[11px]"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: seg.color }}
+                        />
+                        <span className="truncate text-gray-300">{seg.angleName}</span>
+                      </div>
+                      <span className="font-semibold text-gray-100 flex-shrink-0">
+                        {seg.count}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="text-gray-400 text-[11px] italic py-0.5">
+                  No articles in this window
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
