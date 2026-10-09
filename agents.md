@@ -60,7 +60,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Histogram adaptive bucketing**: Dynamic 15m/30m/1h/2h/1d binning so rapid breaking news stories distribute chronologically instead of collapsing into a single 6h bar.
 
 ### Track 2: Editorial Source Quality (`packages/db`)
-- [ ] **Drop The Sun**: Deactivate or remove *The Sun* from active RSS feeds and seed lists.
+- [x] **Drop The Sun**: Deactivated in both local dev and production database sources, and removed from active seed list.
 
 ### Track 3: Ranking & Taxonomy Analysis (`apps/engine`, `packages/db`)
 - [ ] **Feed ranking & sorting**: Review and tune the scoring formula in `scoreCluster.ts` and `getRankedClusters.ts`.
