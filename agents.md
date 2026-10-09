@@ -69,6 +69,10 @@ When starting a session or subagent, select from these decoupled tracks:
 
 - All code in TypeScript.
 - **Apps must not import from `@prisma/client` or access the Prisma client directly.** All database interactions must go through the exported helpers in `@neus/db`.
+- **Database Migrations & Deployment**:
+  - Migrations belong strictly in the Railway Pre-Deploy release lifecycle (`pnpm --filter @neus/db exec prisma migrate deploy`), never in routine cron pipelines.
+  - Frontends (`apps/web`, `apps/admin`) only access data via the GraphQL API (`apps/api`). Any feature requiring a DB schema change inherently requires an API deployment to expose those fields.
+  - Always design migrations to be **additive** (e.g. nullable columns, new tables, or default values) to guarantee zero-downtime compatibility between frontend and API deployments.
 - Prefer modular, composable design.
 - Avoid overengineering — move fast, iterate.
 - Run `pnpm test` and `pnpm build` before committing.
