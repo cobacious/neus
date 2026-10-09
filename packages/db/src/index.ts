@@ -31,6 +31,8 @@ export * from './sources/getActiveSources';
 export * from './sources/getSources';
 export * from './sources/createSource';
 export * from './sources/updateSource';
+export * from './sources/paywalledSources';
+export * from './sources/markPaywalledArticlesResolved';
 export * from './clusters/disbandSingleArticleClusters';
 export * from './stories/syncStoryWithAngles';
 export type { StoryInput, StoryAngleInput } from './stories/syncStoryWithAngles';

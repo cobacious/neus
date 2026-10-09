@@ -11,11 +11,16 @@ import { prisma } from '../client';
  * with new articles anyway, so excluding them improves performance without
  * significant impact on clustering quality.
  *
- * @param daysBack - Number of days to look back (default: 7)
+ * @param daysBack - Number of days to look back (default: 3)
  */
-export async function getUnclusteredArticles(daysBack: number = 7) {
+export async function getUnclusteredArticles(daysBack?: number) {
+  const lookback =
+    daysBack ??
+    (process.env.UNCLUSTERED_LOOKBACK_DAYS
+      ? parseInt(process.env.UNCLUSTERED_LOOKBACK_DAYS, 10)
+      : 3);
   const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+  cutoffDate.setDate(cutoffDate.getDate() - lookback);
 
   return prisma.article.findMany({
     where: {

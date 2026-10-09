@@ -45,6 +45,7 @@ const CLUSTER_QUERY = `
               id
               name
               faviconUrl
+              paywalled
             }
           }
         }
@@ -59,6 +60,7 @@ const CLUSTER_QUERY = `
           id
           name
           faviconUrl
+          paywalled
         }
       }
     }

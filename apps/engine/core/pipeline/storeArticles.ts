@@ -1,6 +1,6 @@
 // storeArticles.ts
 // Store articles in the database only if they don't already exist or have changed
-import { syncArticles } from '@neus/db';
+import { syncArticles, isPaywalledSource } from '@neus/db';
 import {
   logger,
   logPipelineStep,
@@ -32,7 +32,7 @@ export async function storeArticles(articles: RssArticle[]) {
       publishedAt: new Date(article.publishedAt),
       updatedAt: article.updatedAt ? new Date(article.updatedAt) : undefined,
       snippet: article.snippet,
-      content: article.content,
+      content: isPaywalledSource(article.source) ? '' : article.content,
       author: article.author,
       categories: article.categories?.join(',') ?? undefined,
     }));

@@ -71,6 +71,7 @@ model Source {
   rssFeedUrl    String    @unique
   faviconUrl    String?
   active        Boolean   @default(true)
+  paywalled     Boolean   @default(false)
   trustScore    Float?    @default(0)
   lastFetchedAt DateTime?
   articles      Article[]

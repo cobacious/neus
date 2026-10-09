@@ -10,6 +10,7 @@ interface Source {
   id: string;
   name: string;
   faviconUrl?: string | null;
+  paywalled?: boolean;
 }
 
 interface Article {

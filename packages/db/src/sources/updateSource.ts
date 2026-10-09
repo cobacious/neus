@@ -6,6 +6,7 @@ export type UpdateSourceInput = {
   homepageUrl?: string | null;
   rssFeedUrl?: string;
   active?: boolean;
+  paywalled?: boolean;
 };
 
 export async function updateSource({ id, ...data }: UpdateSourceInput) {

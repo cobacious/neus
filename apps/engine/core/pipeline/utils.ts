@@ -18,3 +18,32 @@ export function jaccard(a: string[], b: string[]): number {
   const union = new Set([...A, ...B]);
   return intersection.size / union.size;
 }
+
+/**
+ * Executes an async task over an array of items with bounded concurrency.
+ * Preserves the order of results corresponding to the input items.
+ *
+ * @param items - Array of items to process
+ * @param concurrency - Maximum number of simultaneous async tasks
+ * @param fn - Worker function returning a Promise for each item
+ */
+export async function mapConcurrent<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  const results: R[] = new Array(items.length);
+  let currentIndex = 0;
+
+  const workers = Array.from({ length: limit }, async () => {
+    while (currentIndex < items.length) {
+      const index = currentIndex++;
+      results[index] = await fn(items[index], index);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}

@@ -13,6 +13,7 @@ describe('isPaywalled', () => {
     expect(isPaywalled({ name: 'The Times', homepageUrl: 'https://www.thetimes.com' })).toBe(true);
     expect(isPaywalled({ name: 'FT', homepageUrl: 'https://www.ft.com' })).toBe(true);
     expect(isPaywalled({ name: 'Telegraph', domain: 'telegraph.co.uk' })).toBe(true);
+    expect(isPaywalled({ name: 'Custom Outlet', paywalled: true })).toBe(true);
   });
 
   it('recognizes free publications as non-paywalled', () => {

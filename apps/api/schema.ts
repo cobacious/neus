@@ -94,6 +94,7 @@ const Source = objectType({
     t.nullable.string('homepageUrl');
     t.string('rssFeedUrl');
     t.boolean('active');
+    t.boolean('paywalled');
     t.nullable.string('faviconUrl');
     t.nullable.string('lastFetchedAt');
   },

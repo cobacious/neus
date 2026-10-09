@@ -1,18 +1,20 @@
 /**
- * Utility to identify paywalled news publications (e.g. The Times, FT, The Telegraph).
- * Displays padlock / subscription indicator so readers have full transparency before clicking.
+ * Utility to identify paywalled news sources across the Neus backend.
+ * Checks the database paywalled flag or matches known paywalled domains/titles.
  */
-export function isPaywalled(
-  source?:
-    | {
-        name?: string | null;
-        homepageUrl?: string | null;
-        domain?: string | null;
-        paywalled?: boolean | null;
-      }
-    | string
-    | null
-): boolean {
+
+export type PaywalledSourceInput =
+  | {
+      name?: string | null;
+      domain?: string | null;
+      homepageUrl?: string | null;
+      paywalled?: boolean | null;
+    }
+  | string
+  | null
+  | undefined;
+
+export function isPaywalledSource(source?: PaywalledSourceInput): boolean {
   if (!source) return false;
   if (typeof source === 'object' && source.paywalled === true) return true;
 

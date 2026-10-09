@@ -67,9 +67,9 @@ When starting a session or subagent, select from these decoupled tracks:
 - [ ] **French Protests angle alignment**: Investigate article-to-angle assignments for the French education protests story. (See detailed handoff in [`docs/handoffs/french-protests-angle-grouping.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/french-protests-angle-grouping.md))
 
 ### Track 4: Pipeline Performance & Content Extraction Optimization (`apps/engine`, `packages/db`)
-- [ ] **Content extraction failure loop**: Stop retrying failed article URL fetches in `fillMissingContent.ts` by marking failed extractions, and cap/parallelize fetches. (See detailed handoff in [`docs/handoffs/pipeline-performance-optimization.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/pipeline-performance-optimization.md))
-- [ ] **Paywalled feed skip**: Mark paywalled feeds (The Times, FT, Telegraph, etc.) with a `paywalled: true` flag on `Source` (or skip list) so the extractor never attempts HTTP scraping and relies directly on RSS title/snippet.
-- [ ] **Unclustered lookback window**: Shorten lookback window in `getUnclusteredArticles.ts` from 7 days to 2–3 days to prevent $O(N^2)$ quadratic slowdown over 1,860+ solitary articles.
+- [x] **Content extraction failure loop**: Stop retrying failed article URL fetches in `fillMissingContent.ts` by marking failed extractions, and cap/parallelize fetches. (See detailed handoff in [`docs/handoffs/pipeline-performance-optimization.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/pipeline-performance-optimization.md))
+- [x] **Paywalled feed skip**: Mark paywalled feeds (The Times, FT, Telegraph, etc.) with a `paywalled: true` flag on `Source` (or skip list) so the extractor never attempts HTTP scraping and relies directly on RSS title/snippet.
+- [x] **Unclustered lookback window**: Shorten lookback window in `getUnclusteredArticles.ts` from 7 days to 2–3 days to prevent $O(N^2)$ quadratic slowdown over 1,860+ solitary articles.
 
 ## Preferences & Strict Rules
 

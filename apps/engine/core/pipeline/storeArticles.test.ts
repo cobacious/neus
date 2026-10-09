@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 
 const mockDb = {
   syncArticles: jest.fn(),
+  isPaywalledSource: jest.fn(),
 };
 
 jest.unstable_mockModule('@neus/db', () => mockDb);
@@ -47,6 +48,33 @@ describe('storeArticles', () => {
       expect.objectContaining({
         url: 'https://example.com/valid',
         title: 'Valid Story',
+      }),
+    ]);
+  });
+
+  it('sets content to empty string for articles from paywalled sources', async () => {
+    (mockDb.isPaywalledSource as jest.Mock).mockReturnValue(true);
+    (mockDb.syncArticles as jest.Mock).mockResolvedValue({
+      created: 1,
+      updated: 0,
+      unchanged: 0,
+    } as any);
+
+    await storeArticles([
+      {
+        url: 'https://thetimes.com/story',
+        title: 'Paywalled Story',
+        source: 'The Times',
+        sourceId: 'src-times',
+        publishedAt: new Date().toISOString(),
+        snippet: 'snippet',
+      },
+    ]);
+
+    expect(mockDb.syncArticles).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://thetimes.com/story',
+        content: '',
       }),
     ]);
   });

@@ -16,6 +16,7 @@ const feeds = [
     homepageUrl: 'https://www.thetimes.com',
     rssFeedUrl: 'https://news.google.com/rss/search?q=when:24h+site:thetimes.com&hl=en-GB&gl=GB&ceid=GB:en',
     active: true,
+    paywalled: true,
   },
   {
     name: 'The Independent UK',
@@ -52,6 +53,7 @@ const feeds = [
     name: 'Financial Times',
     homepageUrl: 'https://www.ft.com',
     rssFeedUrl: 'https://www.ft.com/?format=rss',
+    paywalled: true,
   },
   {
     name: 'Daily Mail',
@@ -62,6 +64,7 @@ const feeds = [
     name: 'The Telegraph',
     homepageUrl: 'https://www.telegraph.co.uk',
     rssFeedUrl: 'https://www.telegraph.co.uk/rss.xml',
+    paywalled: true,
   },
   {
     name: 'Channel 4 News',
@@ -115,6 +118,7 @@ async function main() {
         name: feed.name,
         homepageUrl: feed.homepageUrl,
         active: (feed as any).active ?? true,
+        paywalled: (feed as any).paywalled ?? false,
       },
       create: {
         name: feed.name,
@@ -122,6 +126,7 @@ async function main() {
         homepageUrl: feed.homepageUrl,
         domain,
         active: (feed as any).active ?? true,
+        paywalled: (feed as any).paywalled ?? false,
         faviconUrl: `https://icon.horse/icon/${domain}`,
       },
     });
