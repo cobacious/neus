@@ -512,5 +512,30 @@ describe('isSettledNeighborhood', () => {
     const res = isSettledNeighborhood(neighborhood, stories, cutoff);
     expect(res.settled).toBe(false);
   });
+
+  it('treats neighborhood as settled when activeStoryClusterCounts matches neighborhood, ignoring older DB clusters', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+    ];
+    // DB story has 15 historical clusters, but active window only has 2
+    const storiesWithManyDbClusters = [
+      { id: 's1', title: 'Story 1', status: 'developing', overview: 'Overview', _count: { clusters: 15 } },
+    ];
+    const activeMap = new Map<string, number>([['s1', 2]]);
+    const res = isSettledNeighborhood(neighborhood, storiesWithManyDbClusters, cutoff, activeMap);
+    expect(res.settled).toBe(true);
+    expect(res.storyTitle).toBe('Story 1');
+  });
+
+  it('returns false when activeStoryClusterCounts shows more active clusters outside the neighborhood', () => {
+    const neighborhood = [
+      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
+    ];
+    const activeMap = new Map<string, number>([['s1', 3]]);
+    const res = isSettledNeighborhood(neighborhood, stories, cutoff, activeMap);
+    expect(res.settled).toBe(false);
+  });
 });
 

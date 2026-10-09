@@ -77,7 +77,8 @@ export function isSettledNeighborhood<T extends ClusterWithEmbedding>(
     overview: string | null;
     _count?: { clusters: number };
   }>,
-  activityCutoff: Date
+  activityCutoff: Date,
+  activeStoryClusterCounts?: Map<string, number>
 ): { settled: boolean; storyTitle?: string } {
   if (neighborhood.length < 2) return { settled: false };
 
@@ -103,9 +104,14 @@ export function isSettledNeighborhood<T extends ClusterWithEmbedding>(
     return { settled: false };
   }
 
-  // If the story has more clusters in the database than are present in this neighborhood,
-  // do not treat as settled (an angle might be dissociated or split)
-  if (matchedStory._count && matchedStory._count.clusters > neighborhood.length) {
+  // If the story has more active clusters in the current evaluation window than are present in this neighborhood,
+  // do not treat as settled (an angle might be dissociated or split into another neighborhood).
+  // Uses activeStoryClusterCounts if provided, falling back to matchedStory._count.clusters for unit tests.
+  const totalStoryClusters = activeStoryClusterCounts
+    ? activeStoryClusterCounts.get(targetStoryId) ?? neighborhood.length
+    : matchedStory._count?.clusters ?? neighborhood.length;
+
+  if (totalStoryClusters > neighborhood.length) {
     return { settled: false };
   }
 
@@ -518,6 +524,17 @@ export async function organizeStoryAngles() {
   let totalStoriesSynced = 0;
   let totalSkippedSettled = 0;
 
+  // Pre-calculate active cluster count per story in the 30-day window
+  const activeStoryClusterCounts = new Map<string, number>();
+  for (const c of activeClusters) {
+    if (c.storyId) {
+      activeStoryClusterCounts.set(
+        c.storyId,
+        (activeStoryClusterCounts.get(c.storyId) || 0) + 1
+      );
+    }
+  }
+
   const RECENT_ACTIVITY_HOURS = 48;
   const activityCutoff = new Date(Date.now() - RECENT_ACTIVITY_HOURS * 60 * 60 * 1000);
 
@@ -526,7 +543,12 @@ export async function organizeStoryAngles() {
 
     // Skip settled neighborhoods where all clusters already belong to the same existing story,
     // angles are assigned, and no new clusters or articles arrived in the past RECENT_ACTIVITY_HOURS
-    const settledCheck = isSettledNeighborhood(neighborhood, existingStories, activityCutoff);
+    const settledCheck = isSettledNeighborhood(
+      neighborhood,
+      existingStories,
+      activityCutoff,
+      activeStoryClusterCounts
+    );
     if (settledCheck.settled) {
       totalSkippedSettled++;
       logger.info(

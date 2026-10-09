@@ -26,7 +26,7 @@ const feeds = [
   {
     name: 'Daily Express',
     homepageUrl: 'https://www.express.co.uk',
-    rssFeedUrl: 'https://www.express.co.uk/posts/rss/1/news',
+    rssFeedUrl: 'https://news.google.com/rss/search?q=when:24h+site:express.co.uk&hl=en-GB&gl=GB&ceid=GB:en',
   },
   {
     name: 'The i Paper',
