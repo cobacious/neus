@@ -7,7 +7,7 @@ const GEMINI_API_BASE_URL =
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-const openai =
+export const openai =
   OPENAI_API_KEY || process.env.NODE_ENV === 'test'
     ? new OpenAI({
         apiKey: OPENAI_API_KEY || 'mock-key',
@@ -15,19 +15,30 @@ const openai =
       })
     : null;
 
+let geminiDisabled = false;
+
+export function isGeminiActive(): boolean {
+  return Boolean(process.env.GEMINI_API_KEY && !geminiDisabled);
+}
+
+export function resetAiClientState(): void {
+  geminiDisabled = false;
+}
+
 export function resolveSummaryModel(): string {
   const envModel = process.env.SUMMARY_MODEL;
   if (!envModel || envModel.includes('1.5') || envModel.includes('2.0') || envModel === 'gpt-4o-mini') {
-    return process.env.GEMINI_API_KEY ? 'gemini-flash-latest' : 'gpt-4o-mini';
+    return isGeminiActive() ? 'gemini-flash-latest' : 'gpt-4o-mini';
   }
   return envModel;
 }
 
-export function resolveEmbeddingModel(): string {
-  if (process.env.GEMINI_API_KEY) {
+export function resolveEmbeddingModel(provider?: 'gemini' | 'openai'): string {
+  const targetProvider = provider || (isGeminiActive() ? 'gemini' : 'openai');
+  if (targetProvider === 'gemini') {
     return process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2';
   }
-  return process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
+  return process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-large';
 }
 
 export function cleanJsonResponse<T>(text: string): T {
@@ -74,7 +85,7 @@ export async function generateStructuredJson<T>(
 ): Promise<T> {
   const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (geminiKey) {
+  if (geminiKey && !geminiDisabled) {
     const model = request.model || resolveSummaryModel();
     const url = `${GEMINI_API_BASE_URL}/models/${model}:generateContent?key=${geminiKey}`;
 
@@ -119,6 +130,12 @@ export async function generateStructuredJson<T>(
 
         if (!res.ok) {
           const errorText = await res.text();
+          if (res.status === 402 || res.status === 401 || res.status === 403) {
+            geminiDisabled = true;
+            logger.warn(
+              `[${request.step || PipelineStep.Cluster}] Gemini API returned ${res.status}. Disabling Gemini for this run and falling back to OpenAI.`
+            );
+          }
           throw new Error(`Gemini API error (${res.status}): ${errorText}`);
         }
 
@@ -183,50 +200,68 @@ export async function generateEmbedding(
 ): Promise<number[]> {
   const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (geminiKey) {
-    const model = resolveEmbeddingModel();
+  if (geminiKey && !geminiDisabled) {
+    const model = resolveEmbeddingModel('gemini');
     const url = `${GEMINI_API_BASE_URL}/models/${model}:embedContent?key=${geminiKey}`;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: `models/${model}`,
-          content: { parts: [{ text }] },
-        }),
-      });
+    try {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: `models/${model}`,
+            content: { parts: [{ text }] },
+          }),
+        });
 
-      if (res.status === 429) {
-        const backoffMs = Math.pow(2, attempt) * 2000;
-        logger.warn(
-          `[${PipelineStep.Embed}] Gemini rate limit (429) on embedding attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
-        );
-        if (process.env.NODE_ENV !== 'test') {
-          await new Promise((r) => setTimeout(r, backoffMs));
+        if (res.status === 429) {
+          const backoffMs = Math.pow(2, attempt) * 2000;
+          logger.warn(
+            `[${PipelineStep.Embed}] Gemini rate limit (429) on embedding attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
+          );
+          if (process.env.NODE_ENV !== 'test') {
+            await new Promise((r) => setTimeout(r, backoffMs));
+          }
+          continue;
         }
-        continue;
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          if (res.status === 402 || res.status === 401 || res.status === 403) {
+            geminiDisabled = true;
+            logger.warn(
+              `[${PipelineStep.Embed}] Gemini embedding returned ${res.status}. Disabling Gemini for this run and falling back to OpenAI.`
+            );
+          }
+          throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
+        }
+
+        const data = (await res.json()) as { embedding?: { values?: number[] } };
+        if (!data.embedding?.values) {
+          throw new Error('Gemini embedding response missing values');
+        }
+        return data.embedding.values;
       }
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
+      throw new Error(`Exhausted ${maxRetries} retries for Gemini embedding`);
+    } catch (geminiError: any) {
+      if (openai) {
+        logger.warn(
+          `[${PipelineStep.Embed}] Gemini embedding failed (${geminiError.message || geminiError}), falling back to OpenAI...`
+        );
+      } else {
+        throw geminiError;
       }
-
-      const data = (await res.json()) as { embedding?: { values?: number[] } };
-      if (!data.embedding?.values) {
-        throw new Error('Gemini embedding response missing values');
-      }
-      return data.embedding.values;
     }
-
-    throw new Error(`Exhausted ${maxRetries} retries for Gemini embedding`);
   }
 
   if (openai) {
+    const openaiModel = resolveEmbeddingModel('openai');
     const response = await openai.embeddings.create({
-      model: resolveEmbeddingModel(),
+      model: openaiModel,
       input: text,
+      ...(openaiModel === 'text-embedding-3-large' ? { dimensions: 3072 } : {}),
     });
     return response.data[0].embedding as number[];
   }

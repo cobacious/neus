@@ -11,6 +11,7 @@ const mockGenerateEmbedding = jest.fn();
 jest.unstable_mockModule('../../lib/aiClient', () => ({
   generateEmbedding: mockGenerateEmbedding,
   resolveEmbeddingModel: () => 'mock-embedding-model',
+  isGeminiActive: () => true,
 }));
 
 let embedNewArticles: typeof import('./embedArticles').embedNewArticles;

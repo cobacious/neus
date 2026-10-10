@@ -8,7 +8,7 @@ import {
   logPipelineStep,
   PipelineStep,
 } from '../../lib/pipelineLogger';
-import { generateEmbedding, resolveEmbeddingModel } from '../../lib/aiClient';
+import { generateEmbedding, resolveEmbeddingModel, isGeminiActive } from '../../lib/aiClient';
 
 const MAX_EMBEDDING_CHARS = 8192;
 
@@ -51,7 +51,7 @@ export async function embedNewArticles() {
     try {
       const embedding = await generateEmbedding(abridged);
 
-      if (process.env.GEMINI_API_KEY && process.env.NODE_ENV !== 'test') {
+      if (isGeminiActive() && process.env.NODE_ENV !== 'test') {
         await new Promise((r) => setTimeout(r, 1200));
       }
 

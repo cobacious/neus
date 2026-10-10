@@ -22,3 +22,5 @@ package-lock.json
 **/.claude/
 **/.openai/
 
+# Backups
+backups/
