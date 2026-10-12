@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import handler from './og-preview';
+import handler from '../api/og-preview';
 
 describe('og-preview handler', () => {
   const originalFetch = global.fetch;
