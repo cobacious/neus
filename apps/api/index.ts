@@ -24,7 +24,9 @@ const authPlugin: Plugin = {
 
       const request = (args.contextValue as any).request;
       const authHeader = request?.headers?.get('authorization') || request?.headers?.get('Authorization');
-      const token = authHeader?.replace('Bearer ', '');
+
+      const match = authHeader?.match(/^Bearer\s+(.+)$/i);
+      const token = match ? match[1].trim() : undefined;
 
       if (token !== API_KEY) {
         throw new GraphQLError('Unauthorized: Invalid or missing API Key for mutation.', {
