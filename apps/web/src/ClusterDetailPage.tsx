@@ -91,19 +91,27 @@ export default function ClusterDetailPage() {
       }
     };
 
+    const ensureMeta = (selector: string, attr: string, attrVal: string, content: string) => {
+      let el = document.querySelector(selector);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, attrVal);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
     setMeta('meta[name="description"]', summary || '');
     setMeta('meta[property="og:title"]', headline);
     setMeta('meta[property="og:description"]', summary || '');
     setMeta('meta[property="og:url"]', window.location.href);
     setMeta('meta[name="twitter:title"]', headline);
     setMeta('meta[name="twitter:description"]', summary || '');
-    setMeta('meta[name="twitter:card"]', 'summary');
+    setMeta('meta[name="twitter:card"]', 'summary_large_image');
 
-    // Remove og:image from the active DOM so Safari Share Sheet renders clean headline card without homepage banner
-    const ogImageEl = document.querySelector('meta[property="og:image"]');
-    const twitterImageEl = document.querySelector('meta[name="twitter:image"]');
-    ogImageEl?.remove();
-    twitterImageEl?.remove();
+    const dynamicOgImage = `https://neus.news/api/og-image?slug=${encodeURIComponent(slug || '')}`;
+    ensureMeta('meta[property="og:image"]', 'property', 'og:image', dynamicOgImage);
+    ensureMeta('meta[name="twitter:image"]', 'name', 'twitter:image', dynamicOgImage);
 
     return () => {
       document.title = 'Neus - Neutral News';
@@ -123,21 +131,10 @@ export default function ClusterDetailPage() {
         'Restoring balance and neutrality to the news feed without clickbait or bias.'
       );
       setMeta('meta[name="twitter:card"]', 'summary_large_image');
-
-      if (!document.querySelector('meta[property="og:image"]')) {
-        const meta = document.createElement('meta');
-        meta.setAttribute('property', 'og:image');
-        meta.setAttribute('content', 'https://neus.news/og-image.png');
-        document.head.appendChild(meta);
-      }
-      if (!document.querySelector('meta[name="twitter:image"]')) {
-        const meta = document.createElement('meta');
-        meta.setAttribute('name', 'twitter:image');
-        meta.setAttribute('content', 'https://neus.news/og-image.png');
-        document.head.appendChild(meta);
-      }
+      ensureMeta('meta[property="og:image"]', 'property', 'og:image', 'https://neus.news/og-image.png');
+      ensureMeta('meta[name="twitter:image"]', 'name', 'twitter:image', 'https://neus.news/og-image.png');
     };
-  }, [headline, summary]);
+  }, [headline, summary, slug]);
 
   if (result.fetching) return <Loading />;
   if (result.error || !cluster) {

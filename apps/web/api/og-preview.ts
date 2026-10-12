@@ -49,6 +49,13 @@ export default async function handler(req: any, res?: any) {
             summary
             storyAngle
             articleCount
+            story {
+              title
+              overview
+              clusters {
+                id
+              }
+            }
           }
         }`,
         variables: { slug },
@@ -72,9 +79,16 @@ export default async function handler(req: any, res?: any) {
       if (response.ok) {
         const json: any = await response.json();
         const cluster = json?.data?.cluster;
-        if (cluster && cluster.headline) {
-          title = cluster.headline;
-          description = cluster.summary || DEFAULT_DESCRIPTION;
+        if (cluster) {
+          const story = cluster.story;
+          const isMultiAngle = Boolean(story && story.clusters && story.clusters.length > 1);
+          if (isMultiAngle && story?.title) {
+            title = story.title;
+            description = story.overview || cluster.summary || DEFAULT_DESCRIPTION;
+          } else if (cluster.headline) {
+            title = cluster.headline;
+            description = cluster.summary || DEFAULT_DESCRIPTION;
+          }
         }
       }
     } catch (err) {
@@ -150,12 +164,22 @@ export default async function handler(req: any, res?: any) {
     );
 
     if (slug) {
-      // Omit large generic image banners on clusters so iMessage and cards show clean headline cards
-      html = html.replace(/<meta\s+property=["']og:image[^>]*>/g, '');
-      html = html.replace(/<meta\s+name=["']twitter:image[^>]*>/g, '');
+      const dynamicOgImage = `${SITE_URL}/api/og-image?slug=${encodeURIComponent(slug)}`;
+      html = html.replace(
+        /<meta\s+property=["']og:image["'][^>]*>/,
+        `<meta property="og:image" content="${dynamicOgImage}" />`
+      );
+      html = html.replace(
+        /<meta\s+property=["']og:image:alt["'][^>]*>/,
+        `<meta property="og:image:alt" content="${safeTitle} - Neus" />`
+      );
+      html = html.replace(
+        /<meta\s+name=["']twitter:image["'][^>]*>/,
+        `<meta name="twitter:image" content="${dynamicOgImage}" />`
+      );
       html = html.replace(
         /<meta\s+name=["']twitter:card["'][^>]*>/,
-        '<meta name="twitter:card" content="summary" />'
+        '<meta name="twitter:card" content="summary_large_image" />'
       );
     }
   } else {
@@ -164,11 +188,12 @@ export default async function handler(req: any, res?: any) {
     const pageTitle = slug ? `${safeTitle} - Neus` : safeTitle;
     const safeDescription = escapeHtml(description);
     const safeUrl = escapeHtml(canonicalUrl);
-    const imageTag = slug ? '' : `<meta property="og:image" content="${DEFAULT_IMAGE}" />
+    const dynamicOgImage = slug ? `${SITE_URL}/api/og-image?slug=${encodeURIComponent(slug)}` : DEFAULT_IMAGE;
+    const imageTag = `<meta property="og:image" content="${dynamicOgImage}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta name="twitter:image" content="${DEFAULT_IMAGE}" />`;
-    const twitterCard = slug ? 'summary' : 'summary_large_image';
+  <meta name="twitter:image" content="${dynamicOgImage}" />`;
+    const twitterCard = 'summary_large_image';
 
     html = `<!DOCTYPE html>
 <html lang="en">

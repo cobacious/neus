@@ -83,9 +83,14 @@ describe('og-preview handler', () => {
       '<meta property="og:description" content="A visitor entered the enclosure and suffered injuries." />'
     );
     expect(sentBody).toContain(
-      '<meta property="og:url" content="https://neus.news/tiger-incident-at-yorkshire-wildlife-park" />'
+      '<meta property="og:image" content="https://neus.news/api/og-image?slug=tiger-incident-at-yorkshire-wildlife-park"'
     );
-    expect(sentBody).not.toContain('<meta property="og:image"');
+    expect(sentBody).toContain(
+      '<meta name="twitter:image" content="https://neus.news/api/og-image?slug=tiger-incident-at-yorkshire-wildlife-park"'
+    );
+    expect(sentBody).toContain(
+      '<meta name="twitter:card" content="summary_large_image"'
+    );
   });
 
   it('escapes special characters to prevent broken HTML or XSS', async () => {
