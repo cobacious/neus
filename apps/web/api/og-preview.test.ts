@@ -77,7 +77,7 @@ describe('og-preview handler', () => {
     expect(sentStatus).toBe(200);
     expect(sentBody).toContain('<title>Tiger Incident at Yorkshire Wildlife Park - Neus</title>');
     expect(sentBody).toContain(
-      '<meta property="og:title" content="Tiger Incident at Yorkshire Wildlife Park - Neus" />'
+      '<meta property="og:title" content="Tiger Incident at Yorkshire Wildlife Park" />'
     );
     expect(sentBody).toContain(
       '<meta property="og:description" content="A visitor entered the enclosure and suffered injuries." />'
@@ -85,9 +85,7 @@ describe('og-preview handler', () => {
     expect(sentBody).toContain(
       '<meta property="og:url" content="https://neus.news/tiger-incident-at-yorkshire-wildlife-park" />'
     );
-    expect(sentBody).toContain(
-      '<meta http-equiv="refresh" content="0; url=/tiger-incident-at-yorkshire-wildlife-park" />'
-    );
+    expect(sentBody).not.toContain('<meta property="og:image"');
   });
 
   it('escapes special characters to prevent broken HTML or XSS', async () => {

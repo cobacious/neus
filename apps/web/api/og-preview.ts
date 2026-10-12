@@ -32,9 +32,9 @@ export default async function handler(req: any, res?: any) {
 
   let title = DEFAULT_TITLE;
   let description = DEFAULT_DESCRIPTION;
-  let canonicalUrl = slug ? `${SITE_URL}/${slug}` : SITE_URL;
-  let redirectUrl = slug ? `/${slug}` : '/';
+  const canonicalUrl = slug ? `${SITE_URL}/${slug}` : SITE_URL;
 
+  // 1. Fetch cluster metadata if slug is present
   if (slug) {
     try {
       const apiUrl =
@@ -55,7 +55,7 @@ export default async function handler(req: any, res?: any) {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -73,57 +73,122 @@ export default async function handler(req: any, res?: any) {
         const json: any = await response.json();
         const cluster = json?.data?.cluster;
         if (cluster && cluster.headline) {
-          title = `${cluster.headline} - Neus`;
+          title = cluster.headline;
           description = cluster.summary || DEFAULT_DESCRIPTION;
         }
       }
     } catch (err) {
-      // Graceful fallback to default metadata on error or timeout
       console.error('Error fetching cluster metadata for preview:', err);
     }
   }
 
-  const safeTitle = escapeHtml(title);
-  const safeDescription = escapeHtml(description);
-  const safeUrl = escapeHtml(canonicalUrl);
-  const safeRedirect = escapeHtml(redirectUrl);
+  // 2. Fetch the built index.html from disk or host so React bundle scripts are preserved
+  let html = '';
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const candidates = [
+      path.join(process.cwd(), 'dist', 'index.html'),
+      path.join(process.cwd(), 'apps', 'web', 'dist', 'index.html'),
+      path.join(process.cwd(), 'apps', 'web', 'index.html'),
+      path.join(process.cwd(), 'index.html'),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        html = fs.readFileSync(c, 'utf8');
+        break;
+      }
+    }
+  } catch {
+    // Disk read failed, fallback to network
+  }
 
-  const html = `<!DOCTYPE html>
+  if (!html) {
+    try {
+      const host = req.headers?.['x-forwarded-host'] || req.headers?.host || 'neus.news';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
+      const indexRes = await fetch(`${protocol}://${host}/index.html`);
+      if (indexRes.ok) {
+        html = await indexRes.text();
+      }
+    } catch {
+      // Fallback template if fetching index.html fails
+    }
+  }
+
+  // 3. Inject cluster-specific meta tags
+  if (html) {
+    const safeTitle = escapeHtml(title);
+    const pageTitle = slug ? `${safeTitle} - Neus` : safeTitle;
+    const safeDescription = escapeHtml(description);
+    const safeUrl = escapeHtml(canonicalUrl);
+
+    html = html.replace(/<title>[^<]*<\/title>/, `<title>${pageTitle}</title>`);
+    html = html.replace(
+      /<meta\s+name=["']description["'][^>]*>/,
+      `<meta name="description" content="${safeDescription}" />`
+    );
+    html = html.replace(
+      /<meta\s+property=["']og:title["'][^>]*>/,
+      `<meta property="og:title" content="${safeTitle}" />`
+    );
+    html = html.replace(
+      /<meta\s+property=["']og:description["'][^>]*>/,
+      `<meta property="og:description" content="${safeDescription}" />`
+    );
+    html = html.replace(
+      /<meta\s+property=["']og:url["'][^>]*>/,
+      `<meta property="og:url" content="${safeUrl}" />`
+    );
+    html = html.replace(
+      /<meta\s+name=["']twitter:title["'][^>]*>/,
+      `<meta name="twitter:title" content="${safeTitle}" />`
+    );
+    html = html.replace(
+      /<meta\s+name=["']twitter:description["'][^>]*>/,
+      `<meta name="twitter:description" content="${safeDescription}" />`
+    );
+
+    if (slug) {
+      // Omit large generic image banners on clusters so iMessage and cards show clean headline cards
+      html = html.replace(/<meta\s+property=["']og:image[^>]*>/g, '');
+      html = html.replace(/<meta\s+name=["']twitter:image[^>]*>/g, '');
+      html = html.replace(
+        /<meta\s+name=["']twitter:card["'][^>]*>/,
+        '<meta name="twitter:card" content="summary" />'
+      );
+    }
+  } else {
+    // Minimal fallback HTML if template cannot be retrieved
+    const safeTitle = escapeHtml(title);
+    const pageTitle = slug ? `${safeTitle} - Neus` : safeTitle;
+    const safeDescription = escapeHtml(description);
+    const safeUrl = escapeHtml(canonicalUrl);
+    const imageTag = slug ? '' : `<meta property="og:image" content="${DEFAULT_IMAGE}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:image" content="${DEFAULT_IMAGE}" />`;
+    const twitterCard = slug ? 'summary' : 'summary_large_image';
+
+    html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${safeTitle}</title>
+  <title>${pageTitle}</title>
   <meta name="description" content="${safeDescription}" />
-
-  <!-- Open Graph / Facebook / iMessage / WhatsApp -->
   <meta property="og:site_name" content="Neus" />
-  <meta property="og:type" content="article" />
-  <meta property="og:url" content="${safeUrl}" />
   <meta property="og:title" content="${safeTitle}" />
   <meta property="og:description" content="${safeDescription}" />
-  <meta property="og:image" content="${DEFAULT_IMAGE}" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:type" content="image/png" />
-  <meta property="og:image:alt" content="${safeTitle}" />
-
-  <!-- Twitter / X -->
-  <meta name="twitter:card" content="summary_large_image" />
+  <meta property="og:url" content="${safeUrl}" />
+  ${imageTag}
+  <meta name="twitter:card" content="${twitterCard}" />
   <meta name="twitter:title" content="${safeTitle}" />
   <meta name="twitter:description" content="${safeDescription}" />
-  <meta name="twitter:image" content="${DEFAULT_IMAGE}" />
-
-  <!-- Client redirect in case a human lands directly on this route -->
-  <meta http-equiv="refresh" content="0; url=${safeRedirect}" />
-  <link rel="canonical" href="${safeUrl}" />
+  <meta http-equiv="refresh" content="0; url=${slug ? `/${escapeHtml(slug)}` : '/'}" />
 </head>
-<body>
-  <h1>${safeTitle}</h1>
-  <p>${safeDescription}</p>
-  <p><a href="${safeRedirect}">Continue to full story on Neus</a></p>
-</body>
+<body><div id="root"></div></body>
 </html>`;
+  }
 
   // Support Node.js runtime
   if (res && typeof res.setHeader === 'function') {

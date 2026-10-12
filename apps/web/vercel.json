@@ -6,13 +6,13 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(.*(Applebot|applebot|facebookexternalhit|Facebook|Twitterbot|twitterbot|Slackbot|slackbot|LinkedInBot|linkedinbot|Discordbot|discordbot|TelegramBot|telegrambot|WhatsApp|whatsapp).*)"
+          "value": "(?i).*(facebookexternalhit|Twitterbot|WhatsApp|Discordbot|TelegramBot|Applebot|Slackbot|LinkedInBot).*"
         }
       ],
       "destination": "/api/og-preview?slug=:slug"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
