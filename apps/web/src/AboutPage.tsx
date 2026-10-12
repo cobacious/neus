@@ -172,10 +172,10 @@ export default function AboutPage() {
 
       {/* Sources & Editorial Scope */}
       <section className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-xs space-y-4">
-        <h2 className="text-xl font-bold text-gray-900">Sources & Quality Standards</h2>
+        <h2 className="text-xl font-bold text-gray-900">Sources & Scope</h2>
         <div className="space-y-3 text-gray-700 leading-relaxed text-sm sm:text-base">
           <p>
-            Neus indexes established, high-reputation publishers including the BBC, Reuters, The Guardian, Financial Times, The Telegraph, The Independent, Sky News and others across the political spectrum.
+            Neus is focused on UK and world news, indexing established publications including the BBC, Reuters, The Guardian, Financial Times, The Telegraph, The Independent and Sky News.
           </p>
         </div>
       </section>
