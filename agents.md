@@ -58,8 +58,8 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Sparkline tooltip collision**: Prevent tooltips on closely clustered timeline markers from bunching/overlapping.
 - [x] **"Breaking" status decay**: Review criteria so stories active for multiple days transition appropriately to "Developing".
 - [x] **Histogram adaptive bucketing**: Dynamic 15m/30m/1h/2h/1d binning so rapid breaking news stories distribute chronologically instead of collapsing into a single 6h bar.
-- [x] **Angle summary truncation**: Remove 2-line truncation (`line-clamp-2`) on angle summaries in cluster detail view so the full summary is visible. (In open PR #37).
-- [x] **Card footer layout & source wrap**: Reorder card footer with source logos first, `justify-between` article count, and 8-icon limit. (In open PR #37).
+- [x] **Angle summary truncation**: Remove 2-line truncation (`line-clamp-2`) on angle summaries in cluster detail view so the full summary is visible.
+- [x] **Card footer layout & source wrap**: Reorder card footer with source logos first, `justify-between` article count, and 8-icon limit.
 - [ ] **About Page & Footer Navigation**: Create an About page covering what the site is, its aims/reasons for existing (neutrality, thoughtful consumption), how it works, GitHub repo link, Ko-fi donation link, and user feedback mechanism. Add a site footer (or burger menu) linking to About, superceding the top informational banner on both feed and detail pages.
 - [ ] **Story Angle Filtering / Jump Links**: In cluster detail and card views, support filtering articles by angle or making angle pills act as jump links to that angle's section.
 
