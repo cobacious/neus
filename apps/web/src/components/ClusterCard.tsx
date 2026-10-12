@@ -132,7 +132,7 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   }
 
   const sources = Array.from(sourcesMap.values());
-  const visibleSources = sources.slice(0, 5);
+  const visibleSources = sources.slice(0, 8);
   const extraSources = sources.length - visibleSources.length;
 
   const statusConfig = status ? STATUS_CONFIG[status] : null;
