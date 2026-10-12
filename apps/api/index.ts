@@ -1,10 +1,12 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import { createYoga, Plugin } from 'graphql-yoga';
+import { useDisableIntrospection } from '@graphql-yoga/plugin-disable-introspection';
 import { GraphQLError, getOperationAST } from 'graphql';
 import { schema } from './schema';
 
 const API_KEY = process.env.API_KEY;
+const isProd = process.env.NODE_ENV === 'production';
 
 const authPlugin: Plugin = {
   onExecute({ args }) {
@@ -36,9 +38,16 @@ const authPlugin: Plugin = {
   }
 };
 
+const plugins: Plugin[] = [authPlugin];
+
+// Disable introspection queries in production to prevent schema discovery
+if (isProd) {
+  plugins.push(useDisableIntrospection());
+}
+
 const yoga = createYoga({
   schema,
-  plugins: [authPlugin]
+  plugins,
 });
 
 const server = createServer(yoga);
