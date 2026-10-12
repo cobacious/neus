@@ -33,7 +33,7 @@ describe('og-preview handler', () => {
     expect(sentStatus).toBe(200);
     expect(sentBody).toContain('<title>Neus - Neutral News</title>');
     expect(sentBody).toContain(
-      '<meta property="og:description" content="Restoring balance and neutrality to the news feed without clickbait or bias." />'
+      '<meta property="og:description" content="Bringing balance and neutrality to the news feed without clickbait or bias." />'
     );
     expect(sentBody).toContain('content="https://neus.news/og-image.png"');
     expect(headers['Content-Type']).toContain('text/html');
@@ -83,10 +83,10 @@ describe('og-preview handler', () => {
       '<meta property="og:description" content="A visitor entered the enclosure and suffered injuries." />'
     );
     expect(sentBody).toContain(
-      '<meta property="og:image" content="https://neus.news/api/og-image?slug=tiger-incident-at-yorkshire-wildlife-park"'
+      '<meta property="og:image" content="https://neus.news/og-image.png"'
     );
     expect(sentBody).toContain(
-      '<meta name="twitter:image" content="https://neus.news/api/og-image?slug=tiger-incident-at-yorkshire-wildlife-park"'
+      '<meta name="twitter:image" content="https://neus.news/og-image.png"'
     );
     expect(sentBody).toContain(
       '<meta name="twitter:card" content="summary_large_image"'

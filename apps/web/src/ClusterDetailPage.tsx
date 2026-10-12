@@ -109,30 +109,30 @@ export default function ClusterDetailPage() {
     setMeta('meta[name="twitter:description"]', summary || '');
     setMeta('meta[name="twitter:card"]', 'summary_large_image');
 
-    const dynamicOgImage = `https://neus.news/api/og-image?slug=${encodeURIComponent(slug || '')}`;
-    ensureMeta('meta[property="og:image"]', 'property', 'og:image', dynamicOgImage);
-    ensureMeta('meta[name="twitter:image"]', 'name', 'twitter:image', dynamicOgImage);
+    const staticOgImage = 'https://neus.news/og-image.png';
+    ensureMeta('meta[property="og:image"]', 'property', 'og:image', staticOgImage);
+    ensureMeta('meta[name="twitter:image"]', 'name', 'twitter:image', staticOgImage);
 
     return () => {
       document.title = 'Neus - Neutral News';
       setMeta(
         'meta[name="description"]',
-        'Restoring balance and neutrality to the news feed without clickbait or bias.'
+        'Bringing balance and neutrality to the news feed without clickbait or bias.'
       );
       setMeta('meta[property="og:title"]', 'Neus - Neutral News');
       setMeta(
         'meta[property="og:description"]',
-        'Restoring balance and neutrality to the news feed without clickbait or bias.'
+        'Bringing balance and neutrality to the news feed without clickbait or bias.'
       );
       setMeta('meta[property="og:url"]', 'https://neus.news');
       setMeta('meta[name="twitter:title"]', 'Neus - Neutral News');
       setMeta(
         'meta[name="twitter:description"]',
-        'Restoring balance and neutrality to the news feed without clickbait or bias.'
+        'Bringing balance and neutrality to the news feed without clickbait or bias.'
       );
       setMeta('meta[name="twitter:card"]', 'summary_large_image');
-      ensureMeta('meta[property="og:image"]', 'property', 'og:image', 'https://neus.news/og-image.png');
-      ensureMeta('meta[name="twitter:image"]', 'name', 'twitter:image', 'https://neus.news/og-image.png');
+      ensureMeta('meta[property="og:image"]', 'property', 'og:image', staticOgImage);
+      ensureMeta('meta[name="twitter:image"]', 'name', 'twitter:image', staticOgImage);
     };
   }, [headline, summary, slug]);
 

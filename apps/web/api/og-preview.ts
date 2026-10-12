@@ -9,7 +9,7 @@ function escapeHtml(str: string): string {
 
 const DEFAULT_TITLE = 'Neus - Neutral News';
 const DEFAULT_DESCRIPTION =
-  'Restoring balance and neutrality to the news feed without clickbait or bias.';
+  'Bringing balance and neutrality to the news feed without clickbait or bias.';
 const DEFAULT_IMAGE = 'https://neus.news/og-image.png';
 const SITE_URL = 'https://neus.news';
 
@@ -163,36 +163,36 @@ export default async function handler(req: any, res?: any) {
       `<meta name="twitter:description" content="${safeDescription}" />`
     );
 
-    if (slug) {
-      const dynamicOgImage = `${SITE_URL}/api/og-image?slug=${encodeURIComponent(slug)}`;
-      html = html.replace(
-        /<meta\s+property=["']og:image["'][^>]*>/,
-        `<meta property="og:image" content="${dynamicOgImage}" />`
-      );
-      html = html.replace(
-        /<meta\s+property=["']og:image:alt["'][^>]*>/,
-        `<meta property="og:image:alt" content="${safeTitle} - Neus" />`
-      );
-      html = html.replace(
-        /<meta\s+name=["']twitter:image["'][^>]*>/,
-        `<meta name="twitter:image" content="${dynamicOgImage}" />`
-      );
-      html = html.replace(
-        /<meta\s+name=["']twitter:card["'][^>]*>/,
-        '<meta name="twitter:card" content="summary_large_image" />'
-      );
-    }
+    html = html.replace(
+      /<meta\s+property=["']og:image["'][^>]*>/,
+      `<meta property="og:image" content="${DEFAULT_IMAGE}" />`
+    );
+    html = html.replace(
+      /<meta\s+property=["']og:image:height["'][^>]*>/,
+      '<meta property="og:image:height" content="480" />'
+    );
+    html = html.replace(
+      /<meta\s+property=["']og:image:alt["'][^>]*>/,
+      `<meta property="og:image:alt" content="${safeTitle} - Neus" />`
+    );
+    html = html.replace(
+      /<meta\s+name=["']twitter:image["'][^>]*>/,
+      `<meta name="twitter:image" content="${DEFAULT_IMAGE}" />`
+    );
+    html = html.replace(
+      /<meta\s+name=["']twitter:card["'][^>]*>/,
+      '<meta name="twitter:card" content="summary_large_image" />'
+    );
   } else {
     // Minimal fallback HTML if template cannot be retrieved
     const safeTitle = escapeHtml(title);
     const pageTitle = slug ? `${safeTitle} - Neus` : safeTitle;
     const safeDescription = escapeHtml(description);
     const safeUrl = escapeHtml(canonicalUrl);
-    const dynamicOgImage = slug ? `${SITE_URL}/api/og-image?slug=${encodeURIComponent(slug)}` : DEFAULT_IMAGE;
-    const imageTag = `<meta property="og:image" content="${dynamicOgImage}" />
+    const imageTag = `<meta property="og:image" content="${DEFAULT_IMAGE}" />
   <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta name="twitter:image" content="${dynamicOgImage}" />`;
+  <meta property="og:image:height" content="480" />
+  <meta name="twitter:image" content="${DEFAULT_IMAGE}" />`;
     const twitterCard = 'summary_large_image';
 
     html = `<!DOCTYPE html>
