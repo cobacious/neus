@@ -19,18 +19,13 @@ const SIMILARITY_THRESHOLD = process.env.CLUSTER_SIMILARITY_THRESHOLD
   : 0.88;
 const ALLOW_SINGLE_ARTICLE_CLUSTERS = false; // Set to false to skip single article clusters
 
-export async function clusterRecentArticles() {
-  logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
+type UnclusteredArticle = Awaited<ReturnType<typeof getUnclusteredArticles>>[number];
+type RecentCluster = Awaited<ReturnType<typeof getRecentClustersWithEmbeddings>>[number];
 
-  const articles = await getUnclusteredArticles();
-  const existingClusters = await getRecentClustersWithEmbeddings();
-
-  logPipelineSection(
-    PipelineStep.Cluster,
-    `Found ${articles.length} unclustered articles and ${existingClusters.length} recent clusters`
-  );
-
-  // Step 1: Try to assign articles to existing clusters first (prevents duplicates)
+async function assignToExistingClusters(
+  articles: UnclusteredArticle[],
+  existingClusters: RecentCluster[]
+): Promise<string[]> {
   const assignedToExisting: string[] = [];
   const assignmentsToExisting: ClusterAssignment[] = [];
 
@@ -73,21 +68,10 @@ export async function clusterRecentArticles() {
     );
   }
 
-  // Step 2: Cluster remaining articles among themselves
-  const remainingArticles = articles.filter((a) => !assignedToExisting.includes(a.id));
+  return assignedToExisting;
+}
 
-  if (remainingArticles.length === 0) {
-    logPipelineSection(PipelineStep.Cluster, 'No remaining articles to cluster. Done.');
-    return;
-  }
-
-  logPipelineSection(
-    PipelineStep.Cluster,
-    `Clustering ${remainingArticles.length} remaining articles`
-  );
-
-  const articleMap = new Map(remainingArticles.map((a) => [a.id, a]));
-
+function groupArticles(remainingArticles: UnclusteredArticle[]): string[][] {
   // Build Adjacency Map for fast O(1) neighbor lookup during DFS traversal
   const adj = new Map<string, string[]>();
   for (const a of remainingArticles) {
@@ -136,6 +120,14 @@ export async function clusterRecentArticles() {
     if (cluster.length >= minClusterSize) clusters.push(cluster);
   }
 
+  return clusters;
+}
+
+function filterUniqueClusters(
+  clusters: string[][],
+  remainingArticles: UnclusteredArticle[]
+): { filteredClusters: string[][]; skippedDuplicates: number; skippedEmpty: number } {
+  const minClusterSize = ALLOW_SINGLE_ARTICLE_CLUSTERS ? 1 : 2;
   const assignedArticles = new Set<string>();
   const filteredClusters: string[][] = [];
   let skippedDuplicates = 0;
@@ -168,6 +160,13 @@ export async function clusterRecentArticles() {
     });
   }
 
+  return { filteredClusters, skippedDuplicates, skippedEmpty };
+}
+
+async function createNewClusters(
+  filteredClusters: string[][],
+  articleMap: Map<string, UnclusteredArticle>
+): Promise<number> {
   let createdClusters = 0;
   for (const group of filteredClusters) {
     const cluster = await createCluster('embedding', null);
@@ -199,10 +198,12 @@ export async function clusterRecentArticles() {
       method: string;
     }[];
     await createArticleAssignments(assignments);
+
     const embeddings = group
       .map((id) => articleMap.get(id))
       .filter((a): a is { embedding: number[] } => Boolean(a && Array.isArray(a.embedding)))
       .map((a) => a.embedding as number[]);
+
     if (embeddings.length) {
       const dims = embeddings[0].length;
       const mean = Array(dims).fill(0);
@@ -218,6 +219,45 @@ export async function clusterRecentArticles() {
     }
     createdClusters++;
   }
+
+  return createdClusters;
+}
+
+export async function clusterRecentArticles() {
+  logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
+
+  const articles = await getUnclusteredArticles();
+  const existingClusters = await getRecentClustersWithEmbeddings();
+
+  logPipelineSection(
+    PipelineStep.Cluster,
+    `Found ${articles.length} unclustered articles and ${existingClusters.length} recent clusters`
+  );
+
+  // Step 1: Try to assign articles to existing clusters first (prevents duplicates)
+  const assignedToExisting = await assignToExistingClusters(articles, existingClusters);
+
+  // Step 2: Cluster remaining articles among themselves
+  const remainingArticles = articles.filter((a) => !assignedToExisting.includes(a.id));
+
+  if (remainingArticles.length === 0) {
+    logPipelineSection(PipelineStep.Cluster, 'No remaining articles to cluster. Done.');
+    return;
+  }
+
+  logPipelineSection(
+    PipelineStep.Cluster,
+    `Clustering ${remainingArticles.length} remaining articles`
+  );
+
+  const articleMap = new Map(remainingArticles.map((a) => [a.id, a]));
+
+  const clusters = groupArticles(remainingArticles);
+
+  const { filteredClusters, skippedDuplicates, skippedEmpty } = filterUniqueClusters(clusters, remainingArticles);
+
+  const createdClusters = await createNewClusters(filteredClusters, articleMap);
+
   logPipelineSection(
     PipelineStep.Cluster,
     `Clustering complete. ${createdClusters} clusters created. ${skippedDuplicates} duplicates skipped, ${skippedEmpty} empty filtered.`
