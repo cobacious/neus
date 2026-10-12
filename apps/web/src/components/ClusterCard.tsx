@@ -176,37 +176,40 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
         />
       </div>
 
-      {/* Footer: Article count & Sources */}
+      {/* Footer: Sources & Article count */}
       <div className="flex items-center gap-x-2 gap-y-1.5 flex-wrap pt-1">
+        {visibleSources.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 shrink-0 flex-nowrap" aria-label="Sources">
+              {visibleSources.map((source) => {
+                const paywalled = isPaywalled(source);
+                return (
+                  <div key={source.id} className="relative inline-flex items-center">
+                    <img
+                      src={source.faviconUrl || ''}
+                      alt={source.name}
+                      title={`${source.name}${paywalled ? ' (Subscription required)' : ''}`}
+                      className="w-5 h-5 rounded-xs"
+                    />
+                    {paywalled && (
+                      <span
+                        className="absolute -top-1 -right-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold shadow-xs select-none"
+                        title={`${source.name} (Subscription required)`}
+                      >
+                        🔒
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              {extraSources > 0 && <span className="text-xs text-gray-500 font-medium">+{extraSources}</span>}
+            </div>
+            <span className="text-xs text-gray-300">•</span>
+          </>
+        )}
         <span className="text-xs text-gray-600 font-medium shrink-0">
           {timelineArticles.length} {timelineArticles.length === 1 ? 'article' : 'articles'}
         </span>
-        <span className="text-xs text-gray-300">•</span>
-        <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
-          <span className="text-xs text-gray-600 font-medium">Sources:</span>
-          {visibleSources.map((source) => {
-            const paywalled = isPaywalled(source);
-            return (
-              <div key={source.id} className="relative inline-flex items-center">
-                <img
-                  src={source.faviconUrl || ''}
-                  alt={source.name}
-                  title={`${source.name}${paywalled ? ' (Subscription required)' : ''}`}
-                  className="w-5 h-5 rounded-xs"
-                />
-                {paywalled && (
-                  <span
-                    className="absolute -top-1 -right-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold shadow-xs select-none"
-                    title={`${source.name} (Subscription required)`}
-                  >
-                    🔒
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          {extraSources > 0 && <span className="text-xs text-gray-500">+{extraSources}</span>}
-        </div>
       </div>
     </Link>
   );
