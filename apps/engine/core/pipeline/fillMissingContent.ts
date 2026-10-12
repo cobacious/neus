@@ -19,7 +19,6 @@ import { mapConcurrent } from './utils';
 setSanitizeHtmlOptions({
   allowedTags: [], // remove all tags
   allowedAttributes: {},
-  exclusiveFilter: (frame) => !frame.text.trim(), // remove empty blocks
 });
 
 export async function fillMissingContent() {
