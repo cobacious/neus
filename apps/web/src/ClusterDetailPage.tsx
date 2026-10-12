@@ -74,19 +74,70 @@ export default function ClusterDetailPage() {
   const [result] = useQuery({ query: CLUSTER_QUERY, variables: { slug } });
 
   const cluster = result.data?.cluster;
+  const story = cluster?.story;
+  const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
+  const headline = isMultiAngleStory && story ? story.title : cluster?.headline;
+  const summary = isMultiAngleStory && story?.overview ? story.overview : cluster?.summary;
 
   useEffect(() => {
-    if (cluster?.headline) {
-      document.title = `${cluster.headline} - Neus`;
-      const descMeta = document.querySelector('meta[name="description"]');
-      if (descMeta && cluster.summary) {
-        descMeta.setAttribute('content', cluster.summary);
+    if (!headline) return;
+
+    document.title = `${headline} - Neus`;
+
+    const setMeta = (selector: string, content: string) => {
+      const el = document.querySelector(selector);
+      if (el) {
+        el.setAttribute('content', content);
       }
-    }
+    };
+
+    setMeta('meta[name="description"]', summary || '');
+    setMeta('meta[property="og:title"]', headline);
+    setMeta('meta[property="og:description"]', summary || '');
+    setMeta('meta[property="og:url"]', window.location.href);
+    setMeta('meta[name="twitter:title"]', headline);
+    setMeta('meta[name="twitter:description"]', summary || '');
+    setMeta('meta[name="twitter:card"]', 'summary');
+
+    // Remove og:image from the active DOM so Safari Share Sheet renders clean headline card without homepage banner
+    const ogImageEl = document.querySelector('meta[property="og:image"]');
+    const twitterImageEl = document.querySelector('meta[name="twitter:image"]');
+    ogImageEl?.remove();
+    twitterImageEl?.remove();
+
     return () => {
       document.title = 'Neus - Neutral News';
+      setMeta(
+        'meta[name="description"]',
+        'Restoring balance and neutrality to the news feed without clickbait or bias.'
+      );
+      setMeta('meta[property="og:title"]', 'Neus - Neutral News');
+      setMeta(
+        'meta[property="og:description"]',
+        'Restoring balance and neutrality to the news feed without clickbait or bias.'
+      );
+      setMeta('meta[property="og:url"]', 'https://neus.news');
+      setMeta('meta[name="twitter:title"]', 'Neus - Neutral News');
+      setMeta(
+        'meta[name="twitter:description"]',
+        'Restoring balance and neutrality to the news feed without clickbait or bias.'
+      );
+      setMeta('meta[name="twitter:card"]', 'summary_large_image');
+
+      if (!document.querySelector('meta[property="og:image"]')) {
+        const meta = document.createElement('meta');
+        meta.setAttribute('property', 'og:image');
+        meta.setAttribute('content', 'https://neus.news/og-image.png');
+        document.head.appendChild(meta);
+      }
+      if (!document.querySelector('meta[name="twitter:image"]')) {
+        const meta = document.createElement('meta');
+        meta.setAttribute('name', 'twitter:image');
+        meta.setAttribute('content', 'https://neus.news/og-image.png');
+        document.head.appendChild(meta);
+      }
     };
-  }, [cluster?.headline, cluster?.summary]);
+  }, [headline, summary]);
 
   if (result.fetching) return <Loading />;
   if (result.error || !cluster) {
@@ -99,9 +150,6 @@ export default function ClusterDetailPage() {
       </div>
     );
   }
-
-  const story = cluster.story;
-  const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
 
   let earliestCreatedAt = cluster.createdAt;
   if (isMultiAngleStory && story?.clusters) {
@@ -210,13 +258,46 @@ export default function ClusterDetailPage() {
         </div>
       )}
 
-      {/* Back button */}
-      <Link
-        to="/"
-        className="inline-flex items-center text-gray-500 hover:text-gray-900 font-medium mb-4 transition-colors text-sm"
-      >
-        ← Back to list
-      </Link>
+      {/* Top action bar */}
+      <div className="flex items-center justify-between mb-4">
+        <Link
+          to="/"
+          className="inline-flex items-center text-gray-500 hover:text-gray-900 font-medium transition-colors text-sm"
+        >
+          ← Back to list
+        </Link>
+        {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+          <button
+            type="button"
+            onClick={() => {
+              navigator
+                .share({
+                  title: headline || 'Neus Story',
+                  url: window.location.href,
+                })
+                .catch(() => {});
+            }}
+            className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-900 text-sm font-medium transition-colors cursor-pointer"
+            aria-label="Share story"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+              />
+            </svg>
+            Share
+          </button>
+        )}
+      </div>
 
       {/* Archive notification */}
       {cluster.archived && (
