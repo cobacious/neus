@@ -73,21 +73,7 @@ export default function ClusterDetailPage() {
   const { slug } = useParams();
   const [result] = useQuery({ query: CLUSTER_QUERY, variables: { slug } });
 
-  if (result.fetching) return <Loading />;
-  if (result.error || !result.data?.cluster) {
-    return (
-      <div className="bg-white shadow-xs p-8 rounded-lg text-center">
-        <p className="text-gray-600 mb-4">Error loading cluster or story</p>
-        <Link to="/" className="text-blue-600 hover:text-blue-800 font-medium">
-          ← Back to list
-        </Link>
-      </div>
-    );
-  }
-
-  const cluster = result.data.cluster;
-  const story = cluster.story;
-  const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
+  const cluster = result.data?.cluster;
 
   useEffect(() => {
     if (cluster?.headline) {
@@ -101,6 +87,21 @@ export default function ClusterDetailPage() {
       document.title = 'Neus - Neutral News';
     };
   }, [cluster?.headline, cluster?.summary]);
+
+  if (result.fetching) return <Loading />;
+  if (result.error || !cluster) {
+    return (
+      <div className="bg-white shadow-xs p-8 rounded-lg text-center">
+        <p className="text-gray-600 mb-4">Error loading cluster or story</p>
+        <Link to="/" className="text-blue-600 hover:text-blue-800 font-medium">
+          ← Back to list
+        </Link>
+      </div>
+    );
+  }
+
+  const story = cluster.story;
+  const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
 
   let earliestCreatedAt = cluster.createdAt;
   if (isMultiAngleStory && story?.clusters) {
