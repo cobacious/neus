@@ -119,7 +119,7 @@ export default function ClusterList() {
       ))}
 
       {hasMore && (
-        <div className="pt-4 pb-8">
+        <div className="pt-4 pb-8 text-center">
           <button
             onClick={handleLoadMore}
             disabled={result.fetching}
@@ -127,6 +127,9 @@ export default function ClusterList() {
           >
             {result.fetching ? 'Loading...' : 'Load more'}
           </button>
+          <p className="text-xs text-gray-400 mt-2">
+            No infinite scroll here, you decide if you want more.
+          </p>
         </div>
       )}
     </div>
