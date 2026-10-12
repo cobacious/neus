@@ -16,7 +16,7 @@ export default function Footer() {
               Neus
             </Link>
             <p className="text-xs text-gray-500 mt-0.5">
-              Calm, multi-angle news aggregation for thoughtful consumption.
+              Restoring balance and neutrality to the news feed.
             </p>
           </div>
           <nav
@@ -24,7 +24,7 @@ export default function Footer() {
             className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-gray-600"
           >
             <Link to="/" className="hover:text-gray-900 transition-colors">
-              Stories
+              Neus Feed
             </Link>
             <Link to="/about" className="hover:text-gray-900 transition-colors">
               About
