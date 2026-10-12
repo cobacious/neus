@@ -16,7 +16,7 @@ export async function updateSource({ id, ...data }: UpdateSourceInput) {
       ? new URL(data.homepageUrl).hostname.replace(/^www\./, '')
       : null;
     updateData.domain = domain ?? undefined;
-    updateData.faviconUrl = domain ? `https://icon.horse/icon/${domain}` : undefined;
+    updateData.faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : undefined;
   }
   return prisma.source.update({ where: { id }, data: updateData });
 }

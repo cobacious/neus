@@ -24,7 +24,7 @@ export async function createSource({
       active,
       paywalled,
       domain: domain ?? undefined,
-      faviconUrl: domain ? `https://icon.horse/icon/${domain}` : undefined,
+      faviconUrl: domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : undefined,
     },
   });
 }

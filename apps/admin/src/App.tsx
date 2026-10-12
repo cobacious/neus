@@ -26,9 +26,19 @@ export default function App() {
   };
 
   const client = useMemo(() => {
+    const fetchOptions: RequestInit = {};
+    const apiKey = import.meta.env.VITE_API_KEY;
+
+    if (apiKey) {
+      fetchOptions.headers = {
+        Authorization: `Bearer ${apiKey}`,
+      };
+    }
+
     return createClient({
       url: activeEnv.url,
       exchanges: [cacheExchange, fetchExchange],
+      fetchOptions,
     });
   }, [activeEnv.url]);
 

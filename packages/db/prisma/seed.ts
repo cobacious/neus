@@ -112,11 +112,14 @@ async function main() {
   for (const feed of feeds) {
     const url = new URL(feed.homepageUrl);
     const domain = url.hostname.replace(/^www\./, '');
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
     await prisma.source.upsert({
       where: { rssFeedUrl: feed.rssFeedUrl },
       update: {
         name: feed.name,
         homepageUrl: feed.homepageUrl,
+        domain,
+        faviconUrl,
         active: (feed as any).active ?? true,
         paywalled: (feed as any).paywalled ?? false,
       },
@@ -127,7 +130,7 @@ async function main() {
         domain,
         active: (feed as any).active ?? true,
         paywalled: (feed as any).paywalled ?? false,
-        faviconUrl: `https://icon.horse/icon/${domain}`,
+        faviconUrl,
       },
     });
   }
