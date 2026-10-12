@@ -1,7 +1,18 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*(Applebot|applebot|facebookexternalhit|Facebook|Twitterbot|twitterbot|Slackbot|slackbot|LinkedInBot|linkedinbot|Discordbot|discordbot|TelegramBot|telegrambot|WhatsApp|whatsapp).*)"
+        }
+      ],
+      "destination": "/api/og-preview?slug=:slug"
+    },
+    {
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
