@@ -60,7 +60,8 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Histogram adaptive bucketing**: Dynamic 15m/30m/1h/2h/1d binning so rapid breaking news stories distribute chronologically instead of collapsing into a single 6h bar.
 - [x] **Angle summary truncation**: Remove 2-line truncation (`line-clamp-2`) on angle summaries in cluster detail view so the full summary is visible.
 - [x] **Card footer layout & source wrap**: Reorder card footer with source logos first, `justify-between` article count, and 8-icon limit.
-- [x] **About Page & Footer Navigation**: Created About page, hamburger drawer menu, persistent site footer, public-code licensing disclaimer, and retired BetaBanner. (In branch feat/about-page-and-footer).
+- [x] **About Page & Footer Navigation**: Created About page, hamburger drawer menu, persistent site footer, public-code licensing disclaimer, and retired BetaBanner. (Merged in PR #39).
+- [x] **Open Graph & Social Previews**: Added serverless crawler handler for cluster pages, branded 1200x630 `og-image.png`, `summary_large_image` Twitter cards, and in-app dynamic document titles. (In PR #41).
 - [ ] **Story Angle Filtering / Jump Links**: In cluster detail and card views, support filtering articles by angle or making angle pills act as jump links to that angle's section.
 
 ### Track 2: Editorial Source Quality (`packages/db`)
