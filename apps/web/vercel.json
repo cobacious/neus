@@ -1,14 +1,11 @@
 {
   "rewrites": [
     {
-      "source": "/:slug",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": "(?i).*(facebookexternalhit|Twitterbot|WhatsApp|Discordbot|TelegramBot|Applebot|Slackbot|LinkedInBot).*"
-        }
-      ],
+      "source": "/about",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/:slug((?!api/|assets/|favicon\\.svg|og-image\\.png|apple-touch-icon\\.png|robots\\.txt).*)",
       "destination": "/api/og-preview?slug=:slug"
     },
     {
