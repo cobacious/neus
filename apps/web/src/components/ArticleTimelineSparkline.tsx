@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AngleColorStyle, DEFAULT_ANGLE_COLOR } from '../utils/angleColors';
 import { parseDate, formatRelativeTime } from '../utils/dateUtils';
+import SourceFavicon from './SourceFavicon';
 
 export interface TimelineArticle {
   id: string;
@@ -245,13 +246,10 @@ export default function ArticleTimelineSparkline({
         >
           {/* Header: Source favicon, name, and relative time */}
           <div className="flex items-center gap-1.5 mb-1.5 text-[10px] text-gray-300">
-            {hoveredMarker.article.sourceRel?.faviconUrl && (
-              <img
-                src={hoveredMarker.article.sourceRel.faviconUrl}
-                alt=""
-                className="w-3.5 h-3.5 rounded-xs"
-              />
-            )}
+            <SourceFavicon
+              source={hoveredMarker.article.sourceRel || { name: hoveredMarker.article.source }}
+              className="w-3.5 h-3.5 rounded-xs"
+            />
             <span className="font-semibold text-gray-200">
               {hoveredMarker.article.sourceRel?.name ||
                 hoveredMarker.article.source ||

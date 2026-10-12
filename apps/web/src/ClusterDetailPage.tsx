@@ -8,6 +8,7 @@ import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHi
 import { createAngleColorMap, DEFAULT_ANGLE_COLOR } from './utils/angleColors';
 import { parseDate, formatRelativeTime, formatDateHeader } from './utils/dateUtils';
 import { isPaywalled } from './utils/paywallUtils';
+import SourceFavicon from './components/SourceFavicon';
 
 const CLUSTER_QUERY = `
   query Cluster($slug: String!) {
@@ -309,13 +310,10 @@ export default function ClusterDetailPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          {article.sourceRel?.faviconUrl && (
-                            <img
-                              src={article.sourceRel.faviconUrl}
-                              alt=""
-                              className="w-5 h-5 mt-0.5 flex-shrink-0 rounded-xs"
-                            />
-                          )}
+                          <SourceFavicon
+                            source={article.sourceRel || { name: article.source }}
+                            className="w-5 h-5 mt-0.5 rounded-xs"
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="text-gray-900 group-hover:text-blue-600 transition-colors font-medium text-sm">
                               {article.title}
@@ -364,13 +362,10 @@ export default function ClusterDetailPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {article.sourceRel?.faviconUrl && (
-                          <img
-                            src={article.sourceRel.faviconUrl}
-                            alt=""
-                            className="w-5 h-5 mt-0.5 flex-shrink-0 rounded-xs"
-                          />
-                        )}
+                        <SourceFavicon
+                          source={article.sourceRel || { name: article.source }}
+                          className="w-5 h-5 mt-0.5 rounded-xs"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="text-gray-900 group-hover:text-blue-600 transition-colors font-medium text-sm">
                             {article.title}
