@@ -180,9 +180,8 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
       <div className="flex items-center gap-x-2 gap-y-1.5 flex-wrap pt-1">
         <span className="text-xs text-gray-600 font-medium shrink-0">
           {timelineArticles.length} {timelineArticles.length === 1 ? 'article' : 'articles'}
-          {angles.length > 1 && ` across ${angles.length} angles`}
         </span>
-        <span className="text-xs text-gray-300 hidden sm:inline">•</span>
+        <span className="text-xs text-gray-300">•</span>
         <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
           <span className="text-xs text-gray-600 font-medium">Sources:</span>
           {visibleSources.map((source) => {
