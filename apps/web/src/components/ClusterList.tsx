@@ -72,6 +72,10 @@ export default function ClusterList() {
     requestPolicy: 'cache-and-network',
   });
 
+  useEffect(() => {
+    document.title = 'Neus - Neutral News';
+  }, []);
+
   // Update displayed clusters when new data arrives
   useEffect(() => {
     if (result.data && !result.fetching) {

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
@@ -88,6 +89,19 @@ export default function ClusterDetailPage() {
   const story = cluster.story;
   const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
 
+  useEffect(() => {
+    if (cluster?.headline) {
+      document.title = `${cluster.headline} - Neus`;
+      const descMeta = document.querySelector('meta[name="description"]');
+      if (descMeta && cluster.summary) {
+        descMeta.setAttribute('content', cluster.summary);
+      }
+    }
+    return () => {
+      document.title = 'Neus - Neutral News';
+    };
+  }, [cluster?.headline, cluster?.summary]);
+
   let earliestCreatedAt = cluster.createdAt;
   if (isMultiAngleStory && story?.clusters) {
     story.clusters.forEach((c: any) => {
@@ -108,13 +122,14 @@ export default function ClusterDetailPage() {
   });
 
   // 1. Gather all angles
-  const angles: AngleItem[] = isMultiAngleStory && story?.clusters
-    ? story.clusters.map((c: any) => ({
-        id: c.id,
-        name: c.storyAngle || c.headline || 'Angle',
-        articleCount: c.articles ? c.articles.length : 0,
-      }))
-    : [];
+  const angles: AngleItem[] =
+    isMultiAngleStory && story?.clusters
+      ? story.clusters.map((c: any) => ({
+          id: c.id,
+          name: c.storyAngle || c.headline || 'Angle',
+          articleCount: c.articles ? c.articles.length : 0,
+        }))
+      : [];
 
   const colorMap = createAngleColorMap(angles);
 
@@ -183,7 +198,9 @@ export default function ClusterDetailPage() {
   return (
     <div
       className="relative bg-white shadow-xs border border-gray-200 p-6 rounded-lg"
-      style={statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined}
+      style={
+        statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined
+      }
     >
       {/* Straddling Top-Border Status Badge */}
       {status && (
@@ -244,11 +261,7 @@ export default function ClusterDetailPage() {
 
       {/* Histogram on cluster details view (Feature 4) */}
       <div className="my-6">
-        <StoryAngleHistogram
-          articles={allArticles}
-          angles={angles}
-          colorMap={colorMap}
-        />
+        <StoryAngleHistogram articles={allArticles} angles={angles} colorMap={colorMap} />
       </div>
 
       {/* Articles grouped by Angle (Feature 3) */}
@@ -262,9 +275,7 @@ export default function ClusterDetailPage() {
             {story.clusters.map((c: any) => {
               const angleName = c.storyAngle || c.headline || 'Angle';
               const angleStyle =
-                colorMap.get(c.id) ||
-                colorMap.get(angleName) ||
-                DEFAULT_ANGLE_COLOR;
+                colorMap.get(c.id) || colorMap.get(angleName) || DEFAULT_ANGLE_COLOR;
               const angleArticles = c.articles || [];
 
               return (
@@ -290,14 +301,10 @@ export default function ClusterDetailPage() {
 
                   {/* Angle Headline & Summary */}
                   {c.headline && (
-                    <h4 className="text-base font-bold text-gray-900 mt-2 mb-1">
-                      {c.headline}
-                    </h4>
+                    <h4 className="text-base font-bold text-gray-900 mt-2 mb-1">{c.headline}</h4>
                   )}
                   {c.summary && (
-                    <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-                      {c.summary}
-                    </p>
+                    <p className="text-sm text-gray-600 mb-4 leading-relaxed">{c.summary}</p>
                   )}
 
                   {/* Angle Articles List */}
