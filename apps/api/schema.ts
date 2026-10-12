@@ -20,6 +20,7 @@ import {
   createSource,
   updateSource,
 } from '@neus/db';
+import { getOrSetCache, clearQueryCache } from './cache';
 
 const Story = objectType({
   name: 'Story',
@@ -123,27 +124,41 @@ const Query = queryType({
         limit: intArg(),
         offset: intArg(),
       },
-      resolve: async (_, { limit, offset }) => getRankedClusters(limit ?? undefined, offset ?? undefined),
+      resolve: async (_, { limit, offset }) => {
+        const l = limit ?? 10;
+        const o = offset ?? 0;
+        return getOrSetCache(`clusters:${l}:${o}`, () =>
+          getRankedClusters(limit ?? undefined, offset ?? undefined)
+        );
+      },
     });
     t.field('cluster', {
       type: Cluster,
       args: { slug: nonNull(stringArg()) },
-      resolve: async (_, { slug }) => getClusterBySlug(slug),
+      resolve: async (_, { slug }) => {
+        return getOrSetCache(`cluster:${slug}`, () => getClusterBySlug(slug));
+      },
     });
     t.field('clusterById', {
       type: Cluster,
       args: { id: nonNull(stringArg()) },
-      resolve: async (_, { id }) => getClusterById(id),
+      resolve: async (_, { id }) => {
+        return getOrSetCache(`clusterById:${id}`, () => getClusterById(id));
+      },
     });
     t.field('story', {
       type: Story,
       args: { slug: nonNull(stringArg()) },
-      resolve: async (_, { slug }) => getStoryBySlug(slug),
+      resolve: async (_, { slug }) => {
+        return getOrSetCache(`story:${slug}`, () => getStoryBySlug(slug));
+      },
     });
     t.field('storyById', {
       type: Story,
       args: { id: nonNull(stringArg()) },
-      resolve: async (_, { id }) => getStoryById(id),
+      resolve: async (_, { id }) => {
+        return getOrSetCache(`storyById:${id}`, () => getStoryById(id));
+      },
     });
     t.list.field('stories', {
       type: Story,
@@ -152,19 +167,29 @@ const Query = queryType({
         limit: intArg(),
         offset: intArg(),
       },
-      resolve: async (_, { status, limit, offset }) =>
-        getStories({
-          status: status ?? undefined,
-          limit: limit ?? undefined,
-          offset: offset ?? undefined,
-        }),
+      resolve: async (_, { status, limit, offset }) => {
+        const s = status ?? 'all';
+        const l = limit ?? 10;
+        const o = offset ?? 0;
+        return getOrSetCache(`stories:${s}:${l}:${o}`, () =>
+          getStories({
+            status: status ?? undefined,
+            limit: limit ?? undefined,
+            offset: offset ?? undefined,
+          })
+        );
+      },
     });
     t.int('clusterCount', {
-      resolve: async () => countClusters(),
+      resolve: async () => {
+        return getOrSetCache('clusterCount', () => countClusters());
+      },
     });
     t.list.field('sources', {
       type: Source,
-      resolve: async () => getSources(),
+      resolve: async () => {
+        return getOrSetCache('sources', () => getSources());
+      },
     });
   },
 });
@@ -179,7 +204,11 @@ const Mutation = mutationType({
         rssFeedUrl: nonNull(stringArg()),
         active: booleanArg(),
       },
-      resolve: async (_, args) => createSource(args),
+      resolve: async (_, args) => {
+        const source = await createSource(args);
+        clearQueryCache();
+        return source;
+      },
     });
     t.field('updateSource', {
       type: Source,
@@ -190,7 +219,18 @@ const Mutation = mutationType({
         rssFeedUrl: stringArg(),
         active: booleanArg(),
       },
-      resolve: async (_, args) => updateSource(args),
+      resolve: async (_, args) => {
+        const source = await updateSource(args);
+        clearQueryCache();
+        return source;
+      },
+    });
+    t.field('clearCache', {
+      type: 'Boolean',
+      resolve: async () => {
+        clearQueryCache();
+        return true;
+      },
     });
   },
 });
