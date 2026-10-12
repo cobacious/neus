@@ -295,7 +295,7 @@ export default function ClusterDetailPage() {
                     </h4>
                   )}
                   {c.summary && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                    <p className="text-sm text-gray-600 mb-4 leading-relaxed">
                       {c.summary}
                     </p>
                   )}

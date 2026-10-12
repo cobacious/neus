@@ -132,7 +132,7 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   }
 
   const sources = Array.from(sourcesMap.values());
-  const visibleSources = sources.slice(0, 5);
+  const visibleSources = sources.slice(0, 8);
   const extraSources = sources.length - visibleSources.length;
 
   const statusConfig = status ? STATUS_CONFIG[status] : null;
@@ -177,18 +177,19 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
         />
       </div>
 
-      {/* Footer: Article count & Sources */}
-      <div className="flex items-center gap-2 flex-wrap pt-1">
-        <span className="text-xs text-gray-600 font-medium">
+      {/* Footer: Sources & Article count */}
+      <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-1.5 pt-1">
+        {visibleSources.length > 0 && (
+          <div className="flex items-center gap-1.5 shrink-0 flex-nowrap" aria-label="Sources">
+            {visibleSources.map((source) => (
+              <SourceFavicon key={source.id} source={source} showPaywallBadge />
+            ))}
+            {extraSources > 0 && <span className="text-xs text-gray-500 font-medium">+{extraSources}</span>}
+          </div>
+        )}
+        <span className="text-xs text-gray-500 font-medium shrink-0">
           {timelineArticles.length} {timelineArticles.length === 1 ? 'article' : 'articles'}
-          {angles.length > 1 && ` across ${angles.length} angles`}
         </span>
-        <span className="text-xs text-gray-300">•</span>
-        <span className="text-xs text-gray-600 font-medium">Sources:</span>
-        {visibleSources.map((source) => (
-          <SourceFavicon key={source.id} source={source} showPaywallBadge />
-        ))}
-        {extraSources > 0 && <span className="text-xs text-gray-500">+{extraSources}</span>}
       </div>
     </Link>
   );
