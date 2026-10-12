@@ -5,15 +5,16 @@ import { useDisableIntrospection } from '@graphql-yoga/plugin-disable-introspect
 import { GraphQLError, getOperationAST } from 'graphql';
 import { schema } from './schema';
 
-const API_KEY = process.env.API_KEY;
 const isProd = process.env.NODE_ENV === 'production';
 
-const authPlugin: Plugin = {
+export const authPlugin: Plugin = {
   onExecute({ args }) {
     const operationAST = getOperationAST(args.document, args.operationName);
 
     if (operationAST && operationAST.operation === 'mutation') {
-      if (!API_KEY) {
+      // Must read from process.env at execution time to support tests changing env vars
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
         throw new GraphQLError('Server configuration error: API_KEY is not set.', {
           extensions: {
             code: 'INTERNAL_SERVER_ERROR',
@@ -28,7 +29,7 @@ const authPlugin: Plugin = {
       const match = authHeader?.match(/^Bearer\s+(.+)$/i);
       const token = match ? match[1].trim() : undefined;
 
-      if (token !== API_KEY) {
+      if (token !== apiKey) {
         throw new GraphQLError('Unauthorized: Invalid or missing API Key for mutation.', {
           extensions: {
             code: 'UNAUTHENTICATED',
@@ -47,15 +48,15 @@ if (isProd) {
   plugins.push(useDisableIntrospection());
 }
 
-const yoga = createYoga({
+export const yoga = createYoga({
   schema,
   plugins,
 });
 
-const server = createServer(yoga);
-
-const port = parseInt(process.env.PORT || '4000', 10);
-
-server.listen(port, () => {
-  console.log(`GraphQL server running at http://localhost:${port}/graphql`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  const server = createServer(yoga);
+  const port = parseInt(process.env.PORT || '4000', 10);
+  server.listen(port, () => {
+    console.log(`GraphQL server running at http://localhost:${port}/graphql`);
+  });
+}
