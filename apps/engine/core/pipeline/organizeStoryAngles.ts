@@ -541,6 +541,23 @@ export async function organizeStoryAngles() {
   for (let i = 0; i < neighborhoods.length; i++) {
     const neighborhood = neighborhoods[i];
 
+    // Fast skip: if NO cluster in the candidate neighborhood was created or received new articles
+    // in the past RECENT_ACTIVITY_HOURS, nothing has changed since the previous run.
+    const hasRecentActivity = neighborhood.some((c) => {
+      const isNewCluster = new Date(c.createdAt) >= activityCutoff;
+      const latestArticleAt = c.articleAssignments?.[0]?.createdAt;
+      const hasNewArticle = latestArticleAt && new Date(latestArticleAt) >= activityCutoff;
+      return isNewCluster || hasNewArticle;
+    });
+
+    if (!hasRecentActivity) {
+      totalSkippedSettled++;
+      logger.info(
+        `[${PipelineStep.Organize}] Skipping inactive neighborhood ${i + 1}/${neighborhoods.length} (${neighborhood.map((c) => c.id).join(', ')}) (no new clusters or articles in past ${RECENT_ACTIVITY_HOURS}h)`
+      );
+      continue;
+    }
+
     // Skip settled neighborhoods where all clusters already belong to the same existing story,
     // angles are assigned, and no new clusters or articles arrived in the past RECENT_ACTIVITY_HOURS
     const settledCheck = isSettledNeighborhood(
