@@ -114,7 +114,7 @@ export async function generateStructuredJson<T>(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(45000),
+          signal: AbortSignal.timeout(90000),
         });
 
         if (res.status === 429) {
@@ -213,6 +213,7 @@ export async function generateEmbedding(
             model: `models/${model}`,
             content: { parts: [{ text }] },
           }),
+          signal: AbortSignal.timeout(90000),
         });
 
         if (res.status === 429) {
@@ -267,4 +268,114 @@ export async function generateEmbedding(
   }
 
   throw new Error('No Gemini or OpenAI API key configured for embedding');
+}
+
+/**
+ * Generates embedding vectors in batches using Gemini batchEmbedContents or OpenAI embeddings.
+ * Chunks inputs into batches of up to 100 texts to respect Gemini batch size limits.
+ */
+export async function generateEmbeddingsBatch(
+  texts: string[],
+  maxRetries = 3
+): Promise<number[][]> {
+  if (texts.length === 0) return [];
+
+  const BATCH_SIZE = 100;
+  const allEmbeddings: number[][] = [];
+
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const chunk = texts.slice(i, i + BATCH_SIZE);
+    const geminiKey = process.env.GEMINI_API_KEY;
+
+    if (geminiKey && !geminiDisabled) {
+      const model = resolveEmbeddingModel('gemini');
+      const url = `${GEMINI_API_BASE_URL}/models/${model}:batchEmbedContents?key=${geminiKey}`;
+
+      let succeeded = false;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requests: chunk.map((text) => ({
+                model: `models/${model}`,
+                content: { parts: [{ text }] },
+              })),
+            }),
+            signal: AbortSignal.timeout(90000),
+          });
+
+          if (res.status === 429) {
+            const backoffMs = Math.pow(2, attempt) * 2000;
+            logger.warn(
+              `[${PipelineStep.Embed}] Gemini rate limit (429) on batch embedding attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
+            );
+            if (process.env.NODE_ENV !== 'test') {
+              await new Promise((r) => setTimeout(r, backoffMs));
+            }
+            continue;
+          }
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            if (res.status === 402 || res.status === 401 || res.status === 403) {
+              geminiDisabled = true;
+              logger.warn(
+                `[${PipelineStep.Embed}] Gemini batch embedding returned ${res.status}. Disabling Gemini for this run and falling back to OpenAI.`
+              );
+            }
+            throw new Error(`Gemini batch embedding API error (${res.status}): ${errorText}`);
+          }
+
+          const data = (await res.json()) as { embeddings?: Array<{ values?: number[] }> };
+          if (!data.embeddings || data.embeddings.length !== chunk.length) {
+            throw new Error(
+              `Gemini batch embedding count mismatch: expected ${chunk.length}, got ${data.embeddings?.length ?? 0}`
+            );
+          }
+
+          for (const emb of data.embeddings) {
+            if (!emb.values) {
+              throw new Error('Gemini batch embedding item missing values');
+            }
+            allEmbeddings.push(emb.values);
+          }
+
+          succeeded = true;
+          break;
+        } catch (err: any) {
+          if (attempt === maxRetries || geminiDisabled) {
+            if (openai) {
+              logger.warn(
+                `[${PipelineStep.Embed}] Gemini batch embedding failed (${err.message || err}), falling back to OpenAI...`
+              );
+              break;
+            } else {
+              throw err;
+            }
+          }
+        }
+      }
+
+      if (succeeded) continue;
+    }
+
+    if (openai) {
+      const openaiModel = resolveEmbeddingModel('openai');
+      const response = await openai.embeddings.create({
+        model: openaiModel,
+        input: chunk,
+        ...(openaiModel === 'text-embedding-3-large' ? { dimensions: 3072 } : {}),
+      });
+      for (const item of response.data) {
+        allEmbeddings.push(item.embedding as number[]);
+      }
+      continue;
+    }
+
+    throw new Error('No Gemini or OpenAI API key configured for embedding');
+  }
+
+  return allEmbeddings;
 }

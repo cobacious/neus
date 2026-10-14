@@ -8,9 +8,14 @@ import {
   logPipelineStep,
   PipelineStep,
 } from '../../lib/pipelineLogger';
-import { generateEmbedding, resolveEmbeddingModel, isGeminiActive } from '../../lib/aiClient';
+import {
+  generateEmbedding,
+  generateEmbeddingsBatch,
+  resolveEmbeddingModel,
+} from '../../lib/aiClient';
 
 const MAX_EMBEDDING_CHARS = 8192;
+const BATCH_SIZE = 50;
 
 export async function embedNewArticles() {
   logPipelineStep(PipelineStep.Embed, 'Embedding new articles...');
@@ -34,7 +39,7 @@ export async function embedNewArticles() {
   const model = resolveEmbeddingModel();
   logPipelineSection(PipelineStep.Embed, `Using ${model} for embeddings`);
 
-  let embedded = 0;
+  const validArticles: Array<{ id: string; text: string; title: string }> = [];
   for (const article of articlesToEmbed) {
     const textToEmbed = article.content || article.snippet || article.title;
 
@@ -46,22 +51,48 @@ export async function embedNewArticles() {
       continue;
     }
 
-    const abridged = textToEmbed.slice(0, MAX_EMBEDDING_CHARS);
+    validArticles.push({
+      id: article.id,
+      text: textToEmbed.slice(0, MAX_EMBEDDING_CHARS),
+      title: article.title,
+    });
+  }
 
+  let embedded = 0;
+  for (let i = 0; i < validArticles.length; i += BATCH_SIZE) {
+    const batch = validArticles.slice(i, i + BATCH_SIZE);
     try {
-      const embedding = await generateEmbedding(abridged);
-
-      if (isGeminiActive() && process.env.NODE_ENV !== 'test') {
-        await new Promise((r) => setTimeout(r, 1200));
+      let vectors: number[][];
+      if (typeof generateEmbeddingsBatch === 'function') {
+        vectors = await generateEmbeddingsBatch(batch.map((b) => b.text));
+      } else {
+        vectors = await Promise.all(batch.map((b) => generateEmbedding(b.text)));
       }
 
-      await updateArticleEmbedding(article.id, embedding);
-      embedded++;
+      for (let j = 0; j < batch.length; j++) {
+        const vector = vectors[j];
+        if (vector && Array.isArray(vector)) {
+          await updateArticleEmbedding(batch[j].id, vector);
+          embedded++;
+        }
+      }
     } catch (err: any) {
       logger.error(
-        `[${PipelineStep.Embed}] Failed embedding for article ${article.id}:`,
+        `[${PipelineStep.Embed}] Batch embedding failed for ${batch.length} articles, falling back to individual:`,
         err.message || err
       );
+      for (const item of batch) {
+        try {
+          const vector = await generateEmbedding(item.text);
+          await updateArticleEmbedding(item.id, vector);
+          embedded++;
+        } catch (singleErr: any) {
+          logger.error(
+            `[${PipelineStep.Embed}] Failed embedding for article ${item.id}:`,
+            singleErr.message || singleErr
+          );
+        }
+      }
     }
   }
 

@@ -6,6 +6,7 @@ global.fetch = mockFetch as any;
 let generateStructuredJson: typeof import('./aiClient').generateStructuredJson;
 let cleanJsonResponse: typeof import('./aiClient').cleanJsonResponse;
 let generateEmbedding: typeof import('./aiClient').generateEmbedding;
+let generateEmbeddingsBatch: typeof import('./aiClient').generateEmbeddingsBatch;
 let openai: typeof import('./aiClient').openai;
 let isGeminiActive: typeof import('./aiClient').isGeminiActive;
 let resetAiClientState: typeof import('./aiClient').resetAiClientState;
@@ -17,6 +18,7 @@ beforeAll(async () => {
     generateStructuredJson,
     cleanJsonResponse,
     generateEmbedding,
+    generateEmbeddingsBatch,
     openai,
     isGeminiActive,
     resetAiClientState,
@@ -183,6 +185,65 @@ describe('aiClient', () => {
       expect(emb2).toEqual([0.7, 0.8, 0.9]);
       expect(mockFetch).toHaveBeenCalledTimes(1); // still 1, mockFetch was NOT called again
       expect(spy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('generateEmbeddingsBatch', () => {
+    it('returns empty array when input is empty', async () => {
+      const res = await generateEmbeddingsBatch([]);
+      expect(res).toEqual([]);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('calls Gemini batchEmbedContents endpoint and extracts values', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          embeddings: [
+            { values: [0.1, 0.2] },
+            { values: [0.3, 0.4] },
+          ],
+        }),
+      });
+
+      const res = await generateEmbeddingsBatch(['first', 'second']);
+      expect(res).toEqual([
+        [0.1, 0.2],
+        [0.3, 0.4],
+      ]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, options] = mockFetch.mock.calls[0] as [string, any];
+      expect(url).toContain('https://mock.gemini.api/v1beta/models/gemini-embedding-2:batchEmbedContents');
+      const body = JSON.parse(options.body);
+      expect(body.requests).toHaveLength(2);
+      expect(body.requests[0].content.parts[0].text).toBe('first');
+    });
+
+    it('falls back to OpenAI when Gemini batch fails', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Gemini error',
+      });
+
+      const spy = jest.spyOn(openai!.embeddings, 'create').mockResolvedValueOnce({
+        data: [
+          { embedding: [0.5, 0.6] },
+          { embedding: [0.7, 0.8] },
+        ],
+      } as any);
+
+      const res = await generateEmbeddingsBatch(['first', 'second']);
+      expect(res).toEqual([
+        [0.5, 0.6],
+        [0.7, 0.8],
+      ]);
+      expect(spy).toHaveBeenCalledWith({
+        model: 'text-embedding-3-large',
+        input: ['first', 'second'],
+        dimensions: 3072,
+      });
     });
   });
 });

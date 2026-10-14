@@ -6,6 +6,7 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 import { generateStructuredJson } from '../../lib/aiClient';
+import { mapConcurrent } from './utils';
 
 export async function generateClusterSummary(prompt: string): Promise<{ headline: string; summary: string }> {
   return generateStructuredJson<{ headline: string; summary: string }>({
@@ -50,9 +51,13 @@ export async function summarizeClusters() {
     `Summarizing ${clustersToSummarize.length} clusters`
   );
 
-  for (const cluster of clustersToSummarize) {
+  const CONCURRENCY = process.env.SUMMARIZE_CONCURRENCY
+    ? parseInt(process.env.SUMMARIZE_CONCURRENCY, 10)
+    : 3;
+
+  await mapConcurrent(clustersToSummarize, CONCURRENCY, async (cluster) => {
     const articles = cluster.articleAssignments.map((a) => a.article);
-    if (articles.length === 0) continue;
+    if (articles.length === 0) return;
 
     logPipelineSection(
       PipelineStep.Summarise,
@@ -65,11 +70,6 @@ export async function summarizeClusters() {
 
     try {
       const result = await generateClusterSummary(prompt);
-
-      if (process.env.GEMINI_API_KEY && process.env.NODE_ENV !== 'test') {
-        await new Promise((r) => setTimeout(r, 1200));
-      }
-
       await updateClusterSummary(cluster.id, result.headline, result.summary);
       logPipelineSection(PipelineStep.Summarise, `Updated cluster ${cluster.id}`);
     } catch (err: any) {
@@ -78,7 +78,7 @@ export async function summarizeClusters() {
         err.message || err
       );
     }
-  }
+  });
 
   logPipelineSection(PipelineStep.Summarise, 'Summarisation step complete.');
 }
