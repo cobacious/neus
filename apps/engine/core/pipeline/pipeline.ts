@@ -14,31 +14,54 @@ import { pruneArchivedPayloads } from './pruneArchivedPayloads';
 import { purgeOldUnclusteredArticles } from './purgeOldUnclusteredArticles';
 import { vacuumDb } from './vacuumDb';
 import { resetPipelineLogger, logger, PipelineStep, emitWorkflowAnnotation } from '../../lib/pipelineLogger';
+import { resetAiUsage, formatAiUsageLines, getTotalAiCostUsd } from '../../lib/aiUsage';
 import fs from 'fs';
 
 export async function runPipeline() {
   const startTime = Date.now();
   resetPipelineLogger();
-  const sources = await getActiveSources();
-  const allArticles = await ingestArticles(sources);
-  await storeArticles(allArticles);
-  await fillMissingContent();
-  await embedNewArticles();
-  await clusterRecentArticles();
-  await scoreClusters();
-  await summarizeClusters();
-  await organizeStoryAngles();
-  await cleanupEmptyClusters();
-  await disbandSingleClusters();
-  await archiveOldClusters();
-  await pruneArchivedPayloads();
-  await purgeOldUnclusteredArticles();
-  await vacuumDb();
+  resetAiUsage();
+
+  const stepTimings: Array<{ name: string; seconds: number }> = [];
+  async function timed<T>(name: string, fn: () => Promise<T>): Promise<T> {
+    const stepStart = Date.now();
+    try {
+      return await fn();
+    } finally {
+      stepTimings.push({ name, seconds: Math.round((Date.now() - stepStart) / 1000) });
+    }
+  }
+
+  const sources = await timed('ingest-sources', () => getActiveSources());
+  const allArticles = await timed('ingest', () => ingestArticles(sources));
+  await timed('store', () => storeArticles(allArticles));
+  await timed('fetch', () => fillMissingContent());
+  await timed('embed', () => embedNewArticles());
+  await timed('cluster', () => clusterRecentArticles());
+  await timed('score', () => scoreClusters());
+  await timed('summarise', () => summarizeClusters());
+  await timed('organize', () => organizeStoryAngles());
+  await timed('cleanup', () => cleanupEmptyClusters());
+  await timed('disband', () => disbandSingleClusters());
+  await timed('archive', () => archiveOldClusters());
+  await timed('prune', () => pruneArchivedPayloads());
+  await timed('purge', () => purgeOldUnclusteredArticles());
+  await timed('vacuum', () => vacuumDb());
 
   const durationSec = Math.round((Date.now() - startTime) / 1000);
   const metrics = await getDatabaseUsageMetrics();
 
   logger.info(`[${PipelineStep.Summary}] Pipeline execution finished in ${durationSec}s`);
+  logger.info(
+    `[${PipelineStep.Summary}] Step timings (s): ${stepTimings.map((s) => `${s.name}=${s.seconds}`).join(' ')}`
+  );
+  for (const line of formatAiUsageLines()) {
+    logger.info(`[${PipelineStep.Summary}] AI usage ${line}`);
+  }
+  const aiCost = getTotalAiCostUsd();
+  logger.info(
+    `[${PipelineStep.Summary}] AI spend: total=$${aiCost.totalUsd.toFixed(4)} (gemini=$${aiCost.geminiUsd.toFixed(4)} openai=$${aiCost.openaiUsd.toFixed(4)})`
+  );
   logger.info(`[${PipelineStep.Summary}] Database Storage: ${metrics.storageFormatted}`);
   logger.info(`[${PipelineStep.Summary}] Database Egress: ${metrics.egressFormatted}`);
   logger.info(`[${PipelineStep.Summary}] Database Compute: ${metrics.computeFormatted}`);
@@ -63,6 +86,7 @@ export async function runPipeline() {
 
 - **Status**: Completed successfully ✅
 - **Duration**: ${durationSec}s
+- **AI Spend (this run)**: $${aiCost.totalUsd.toFixed(4)} (Gemini: $${aiCost.geminiUsd.toFixed(4)}, OpenAI: $${aiCost.openaiUsd.toFixed(4)})
 - **Ingested Articles (this run)**: ${allArticles.length}
 - **Timestamp**: ${new Date().toISOString()}
 

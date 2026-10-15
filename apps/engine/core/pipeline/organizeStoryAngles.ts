@@ -46,6 +46,7 @@ export type CandidateStory = {
   title: string;
   status: string;
   overview: string | null;
+  updatedAt?: Date | string;
   _count?: { clusters: number };
 };
 
@@ -75,6 +76,7 @@ export function isSettledNeighborhood<T extends ClusterWithEmbedding>(
     title: string;
     status: string;
     overview: string | null;
+    updatedAt?: Date | string;
     _count?: { clusters: number };
   }>,
   activityCutoff: Date,
@@ -115,6 +117,19 @@ export function isSettledNeighborhood<T extends ClusterWithEmbedding>(
     return { settled: false };
   }
 
+  // If matchedStory has an updatedAt timestamp, check if any cluster was created after the story was last organized
+  if (matchedStory.updatedAt) {
+    const storyUpdatedMs = new Date(matchedStory.updatedAt).getTime();
+    const hasNewClusterSinceUpdate = neighborhood.some(
+      (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
+    );
+    if (hasNewClusterSinceUpdate) {
+      return { settled: false };
+    }
+    return { settled: true, storyTitle: matchedStory.title };
+  }
+
+  // Fallback when story.updatedAt is not provided (e.g. minimal unit tests):
   // Check if any cluster in the neighborhood was created recently (< 48h)
   const hasRecentlyCreatedCluster = neighborhood.some(
     (c) => new Date(c.createdAt) >= activityCutoff
@@ -538,22 +553,48 @@ export async function organizeStoryAngles() {
   const RECENT_ACTIVITY_HOURS = 48;
   const activityCutoff = new Date(Date.now() - RECENT_ACTIVITY_HOURS * 60 * 60 * 1000);
 
-  for (let i = 0; i < neighborhoods.length; i++) {
-    const neighborhood = neighborhoods[i];
+  // Time budget for the evaluation loop (default 8 minutes), overridable via env.
+  const timeBudgetMs = process.env.ORGANIZE_TIME_BUDGET_MS
+    ? parseInt(process.env.ORGANIZE_TIME_BUDGET_MS, 10)
+    : 8 * 60 * 1000;
+  const organizeStart = Date.now();
+  let totalEvaluated = 0;
+  let totalDeferred = 0;
 
-    // Fast skip: if NO cluster in the candidate neighborhood was created or received new articles
-    // in the past RECENT_ACTIVITY_HOURS, nothing has changed since the previous run.
-    const hasRecentActivity = neighborhood.some((c) => {
+  const hasRecentActivityIn = (n: ClusterWithEmbedding[]) =>
+    n.some((c) => {
       const isNewCluster = new Date(c.createdAt) >= activityCutoff;
       const latestArticleAt = c.articleAssignments?.[0]?.createdAt;
       const hasNewArticle = latestArticleAt && new Date(latestArticleAt) >= activityCutoff;
-      return isNewCluster || hasNewArticle;
+      return isNewCluster || Boolean(hasNewArticle);
     });
 
-    if (!hasRecentActivity) {
+  const latestActivityMs = (n: ClusterWithEmbedding[]) =>
+    Math.max(
+      ...n.map((c) =>
+        Math.max(
+          new Date(c.createdAt).getTime(),
+          c.articleAssignments?.[0]?.createdAt
+            ? new Date(c.articleAssignments[0].createdAt).getTime()
+            : 0
+        )
+      )
+    );
+
+  // Freshest neighborhoods first, so breaking news is always handled before the budget runs out.
+  const orderedNeighborhoods = [...neighborhoods].sort(
+    (a, b) => latestActivityMs(b) - latestActivityMs(a)
+  );
+
+  for (let i = 0; i < orderedNeighborhoods.length; i++) {
+    const neighborhood = orderedNeighborhoods[i];
+
+    // Fast skip: if NO cluster in the candidate neighborhood was created or received new articles
+    // in the past RECENT_ACTIVITY_HOURS, nothing has changed since the previous run.
+    if (!hasRecentActivityIn(neighborhood)) {
       totalSkippedSettled++;
       logger.info(
-        `[${PipelineStep.Organize}] Skipping inactive neighborhood ${i + 1}/${neighborhoods.length} (${neighborhood.map((c) => c.id).join(', ')}) (no new clusters or articles in past ${RECENT_ACTIVITY_HOURS}h)`
+        `[${PipelineStep.Organize}] Skipping inactive neighborhood ${i + 1}/${orderedNeighborhoods.length} (${neighborhood.length} clusters) (no new clusters or articles in past ${RECENT_ACTIVITY_HOURS}h)`
       );
       continue;
     }
@@ -574,6 +615,19 @@ export async function organizeStoryAngles() {
       continue;
     }
 
+    // Time budget: stop starting new evaluations once the budget is spent. Neighborhoods are
+    // processed freshest-first, and anything deferred still has recent activity so it is
+    // picked up again on the next run. This keeps the pipeline inside the CI time limit so the
+    // cleanup, archive and purge steps always get to run.
+    if (Date.now() - organizeStart >= timeBudgetMs) {
+      totalDeferred = orderedNeighborhoods.slice(i).filter(hasRecentActivityIn).length;
+      logger.warn(
+        `[${PipelineStep.Organize}] Time budget of ${Math.round(timeBudgetMs / 1000)}s reached after ${totalEvaluated} evaluations. Deferring ${totalDeferred} active neighborhood(s) to the next run.`
+      );
+      break;
+    }
+    totalEvaluated++;
+
     const candidateStories = findCandidateStoriesForNeighborhood(neighborhood, existingStories);
 
     const clustersForPrompt = neighborhood.map((c) => ({
@@ -589,7 +643,7 @@ export async function organizeStoryAngles() {
       evalResult = await evaluateNeighborhood(clustersForPrompt, candidateStories);
     } catch (err: any) {
       logger.error(
-        `[${PipelineStep.Organize}] Failed evaluating neighborhood ${i + 1}/${neighborhoods.length}: ${err.message || err}`
+        `[${PipelineStep.Organize}] Failed evaluating neighborhood ${i + 1}/${orderedNeighborhoods.length}: ${err.message || err}`
       );
       continue;
     }
@@ -663,25 +717,26 @@ export async function organizeStoryAngles() {
             const storyArticles = await getStoryArticlesForRealignment(angleClusterIds);
 
             // Only run article classification if:
-            // 1. Angle count/membership changed, OR
-            // 2. Any cluster in this story received new articles or was created in the last 48h
-            const hasRecentActivity = survivingClusters.some((c) => {
-              const latest = (c as any).articleAssignments?.[0]?.createdAt;
-              return (
-                (latest && new Date(latest) >= activityCutoff) ||
-                new Date(c.createdAt) >= activityCutoff
-              );
-            });
-            const existingStoryClusterCount = targetStoryId
-              ? existingStories.find((s) => s.id === targetStoryId)?._count?.clusters
-              : undefined;
+            // 1. New story created (!targetStoryId), OR
+            // 2. Angle count/membership changed, OR
+            // 3. A new cluster was added to this story since it was last organized
+            const targetStory = targetStoryId
+              ? existingStories.find((s) => s.id === targetStoryId)
+              : null;
+            const existingStoryClusterCount = targetStory?._count?.clusters;
             const hasAngleCountChange =
               existingStoryClusterCount !== undefined &&
               existingStoryClusterCount !== survivingAngles.length;
+            const storyUpdatedMs = targetStory?.updatedAt
+              ? new Date(targetStory.updatedAt).getTime()
+              : 0;
+            const hasNewClusterSinceUpdate = survivingClusters.some(
+              (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
+            );
 
             if (
               storyArticles.length > 0 &&
-              (hasRecentActivity || hasAngleCountChange || !targetStoryId)
+              (!targetStoryId || hasAngleCountChange || hasNewClusterSinceUpdate)
             ) {
               const anglesWithHeadlines = survivingAngles.map((a) => ({
                 clusterId: a.clusterId,
@@ -754,6 +809,6 @@ export async function organizeStoryAngles() {
 
   logPipelineSection(
     PipelineStep.Organize,
-    `Story organization complete. Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-angle stories, skipped ${totalSkippedSettled} settled stories, ${disbandedStoriesCount} disbanded, ${dormantCount} stories dormant.`
+    `Story organization complete in ${Math.round((Date.now() - organizeStart) / 1000)}s. Evaluated ${totalEvaluated} neighborhoods, deferred ${totalDeferred} to next run (time budget ${Math.round(timeBudgetMs / 1000)}s). Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-angle stories, skipped ${totalSkippedSettled} settled stories, ${disbandedStoriesCount} disbanded, ${dormantCount} stories dormant.`
   );
 }

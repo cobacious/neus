@@ -79,7 +79,12 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Article extractor DOMException fix**: Dropped `exclusiveFilter` function in `setSanitizeHtmlOptions` which threw `DataCloneError` under `@extractus/article-extractor` 8.1.0's `structuredClone`.
 
 ### Track 5: CI/CD & Testing Automation (`.github/workflows`)
-- [ ] **PR test & build gating CI**: Add a GitHub Actions CI workflow that runs `pnpm test`, typecheck, and build on pull requests and gates merging into `main`.
+- [ ] **PR test & build gating CI**: Add a GitHub Actions CI workflow that runs `pnpm test`, typecheck and build on pull requests and gates merging into `main`.
+
+### Track 6: Admin Editorial & Cluster Management (`apps/admin`, `apps/api`)
+- [ ] **Cluster browser and search**: List, filter and search active clusters across environments.
+- [ ] **Cluster merge and story grouping**: Support merging duplicate clusters and grouping related clusters into story umbrellas with distinct angles. (See detailed handoff in [`docs/handoffs/admin-cluster-management.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/admin-cluster-management.md))
+- [ ] **Yorkshire tiger incident consolidation**: Merge the two separate Yorkshire tiger enclosure clusters into one story umbrella. (See detailed handoff in [`docs/handoffs/yorkshire-tiger-story-merge.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/yorkshire-tiger-story-merge.md))
 
 ## Preferences & Strict Rules
 

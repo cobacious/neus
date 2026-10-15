@@ -385,6 +385,50 @@ describe('organizeStoryAngles', () => {
     expect(mockDb.disbandUnderpopulatedStories).toHaveBeenCalled();
   });
 
+  it('defers evaluations and still runs the dormancy sweep when the time budget is spent', async () => {
+    process.env.ORGANIZE_TIME_BUDGET_MS = '0';
+    try {
+      (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+        { id: 'c1', headline: 'A', summary: 'S1', embedding: [1, 0], createdAt: new Date() },
+        { id: 'c2', headline: 'B', summary: 'S2', embedding: [1, 0], createdAt: new Date() },
+      ]);
+
+      await organizeStoryAngles();
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+      expect(mockDb.mergeClusters).not.toHaveBeenCalled();
+      expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
+    } finally {
+      delete process.env.ORGANIZE_TIME_BUDGET_MS;
+    }
+  });
+
+  it('evaluates the freshest neighborhood first', async () => {
+    const thirtyHoursAgo = new Date(Date.now() - 30 * 60 * 60 * 1000);
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      { id: 'old1', headline: 'Older headline one', summary: 'S', embedding: [1, 0], createdAt: thirtyHoursAgo },
+      { id: 'old2', headline: 'Older headline two', summary: 'S', embedding: [1, 0], createdAt: thirtyHoursAgo },
+      { id: 'new1', headline: 'Fresh headline one', summary: 'S', embedding: [0, 1], createdAt: new Date() },
+      { id: 'new2', headline: 'Fresh headline two', summary: 'S', embedding: [0, 1], createdAt: new Date() },
+    ]);
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({ merges: [], story: null }) }] } }],
+      }),
+    });
+
+    await organizeStoryAngles();
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const firstBody = (mockFetch.mock.calls[0] as [string, any])[1].body as string;
+    expect(firstBody).toContain('Fresh headline one');
+    expect(firstBody).not.toContain('Older headline one');
+  });
+
   it('skips settled neighborhoods without invoking LLM or mutating database', async () => {
     const oldDate = new Date(Date.now() - 72 * 60 * 60 * 1000); // 3 days ago
 

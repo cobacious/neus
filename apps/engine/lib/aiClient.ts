@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { logger, PipelineStep } from './pipelineLogger';
+import { recordAiUsage } from './aiUsage';
 
 const GEMINI_API_BASE_URL =
   process.env.GEMINI_API_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
@@ -110,14 +111,37 @@ export async function generateStructuredJson<T>(
 
     try {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(90000),
-        });
+        const startedAt = Date.now();
+        const usageStep = request.step || PipelineStep.Cluster;
+        let res: Response;
+        try {
+          res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(90000),
+          });
+        } catch (fetchErr) {
+          recordAiUsage({
+            step: usageStep,
+            provider: 'gemini',
+            model,
+            operation: 'generate',
+            durationMs: Date.now() - startedAt,
+            failed: true,
+          });
+          throw fetchErr;
+        }
 
         if (res.status === 429) {
+          recordAiUsage({
+            step: usageStep,
+            provider: 'gemini',
+            model,
+            operation: 'generate',
+            durationMs: Date.now() - startedAt,
+            failed: true,
+          });
           const backoffMs = Math.pow(2, attempt) * 2000;
           logger.warn(
             `[${request.step || PipelineStep.Cluster}] Gemini rate limit (429) on attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
@@ -129,6 +153,14 @@ export async function generateStructuredJson<T>(
         }
 
         if (!res.ok) {
+          recordAiUsage({
+            step: usageStep,
+            provider: 'gemini',
+            model,
+            operation: 'generate',
+            durationMs: Date.now() - startedAt,
+            failed: true,
+          });
           const errorText = await res.text();
           if (res.status === 402 || res.status === 401 || res.status === 403) {
             geminiDisabled = true;
@@ -140,6 +172,16 @@ export async function generateStructuredJson<T>(
         }
 
         const data = (await res.json()) as any;
+        recordAiUsage({
+          step: usageStep,
+          provider: 'gemini',
+          model,
+          operation: 'generate',
+          durationMs: Date.now() - startedAt,
+          promptTokens: data.usageMetadata?.promptTokenCount,
+          outputTokens: data.usageMetadata?.candidatesTokenCount,
+          thoughtTokens: data.usageMetadata?.thoughtsTokenCount,
+        });
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!content) throw new Error('Gemini response missing text');
 
@@ -175,12 +217,22 @@ export async function generateStructuredJson<T>(
     }
     messages.push({ role: 'user', content: request.prompt });
 
+    const openaiStartedAt = Date.now();
     const completion = await openai.chat.completions.create({
       model,
       messages,
       response_format: { type: 'json_object' },
       max_tokens: request.maxTokens ?? 4096,
       temperature: request.temperature ?? 0.1,
+    });
+    recordAiUsage({
+      step: request.step || PipelineStep.Cluster,
+      provider: 'openai',
+      model,
+      operation: 'generate',
+      durationMs: Date.now() - openaiStartedAt,
+      promptTokens: completion.usage?.prompt_tokens,
+      outputTokens: completion.usage?.completion_tokens,
     });
 
     const content = completion.choices[0].message.content;
@@ -294,6 +346,7 @@ export async function generateEmbeddingsBatch(
       let succeeded = false;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
+          const batchStartedAt = Date.now();
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -335,12 +388,22 @@ export async function generateEmbeddingsBatch(
             );
           }
 
+          const batchValues: number[][] = [];
           for (const emb of data.embeddings) {
             if (!emb.values) {
               throw new Error('Gemini batch embedding item missing values');
             }
-            allEmbeddings.push(emb.values);
+            batchValues.push(emb.values);
           }
+          allEmbeddings.push(...batchValues);
+          recordAiUsage({
+            step: PipelineStep.Embed,
+            provider: 'gemini',
+            model,
+            operation: 'embed',
+            durationMs: Date.now() - batchStartedAt,
+            items: chunk.length,
+          });
 
           succeeded = true;
           break;
@@ -363,10 +426,20 @@ export async function generateEmbeddingsBatch(
 
     if (openai) {
       const openaiModel = resolveEmbeddingModel('openai');
+      const openaiStartedAt = Date.now();
       const response = await openai.embeddings.create({
         model: openaiModel,
         input: chunk,
         ...(openaiModel === 'text-embedding-3-large' ? { dimensions: 3072 } : {}),
+      });
+      recordAiUsage({
+        step: PipelineStep.Embed,
+        provider: 'openai',
+        model: openaiModel,
+        operation: 'embed',
+        durationMs: Date.now() - openaiStartedAt,
+        promptTokens: response.usage?.prompt_tokens,
+        items: chunk.length,
       });
       for (const item of response.data) {
         allEmbeddings.push(item.embedding as number[]);

@@ -24,3 +24,6 @@ package-lock.json
 
 # Backups
 backups/
+
+# Local pipeline simulation fixtures
+apps/engine/fixtures/*.json
