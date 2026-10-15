@@ -81,7 +81,7 @@ jobs:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SUMMARY_MODEL: gemini-flash-latest
+          SUMMARY_MODEL: gemini-flash-lite-latest
           # Pipeline limits (0 = unlimited to process all incoming articles without backlog)
           MAX_EMBEDDINGS: 0
           MAX_CONTENT_EXTRACTION: 0

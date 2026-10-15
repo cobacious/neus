@@ -28,8 +28,14 @@ export function resetAiClientState(): void {
 
 export function resolveSummaryModel(): string {
   const envModel = process.env.SUMMARY_MODEL;
-  if (!envModel || envModel.includes('1.5') || envModel.includes('2.0') || envModel === 'gpt-4o-mini') {
-    return isGeminiActive() ? 'gemini-flash-latest' : 'gpt-4o-mini';
+  if (
+    !envModel ||
+    envModel.includes('1.5') ||
+    envModel.includes('2.0') ||
+    envModel === 'gpt-4o-mini' ||
+    envModel === 'gemini-flash-latest'
+  ) {
+    return isGeminiActive() ? 'gemini-flash-lite-latest' : 'gpt-4o-mini';
   }
   return envModel;
 }
@@ -90,13 +96,24 @@ export async function generateStructuredJson<T>(
     const model = request.model || resolveSummaryModel();
     const url = `${GEMINI_API_BASE_URL}/models/${model}:generateContent?key=${geminiKey}`;
 
+    const generationConfig: Record<string, unknown> = {
+      responseMimeType: 'application/json',
+      temperature: request.temperature ?? 0.1,
+      maxOutputTokens: request.maxTokens ?? 16384,
+    };
+
+    // Models with thinking enabled by default (e.g. gemini-flash-latest or thinking variants)
+    // waste budget generating hidden reasoning tokens on structured JSON tasks.
+    // Models without thinking (such as flash-lite) reject thinkingConfig, so only set when appropriate.
+    if (model.includes('thinking') || model === 'gemini-flash-latest') {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: 0,
+      };
+    }
+
     const body: Record<string, unknown> = {
       contents: [{ parts: [{ text: request.prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: request.temperature ?? 0.1,
-        maxOutputTokens: request.maxTokens ?? 16384,
-      },
+      generationConfig,
     };
 
     if (request.systemInstruction) {
@@ -396,6 +413,10 @@ export async function generateEmbeddingsBatch(
             batchValues.push(emb.values);
           }
           allEmbeddings.push(...batchValues);
+          const estimatedTokens = chunk.reduce(
+            (sum, text) => sum + Math.ceil(text.length / 4),
+            0
+          );
           recordAiUsage({
             step: PipelineStep.Embed,
             provider: 'gemini',
@@ -403,6 +424,7 @@ export async function generateEmbeddingsBatch(
             operation: 'embed',
             durationMs: Date.now() - batchStartedAt,
             items: chunk.length,
+            promptTokens: estimatedTokens,
           });
 
           succeeded = true;

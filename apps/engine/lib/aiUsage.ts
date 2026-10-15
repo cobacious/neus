@@ -39,6 +39,13 @@ export interface AiUsageTotals {
   estimatedCostUsd: number;
 }
 
+/**
+ * Converts USD spend to GBP including 20% UK VAT (approx $1.30 per £1 exchange rate).
+ */
+export function usdToGbpWithVat(usd: number): number {
+  return (usd / 1.30) * 1.20;
+}
+
 export function estimateCostUsd(
   provider: AiProvider,
   model: string,
@@ -49,21 +56,25 @@ export function estimateCostUsd(
   const totalOutput = outputTokens + thoughtTokens;
 
   if (provider === 'gemini') {
+    if (model.includes('lite')) {
+      // Gemini Flash-Lite: $0.25/1M input, $1.50/1M output
+      return (promptTokens * 0.25 + totalOutput * 1.50) / 1_000_000;
+    }
     if (model.includes('flash')) {
-      // Gemini Flash pricing: $0.075/1M input, $0.30/1M output
-      return (promptTokens * 0.075 + totalOutput * 0.3) / 1_000_000;
+      // Gemini Flash standard: $0.75/1M input, $3.75/1M output
+      return (promptTokens * 0.75 + totalOutput * 3.75) / 1_000_000;
     }
     if (model.includes('embedding')) {
       // Gemini Embeddings: ~$0.025/1M tokens
       return (promptTokens * 0.025) / 1_000_000;
     }
-    return (promptTokens * 0.075 + totalOutput * 0.3) / 1_000_000;
+    return (promptTokens * 0.75 + totalOutput * 3.75) / 1_000_000;
   }
 
   if (provider === 'openai') {
     if (model.includes('gpt-4o-mini')) {
-      // gpt-4o-mini pricing: $0.15/1M input, $0.60/1M output
-      return (promptTokens * 0.15 + totalOutput * 0.6) / 1_000_000;
+      // gpt-4o-mini: $0.15/1M input, $0.60/1M output
+      return (promptTokens * 0.15 + totalOutput * 0.60) / 1_000_000;
     }
     if (model.includes('embedding-3-large')) {
       return (promptTokens * 0.13) / 1_000_000;
@@ -71,7 +82,7 @@ export function estimateCostUsd(
     if (model.includes('embedding-3-small')) {
       return (promptTokens * 0.02) / 1_000_000;
     }
-    return (promptTokens * 0.15 + totalOutput * 0.6) / 1_000_000;
+    return (promptTokens * 0.15 + totalOutput * 0.60) / 1_000_000;
   }
 
   return 0;
@@ -137,6 +148,7 @@ export function getTotalAiCostUsd(): {
   totalUsd: number;
   geminiUsd: number;
   openaiUsd: number;
+  totalGbpVat: number;
 } {
   let totalUsd = 0;
   let geminiUsd = 0;
@@ -148,13 +160,15 @@ export function getTotalAiCostUsd(): {
     if (t.provider === 'openai') openaiUsd += t.estimatedCostUsd;
   }
 
-  return { totalUsd, geminiUsd, openaiUsd };
+  const totalGbpVat = usdToGbpWithVat(totalUsd);
+  return { totalUsd, geminiUsd, openaiUsd, totalGbpVat };
 }
 
 /** One human readable line per bucket, suitable for the pipeline log. */
 export function formatAiUsageLines(): string[] {
   return getAiUsageTotals().map((t) => {
     const avgMs = t.calls > 0 ? Math.round(t.totalMs / t.calls) : 0;
+    const gbpCost = usdToGbpWithVat(t.estimatedCostUsd);
     const parts = [
       `${t.provider}/${t.model} ${t.operation}`,
       `calls=${t.calls}`,
@@ -164,7 +178,7 @@ export function formatAiUsageLines(): string[] {
       `promptTokens=${t.promptTokens}`,
       `outputTokens=${t.outputTokens}`,
       `thoughtTokens=${t.thoughtTokens}`,
-      `estCost=$${t.estimatedCostUsd.toFixed(4)}`,
+      `estCost=$${t.estimatedCostUsd.toFixed(4)} (~£${gbpCost.toFixed(4)} inc VAT)`,
     ];
     if (t.items > 0) parts.push(`items=${t.items}`);
     return `[${t.step}] ${parts.join(' ')}`;

@@ -60,7 +60,7 @@ export async function runPipeline() {
   }
   const aiCost = getTotalAiCostUsd();
   logger.info(
-    `[${PipelineStep.Summary}] AI spend: total=$${aiCost.totalUsd.toFixed(4)} (gemini=$${aiCost.geminiUsd.toFixed(4)} openai=$${aiCost.openaiUsd.toFixed(4)})`
+    `[${PipelineStep.Summary}] AI spend: total=$${aiCost.totalUsd.toFixed(4)} (~£${aiCost.totalGbpVat.toFixed(4)} inc VAT) (gemini=$${aiCost.geminiUsd.toFixed(4)} openai=$${aiCost.openaiUsd.toFixed(4)})`
   );
   logger.info(`[${PipelineStep.Summary}] Database Storage: ${metrics.storageFormatted}`);
   logger.info(`[${PipelineStep.Summary}] Database Egress: ${metrics.egressFormatted}`);
@@ -86,7 +86,7 @@ export async function runPipeline() {
 
 - **Status**: Completed successfully ✅
 - **Duration**: ${durationSec}s
-- **AI Spend (this run)**: $${aiCost.totalUsd.toFixed(4)} (Gemini: $${aiCost.geminiUsd.toFixed(4)}, OpenAI: $${aiCost.openaiUsd.toFixed(4)})
+- **AI Spend (this run)**: $${aiCost.totalUsd.toFixed(4)} (~£${aiCost.totalGbpVat.toFixed(4)} inc VAT) [Gemini: $${aiCost.geminiUsd.toFixed(4)}, OpenAI: $${aiCost.openaiUsd.toFixed(4)}]
 - **Ingested Articles (this run)**: ${allArticles.length}
 - **Timestamp**: ${new Date().toISOString()}
 

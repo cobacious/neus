@@ -72,7 +72,7 @@ describe('aiClient', () => {
       expect(data).toEqual({ result: 'success' });
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const [url, options] = mockFetch.mock.calls[0] as [string, any];
-      expect(url).toContain('https://mock.gemini.api/v1beta/models/gemini-flash-latest:generateContent');
+      expect(url).toContain('https://mock.gemini.api/v1beta/models/gemini-flash-lite-latest:generateContent');
       const body = JSON.parse(options.body);
       expect(body.systemInstruction.parts[0].text).toBe('test system');
     });
