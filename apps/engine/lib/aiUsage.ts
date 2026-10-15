@@ -56,18 +56,12 @@ export function estimateCostUsd(
   const totalOutput = outputTokens + thoughtTokens;
 
   if (provider === 'gemini') {
-    if (model.includes('lite')) {
-      // Gemini Flash-Lite: $0.25/1M input, $1.50/1M output
-      return (promptTokens * 0.25 + totalOutput * 1.50) / 1_000_000;
-    }
-    if (model.includes('flash')) {
-      // Gemini Flash standard: $0.75/1M input, $3.75/1M output
-      return (promptTokens * 0.75 + totalOutput * 3.75) / 1_000_000;
-    }
     if (model.includes('embedding')) {
-      // Gemini Embeddings: ~$0.025/1M tokens
-      return (promptTokens * 0.025) / 1_000_000;
+      // Gemini Embeddings (gemini-embedding-2): $0.20/1M tokens
+      return (promptTokens * 0.20) / 1_000_000;
     }
+    // Active Google Cloud Billing rate for Flash models: $0.75/1M input, $3.75/1M output.
+    // Calibrated conservatively to align with console prepay deductions.
     return (promptTokens * 0.75 + totalOutput * 3.75) / 1_000_000;
   }
 
