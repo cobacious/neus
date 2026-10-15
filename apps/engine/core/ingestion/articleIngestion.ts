@@ -72,6 +72,9 @@ export async function fetchArticlesFromRss(feedUrl: string, timeoutMs = 15000): 
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
+      if (res.body && typeof res.body.cancel === 'function') {
+        await res.body.cancel().catch(() => {});
+      }
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
     return res.text();

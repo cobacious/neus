@@ -71,10 +71,19 @@ export async function fillMissingContent() {
 
     try {
       const res = await fetch(article.url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 (compatible; NeusFeedReader/1.0; +https://neus.news)',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-GB,en;q=0.9',
+        },
         signal: AbortSignal.timeout(10000),
       });
 
       if (!res.ok) {
+        if (res.body && typeof res.body.cancel === 'function') {
+          await res.body.cancel().catch(() => {});
+        }
         logger.warn(
           `[${PipelineStep.Fetch}] HTTP ${res.status} when fetching: ${article.title} (${article.url})`
         );

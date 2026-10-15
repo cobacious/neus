@@ -151,6 +151,9 @@ export async function generateStructuredJson<T>(
         }
 
         if (res.status === 429) {
+          if (res.body && typeof res.body.cancel === 'function') {
+            await res.body.cancel().catch(() => {});
+          }
           recordAiUsage({
             step: usageStep,
             provider: 'gemini',
@@ -286,6 +289,9 @@ export async function generateEmbedding(
         });
 
         if (res.status === 429) {
+          if (res.body && typeof res.body.cancel === 'function') {
+            await res.body.cancel().catch(() => {});
+          }
           const backoffMs = Math.pow(2, attempt) * 2000;
           logger.warn(
             `[${PipelineStep.Embed}] Gemini rate limit (429) on embedding attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
@@ -377,6 +383,9 @@ export async function generateEmbeddingsBatch(
           });
 
           if (res.status === 429) {
+            if (res.body && typeof res.body.cancel === 'function') {
+              await res.body.cancel().catch(() => {});
+            }
             const backoffMs = Math.pow(2, attempt) * 2000;
             logger.warn(
               `[${PipelineStep.Embed}] Gemini rate limit (429) on batch embedding attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
