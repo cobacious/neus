@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
@@ -83,6 +83,20 @@ export default function ClusterDetailPage() {
   const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
   const headline = isMultiAngleStory && story ? story.title : cluster?.headline;
   const summary = isMultiAngleStory && story?.overview ? story.overview : cluster?.summary;
+
+  const [expandedAngleIds, setExpandedAngleIds] = useState<Set<string>>(new Set());
+
+  const toggleAngleExpansion = (angleId: string) => {
+    setExpandedAngleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(angleId)) {
+        next.delete(angleId);
+      } else {
+        next.add(angleId);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!headline) return;
@@ -354,6 +368,10 @@ export default function ClusterDetailPage() {
               const angleStyle =
                 colorMap.get(c.id) || colorMap.get(angleName) || DEFAULT_ANGLE_COLOR;
               const angleArticles = sortArticlesNewestFirst(c.articles || []);
+              const isExpanded = expandedAngleIds.has(c.id);
+              const hasMoreArticles = angleArticles.length > 10;
+              const visibleArticles =
+                hasMoreArticles && !isExpanded ? angleArticles.slice(0, 10) : angleArticles;
 
               return (
                 <div key={c.id} className="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
@@ -386,7 +404,7 @@ export default function ClusterDetailPage() {
 
                   {/* Angle Articles List */}
                   <ul className="space-y-2.5 mt-3">
-                    {angleArticles.map((article: any) => (
+                    {visibleArticles.map((article: any) => (
                       <li key={article.id}>
                         <a
                           href={article.url}
@@ -425,6 +443,29 @@ export default function ClusterDetailPage() {
                       </li>
                     ))}
                   </ul>
+
+                  {/* Progressive Disclosure Toggle */}
+                  {hasMoreArticles && (
+                    <div className="mt-3 pt-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleAngleExpansion(c.id)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <span>Show fewer</span>
+                            <span aria-hidden="true">↑</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Show {angleArticles.length - 10} more articles</span>
+                            <span aria-hidden="true">↓</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
