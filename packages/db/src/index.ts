@@ -44,5 +44,6 @@ export * from './stories/realignStoryArticles';
 export * from './stories/dissociateClusters';
 export * from './stories/disbandUnderpopulatedStories';
 export * from './maintenance/vacuumDatabase';
+export * from './maintenance/reembedMigration';
 export * from './metrics/getDatabaseUsageMetrics';
 export type { Source, Cluster, Story } from '@prisma/client';
