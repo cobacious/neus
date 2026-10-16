@@ -11,7 +11,7 @@ export default function App() {
     <BrowserRouter>
       <div className="min-h-screen flex flex-col bg-gray-100">
         <Header />
-        <main className="flex-1 max-w-3xl w-full mx-auto px-4 pb-12">
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 pt-6 pb-12">
           <Routes>
             <Route path="/" element={<ClusterList />} />
             <Route path="/about" element={<AboutPage />} />

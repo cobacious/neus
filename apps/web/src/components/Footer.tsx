@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import GitHubIcon from './GitHubIcon';
+import Logo from './Logo';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -11,11 +12,12 @@ export default function Footer() {
           <div>
             <Link
               to="/"
-              className="text-base font-semibold text-gray-900 hover:text-gray-700 transition-colors"
+              className="inline-block hover:opacity-80 transition-opacity"
             >
-              Neus
+              <Logo className="text-2xl" />
+              <span className="sr-only">Neus</span>
             </Link>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 mt-1">
               Restoring balance and neutrality to the news feed.
             </p>
           </div>

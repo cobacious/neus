@@ -1,26 +1,39 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import GitHubIcon from './GitHubIcon';
 
+const BRAND_COLORS = [
+  '#4F6D7A', // Blue Slate
+  '#DD6E42', // Burnt Peach
+  '#B8C7B7', // Ash Grey
+  '#D2BFDE', // Thistle
+  '#805448', // Clay Soil
+  '#575353', // Charcoal
+];
+
 export default function Header() {
-  const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const headerRef = useRef<HTMLElement>(null);
   const location = useLocation();
+
+  // Randomize segment weights on initial page load
+  const [paletteSegments] = useState(() => {
+    return BRAND_COLORS.map((color) => ({
+      color,
+      weight: Math.floor(Math.random() * 40 + 10) / 10, // 1.0 to 5.0
+    }));
+  });
 
   // Close drawer on route navigation
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
 
-  // Handle sticky header scroll detection
+  // Handle subtle elevation shadow on scroll
   useEffect(() => {
     const handleScroll = () => {
-      if (headerRef.current) {
-        const headerBottom = headerRef.current.getBoundingClientRect().bottom;
-        setShowStickyHeader(headerBottom < 0);
-      }
+      setIsScrolled(window.scrollY > 10);
     };
 
     handleScroll();
@@ -54,67 +67,40 @@ export default function Header() {
 
   return (
     <>
-      {/* Original header - scrolls away naturally */}
+      {/* Modern Left-Aligned Sticky Navbar */}
       <header
-        ref={headerRef}
-        className="my-6 px-4 py-4 border-b border-gray-200 pb-6 relative"
+        className={`sticky top-0 z-40 bg-white border-b border-gray-200 transition-shadow duration-200 ${
+          isScrolled ? 'shadow-sm' : ''
+        }`}
       >
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="w-10"></div> {/* Spacer to center the logo */}
-          <h1 className="flex justify-center flex-1">
-            <Link to="/" className="block">
-              <Logo className="h-10 lg:h-14 w-auto" />
-              <span className="sr-only">Neus</span>
-            </Link>
-          </h1>
-          <button
-            type="button"
-            onClick={toggleMenu}
-            className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={isMenuOpen}
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              {isMenuOpen ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              )}
-            </svg>
-          </button>
+        {/* Subtle Brand Editorial Stripe (Randomized segment widths on load) */}
+        <div className="flex h-1 w-full overflow-hidden" aria-hidden="true">
+          {paletteSegments.map((seg, idx) => (
+            <div
+              key={idx}
+              style={{
+                backgroundColor: seg.color,
+                flexGrow: seg.weight,
+                flexBasis: 0,
+              }}
+            />
+          ))}
         </div>
-      </header>
 
-      {/* Sticky header - slides in from top after original is off screen */}
-      <header
-        className={`
-          fixed top-0 left-0 right-0 px-4 py-2 bg-white border-b border-gray-200 shadow-sm z-40
-          transition-transform duration-300 ease-out
-          ${showStickyHeader ? 'translate-y-0' : '-translate-y-full'}
-        `}
-        aria-hidden={!showStickyHeader}
-      >
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <h1 className="flex">
-            <Link to="/" tabIndex={showStickyHeader ? 0 : -1} className="block">
-              <Logo className="h-6 w-auto" />
-              <span className="sr-only">Neus</span>
+        <div className="max-w-3xl mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between">
+          <h1 className="flex items-center">
+            <Link to="/" className="inline-flex items-center gap-2.5 sm:gap-3 group">
+              <Logo className="text-3xl sm:text-4xl" />
+              <span
+                className="text-gray-300 font-light text-xl leading-none select-none -translate-y-px"
+                aria-hidden="true"
+              >
+                |
+              </span>
+              <span className="text-xs sm:text-sm font-medium text-gray-500 tracking-tight leading-none group-hover:text-gray-800 transition-colors">
+                Neutral news
+              </span>
+              <span className="sr-only">Neus - Neutral news</span>
             </Link>
           </h1>
           <button
@@ -123,10 +109,9 @@ export default function Header() {
             className="text-gray-600 hover:text-gray-900 transition-colors p-1.5 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMenuOpen}
-            tabIndex={showStickyHeader ? 0 : -1}
           >
             <svg
-              className="h-5 w-5"
+              className="h-6 w-6"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -166,8 +151,15 @@ export default function Header() {
           <div className="fixed inset-y-0 right-0 max-w-xs w-full bg-white shadow-2xl flex flex-col z-50">
             {/* Drawer Header */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <Link to="/" onClick={closeMenu} className="block">
-                <Logo className="h-6 w-auto" />
+              <Link to="/" onClick={closeMenu} className="inline-flex items-center gap-2.5">
+                <Logo className="text-2xl sm:text-3xl" />
+                <span
+                  className="text-gray-300 font-light text-lg leading-none select-none -translate-y-px"
+                  aria-hidden="true"
+                >
+                  |
+                </span>
+                <span className="text-xs font-medium text-gray-500 leading-none">Neutral news</span>
                 <span className="sr-only">Neus</span>
               </Link>
               <button
@@ -241,7 +233,7 @@ export default function Header() {
                   <span>Support on Ko-fi</span>
                 </a>
                 <a
-                  href="https://github.com/cobacious/neus/issues"
+                  href="https://github.com/cobacious/neus"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
