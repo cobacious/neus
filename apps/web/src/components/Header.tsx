@@ -41,7 +41,7 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Handle Escape key to close menu
+  // Handle Escape key and scroll locking without layout shift
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMenuOpen) {
@@ -50,14 +50,22 @@ export default function Header() {
     };
 
     if (isMenuOpen) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
+      // If the scrollbar gutter collapsed, compensate with paddingRight on body
+      const remainingGutter = window.innerWidth - document.documentElement.clientWidth;
+      if (scrollbarWidth > 0 && remainingGutter === 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
       window.addEventListener('keydown', handleKeyDown);
     } else {
       document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
     }
 
     return () => {
       document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isMenuOpen]);
@@ -149,33 +157,22 @@ export default function Header() {
 
           {/* Drawer container */}
           <div className="fixed inset-y-0 right-0 max-w-xs w-full bg-white shadow-2xl flex flex-col z-50">
-            {/* Drawer Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <Link to="/" onClick={closeMenu} className="inline-flex items-center gap-2.5">
-                <Logo className="text-2xl sm:text-3xl" />
-                <span
-                  className="text-gray-300 font-light text-lg leading-none select-none -translate-y-px"
-                  aria-hidden="true"
-                >
-                  |
-                </span>
-                <span className="text-xs font-medium text-gray-500 leading-none">Neutral news</span>
-                <span className="sr-only">Neus</span>
-              </Link>
+            {/* Drawer Header - Clean close action aligned with navbar burger position */}
+            <div className="px-4 py-3 sm:py-3.5 flex items-center justify-end">
               <button
                 type="button"
                 onClick={closeMenu}
-                className="text-gray-500 hover:text-gray-900 p-1.5 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+                className="text-gray-600 hover:text-gray-900 p-1.5 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
                 aria-label="Close menu"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
             {/* Navigation links */}
-            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+            <div className="flex-1 overflow-y-auto px-4 pt-2 pb-6 space-y-6">
               <div className="space-y-1">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Navigation
@@ -248,8 +245,8 @@ export default function Header() {
 
             {/* Drawer Footer */}
             <div className="p-4 border-t border-gray-100 bg-gray-50 text-xs text-gray-400">
-              <p className="font-medium text-gray-600">Neus</p>
-              <p className="mt-0.5">© {new Date().getFullYear()} All rights reserved.</p>
+              <Logo className="text-xl" />
+              <p className="mt-1">© {new Date().getFullYear()} All rights reserved.</p>
             </div>
           </div>
         </div>
