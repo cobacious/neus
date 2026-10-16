@@ -18,7 +18,7 @@
     },
     {
       "source": "/:slug((?!api/|assets/|favicon\\.svg|og-image\\.png|apple-touch-icon\\.png|robots\\.txt|feed\\.xml|rss\\.xml|sitemap\\.xml).*)",
-      "destination": "/api/og-preview?slug=:slug"
+      "destination": "/api/prerender?slug=:slug"
     },
     {
       "source": "/(.*)",

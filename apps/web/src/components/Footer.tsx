@@ -49,9 +49,7 @@ export default function Footer() {
               <span>Ko-fi</span>
             </a>
             <a
-              href="https://github.com/cobacious/neus/issues"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:feedback@neus.news?subject=Neus%20Feedback"
               className="hover:text-gray-900 transition-colors"
             >
               Feedback

@@ -297,19 +297,29 @@ export default function AboutPage() {
               Share Feedback
             </h3>
             <p className="text-xs sm:text-sm text-gray-600 mt-2 leading-normal">
-              Encountered a clustering anomaly, have thoughts on our neutral summarization or want
-              to suggest new sources? Feedback and issue reports are warmly welcomed on GitHub.
+              Have thoughts on our neutral summarization, want to suggest new editorial sources or
+              spotted a clustering anomaly? Direct feedback is warmly welcomed via email.
             </p>
           </div>
-          <div>
+          <div className="space-y-2">
             <a
-              href="https://github.com/cobacious/neus/issues"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:feedback@neus.news?subject=Neus%20Feedback"
               className="inline-flex items-center justify-center w-full px-4 py-2 border border-gray-300 bg-gray-50 text-gray-800 font-medium rounded-lg text-sm hover:bg-gray-100 transition-colors"
             >
-              Open GitHub Issue
+              Email feedback@neus.news
             </a>
+            <p className="text-[11px] text-gray-400 text-center">
+              For technical bugs and code contributions, you can also{' '}
+              <a
+                href="https://github.com/cobacious/neus/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-gray-600"
+              >
+                open a GitHub issue
+              </a>
+              .
+            </p>
           </div>
         </div>
       </section>

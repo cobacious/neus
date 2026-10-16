@@ -18,7 +18,8 @@
     "db:migrate": "pnpm --filter @neus/db exec prisma migrate dev",
     "db:seed": "pnpm --filter @neus/db exec prisma db seed",
     "pipeline": "pnpm --filter @neus/engine pipeline",
-    "substack:draft": "pnpm --filter @neus/engine substack:draft"
+    "substack:draft": "pnpm --filter @neus/engine substack:draft",
+    "bluesky:post": "pnpm --filter @neus/engine bluesky:post"
   },
   "keywords": [],
   "author": "",
