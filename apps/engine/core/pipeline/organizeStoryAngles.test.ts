@@ -23,6 +23,7 @@ let buildNeighborhoods: typeof import('./organizeStoryAngles').buildNeighborhood
 let computeCentroidEmbedding: typeof import('./organizeStoryAngles').computeCentroidEmbedding;
 let findCandidateStoriesForNeighborhood: typeof import('./organizeStoryAngles').findCandidateStoriesForNeighborhood;
 let isSettledNeighborhood: typeof import('./organizeStoryAngles').isSettledNeighborhood;
+let classifyArticleAngles: typeof import('./organizeStoryAngles').classifyArticleAngles;
 
 beforeAll(async () => {
   process.env.GEMINI_API_KEY = 'mock-gemini-key';
@@ -33,6 +34,7 @@ beforeAll(async () => {
     computeCentroidEmbedding,
     findCandidateStoriesForNeighborhood,
     isSettledNeighborhood,
+    classifyArticleAngles,
   } = await import('./organizeStoryAngles'));
 });
 
@@ -580,6 +582,92 @@ describe('isSettledNeighborhood', () => {
     const activeMap = new Map<string, number>([['s1', 3]]);
     const res = isSettledNeighborhood(neighborhood, stories, cutoff, activeMap);
     expect(res.settled).toBe(false);
+  });
+});
+
+describe('classifyArticleAngles', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  const angles = [
+    { clusterId: 'c1', angle: 'Legal Proceedings', headline: 'Trial begins', embedding: [1, 0, 0] },
+    { clusterId: 'c2', angle: 'Political Fallout', headline: 'Ministers respond', embedding: [0, 1, 0] },
+  ];
+
+  it('resolves confident articles via vector cosine similarity without making LLM calls', async () => {
+    const articles = [
+      { articleId: 'a1', currentClusterId: 'c1', title: 'Court hearing day one', embedding: [0.99, 0.05, 0] },
+      { articleId: 'a2', currentClusterId: 'c1', title: 'PM faces questions in parliament', embedding: [0.05, 0.99, 0] }, // misclassified into c1, clearly c2
+    ];
+
+    const assignments = await classifyArticleAngles('Major Political Trial', angles, articles);
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(assignments).toEqual([
+      { articleId: 'a1', targetClusterId: 'c1' },
+      { articleId: 'a2', targetClusterId: 'c2' },
+    ]);
+  });
+
+  it('defers ambiguous articles to LLM while resolving confident ones locally', async () => {
+    const articles = [
+      { articleId: 'a1', currentClusterId: 'c1', title: 'Court hearing day one', embedding: [0.99, 0.05, 0] }, // clear match for c1
+      { articleId: 'a2', currentClusterId: 'c1', title: 'Ambiguous reaction piece', embedding: [0.6, 0.58, 0] }, // ambiguous margin < 0.04
+    ];
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    assignments: [{ articleId: 'a2', targetClusterId: 'c2' }],
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+
+    const assignments = await classifyArticleAngles('Major Political Trial', angles, articles);
+
+    // LLM should only have been called once for the single ambiguous article a2
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(assignments).toEqual([
+      { articleId: 'a1', targetClusterId: 'c1' },
+      { articleId: 'a2', targetClusterId: 'c2' },
+    ]);
+  });
+
+  it('preserves established articles in existing stories without LLM calls', async () => {
+    const articles = [
+      { articleId: 'a-old', currentClusterId: 'c1', title: 'Historic piece', embedding: null },
+      { articleId: 'a-new', currentClusterId: 'c-incoming', title: 'New development', embedding: [0.05, 0.98, 0] },
+    ];
+
+    const extendedAngles = [
+      ...angles,
+      { clusterId: 'c-incoming', angle: 'Public Opinion', headline: 'Voters react', embedding: [0, 0, 1] },
+    ];
+
+    const assignments = await classifyArticleAngles('Major Political Trial', extendedAngles, articles, {
+      isExistingStory: true,
+      newClusterIds: new Set(['c-incoming']),
+    });
+
+    // No LLM call needed: a-old is preserved incrementally; a-new is resolved via vector similarity
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(assignments).toEqual([
+      { articleId: 'a-old', targetClusterId: 'c1' },
+      { articleId: 'a-new', targetClusterId: 'c2' },
+    ]);
   });
 });
 

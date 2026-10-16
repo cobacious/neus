@@ -428,18 +428,109 @@ Return JSON with this exact schema:
 
 export async function classifyArticleAngles(
   storyTitle: string,
-  angles: Array<{ clusterId: string; angle: string; headline?: string | null }>,
-  articles: Array<{ articleId: string; currentClusterId: string; title: string }>
+  angles: Array<{
+    clusterId: string;
+    angle: string;
+    headline?: string | null;
+    embedding?: number[] | null;
+  }>,
+  articles: Array<{
+    articleId: string;
+    currentClusterId: string;
+    title: string;
+    embedding?: unknown;
+  }>,
+  options?: {
+    isExistingStory?: boolean;
+    newClusterIds?: Set<string>;
+  }
 ): Promise<Array<{ articleId: string; targetClusterId: string }>> {
   if (angles.length < 2 || articles.length === 0) return [];
 
-  const BATCH_SIZE = 25;
-  const allAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+  const anglesWithEmbeddings = angles.filter(
+    (a) => Array.isArray(a.embedding) && (a.embedding as number[]).length > 0
+  );
 
-  for (let i = 0; i < articles.length; i += BATCH_SIZE) {
-    const batch = articles.slice(i, i + BATCH_SIZE);
+  const resolvedAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+  const ambiguousArticles: Array<{ articleId: string; currentClusterId: string; title: string }> = [];
+
+  const isExistingStory = options?.isExistingStory ?? false;
+  const newClusterIds = options?.newClusterIds ?? new Set<string>();
+
+  // 1. Vector Cosine Similarity Pre-filtering & Incremental evaluation
+  for (const article of articles) {
+    const isFromNewCluster = newClusterIds.has(article.currentClusterId);
+    const artEmb =
+      Array.isArray(article.embedding) && (article.embedding as number[]).length > 0
+        ? (article.embedding as number[])
+        : null;
+
+    if (artEmb && anglesWithEmbeddings.length >= 2) {
+      const matchingAngles = anglesWithEmbeddings.filter(
+        (a) => (a.embedding as number[]).length === artEmb.length
+      );
+
+      if (matchingAngles.length >= 2) {
+        const scored = matchingAngles
+          .map((a) => ({
+            clusterId: a.clusterId,
+            similarity: cosineSimilarity(artEmb, a.embedding as number[]),
+          }))
+          .sort((x, y) => y.similarity - x.similarity);
+
+        const best = scored[0];
+        const second = scored[1];
+        const margin = (best?.similarity ?? 0) - (second?.similarity ?? 0);
+
+        // Confident match:
+        // - If best match is current cluster with solid similarity (>= 0.65) and clear margin (>= 0.04), keep it.
+        // - If best match is a different cluster with strong separation (similarity >= 0.70 and margin >= 0.04), reassign.
+        if (best.clusterId === article.currentClusterId && best.similarity >= 0.65 && margin >= 0.04) {
+          resolvedAssignments.push({ articleId: article.articleId, targetClusterId: best.clusterId });
+          continue;
+        } else if (best.similarity >= 0.70 && margin >= 0.04) {
+          resolvedAssignments.push({ articleId: article.articleId, targetClusterId: best.clusterId });
+          continue;
+        }
+      }
+    }
+
+    // Incremental optimization: if this is an existing story and the article is already
+    // in an established cluster (not a new incoming cluster), keep its current assignment
+    // rather than paying for an LLM re-classification.
+    if (isExistingStory && !isFromNewCluster && angles.some((a) => a.clusterId === article.currentClusterId)) {
+      resolvedAssignments.push({ articleId: article.articleId, targetClusterId: article.currentClusterId });
+      continue;
+    }
+
+    // Ambiguous, unassigned or new cluster article without high confidence: defer to LLM
+    ambiguousArticles.push({
+      articleId: article.articleId,
+      currentClusterId: article.currentClusterId,
+      title: article.title,
+    });
+  }
+
+  if (ambiguousArticles.length === 0) {
+    logger.info(
+      `[${PipelineStep.Organize}] All ${articles.length} article(s) for "${storyTitle}" resolved via vector similarity (0 LLM calls)`
+    );
+    return resolvedAssignments;
+  }
+
+  if (resolvedAssignments.length > 0) {
+    logger.info(
+      `[${PipelineStep.Organize}] ${resolvedAssignments.length}/${articles.length} article(s) resolved via vector similarity; classifying remaining ${ambiguousArticles.length} article(s) with LLM...`
+    );
+  }
+
+  const BATCH_SIZE = 25;
+  const llmAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+
+  for (let i = 0; i < ambiguousArticles.length; i += BATCH_SIZE) {
+    const batch = ambiguousArticles.slice(i, i + BATCH_SIZE);
     const batchIndex = Math.floor(i / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(articles.length / BATCH_SIZE);
+    const totalBatches = Math.ceil(ambiguousArticles.length / BATCH_SIZE);
 
     logger.info(
       `[${PipelineStep.Organize}] Classifying batch ${batchIndex}/${totalBatches} (${batch.length} articles) for "${storyTitle}"...`
@@ -487,11 +578,11 @@ Return JSON with key "assignments": Array<{ articleId: string, targetClusterId: 
     });
 
     if (Array.isArray(parsed.assignments)) {
-      allAssignments.push(...parsed.assignments);
+      llmAssignments.push(...parsed.assignments);
     }
   }
 
-  return allAssignments;
+  return [...resolvedAssignments, ...llmAssignments];
 }
 
 export async function organizeStoryAngles() {
@@ -738,16 +829,34 @@ export async function organizeStoryAngles() {
               storyArticles.length > 0 &&
               (!targetStoryId || hasAngleCountChange || hasNewClusterSinceUpdate)
             ) {
-              const anglesWithHeadlines = survivingAngles.map((a) => ({
-                clusterId: a.clusterId,
-                angle: a.angle,
-                headline: survivingClusters.find((c) => c.id === a.clusterId)?.headline ?? null,
-              }));
+              const anglesWithHeadlines = survivingAngles.map((a) => {
+                const cluster = survivingClusters.find((c) => c.id === a.clusterId);
+                return {
+                  clusterId: a.clusterId,
+                  angle: a.angle,
+                  headline: cluster?.headline ?? null,
+                  embedding: (Array.isArray(cluster?.embedding) ? cluster.embedding : null) as number[] | null,
+                };
+              });
+
+              const newClusterIds = new Set(
+                survivingClusters
+                  .filter(
+                    (c) =>
+                      new Date(c.createdAt).getTime() > storyUpdatedMs + 60000 ||
+                      c.storyId !== targetStoryId
+                  )
+                  .map((c) => c.id)
+              );
 
               const assignments = await classifyArticleAngles(
                 storyItem.storyTitle,
                 anglesWithHeadlines,
-                storyArticles
+                storyArticles,
+                {
+                  isExistingStory: Boolean(targetStoryId),
+                  newClusterIds,
+                }
               );
 
               const validClusterIdSet = new Set(angleClusterIds);
