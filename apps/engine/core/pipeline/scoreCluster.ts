@@ -11,7 +11,9 @@ export type ScorableCluster = {
 };
 
 const HOUR_MS = 1000 * 60 * 60;
-const HALF_LIFE_HOURS = 72; // 3-day half-life for exponential recency decay
+export const HALF_LIFE_HOURS = process.env.CLUSTER_SCORE_HALF_LIFE_HOURS
+  ? parseFloat(process.env.CLUSTER_SCORE_HALF_LIFE_HOURS)
+  : 24; // 24-hour half-life for exponential recency decay (down from 72h)
 
 export function scoreCluster(cluster: ScorableCluster, now: number = Date.now()): number {
   if (!cluster.articleAssignments || cluster.articleAssignments.length === 0) return 0;
