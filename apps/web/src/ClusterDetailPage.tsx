@@ -419,15 +419,13 @@ export default function ClusterDetailPage() {
                   <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                     <div className="flex items-center gap-2">
                       <span
-                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border"
-                        style={{
-                          backgroundColor: angleStyle.bg,
-                          borderColor: angleStyle.border,
-                          color: angleStyle.text,
-                        }}
-                      >
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: angleStyle.border }}
+                        aria-hidden="true"
+                      />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">
                         {angleName}
-                      </span>
+                      </h4>
                     </div>
                     <span className="text-xs text-gray-500 font-medium">
                       {angleArticles.length} {angleArticles.length === 1 ? 'article' : 'articles'}
@@ -436,7 +434,7 @@ export default function ClusterDetailPage() {
 
                   {/* Angle Headline & Summary */}
                   {c.headline && (
-                    <h4 className="text-base font-bold text-gray-900 mt-2 mb-1">{c.headline}</h4>
+                    <h5 className="text-base font-bold text-gray-900 mt-2 mb-1">{c.headline}</h5>
                   )}
                   {c.summary && (
                     <p className="text-sm text-gray-600 mb-4 leading-relaxed">{c.summary}</p>
@@ -448,7 +446,8 @@ export default function ClusterDetailPage() {
                       <li key={article.id}>
                         <a
                           href={article.url}
-                          className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 transition-all group"
+                          className="flex items-start gap-3 p-3 rounded-r-lg rounded-l-xs border border-gray-200 border-l-[3px] bg-white hover:border-gray-300 hover:bg-gray-50 transition-all group"
+                          style={{ borderLeftColor: angleStyle.border }}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
