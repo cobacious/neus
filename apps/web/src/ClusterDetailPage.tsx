@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
 import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './components/StatusBadge';
-import StoryAnglePills, { AngleItem } from './components/StoryAnglePills';
+import { AngleItem } from './components/StoryAnglePills';
 import StoryAngleFilterTabs, { resolveActiveAngleId } from './components/StoryAngleFilterTabs';
 import ArticleTimelineSparkline, { TimelineArticle } from './components/ArticleTimelineSparkline';
 import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHistogram';
@@ -347,22 +347,6 @@ export default function ClusterDetailPage() {
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 my-2 leading-tight">
         {isMultiAngleStory && story ? story.title : cluster.headline}
       </h1>
-
-      {/* Angle pills (Feature 2) */}
-      {angles.length > 1 && (
-        <div className="my-3">
-          <div className="text-xs text-gray-500 font-medium mb-1.5 uppercase tracking-wider">
-            Story Angles:
-          </div>
-          <StoryAnglePills
-            angles={angles}
-            colorMap={colorMap}
-            size="md"
-            activeAngleId={selectedAngleId}
-            onSelectAngle={(angleId) => handleSelectAngle(angleId, true)}
-          />
-        </div>
-      )}
 
       {/* Main Summary */}
       <p className="text-gray-700 my-4 text-base leading-relaxed">

@@ -67,7 +67,7 @@ export default function StoryAnglePills({
             className={`inline-flex items-center font-medium rounded-full border transition-all select-none ${sizeClasses} ${
               isInteractive
                 ? isActive
-                  ? 'ring-2 ring-gray-700 ring-offset-1 font-semibold cursor-pointer shadow-xs'
+                  ? 'border-2 font-semibold cursor-pointer shadow-xs'
                   : 'hover:opacity-80 cursor-pointer'
                 : ''
             }`}
