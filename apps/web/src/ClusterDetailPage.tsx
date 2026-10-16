@@ -281,14 +281,14 @@ export default function ClusterDetailPage() {
 
   return (
     <div
-      className="relative bg-white shadow-xs border border-gray-200 p-6 rounded-lg"
+      className="relative bg-white shadow-xs border border-gray-200 -mx-4 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border-x px-4 py-5 sm:p-6"
       style={
         statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined
       }
     >
       {/* Straddling Top-Border Status Badge */}
       {status && (
-        <div className="absolute right-6 top-0 -translate-y-1/2 z-10">
+        <div className="absolute right-4 sm:right-6 top-0 -translate-y-1/2 z-10">
           <StatusBadge status={status} size="md" />
         </div>
       )}
@@ -399,7 +399,7 @@ export default function ClusterDetailPage() {
         )}
 
         {isMultiAngleStory && story?.clusters ? (
-          <div className="space-y-8">
+          <div className="space-y-4 sm:space-y-8">
             {(selectedAngleId
               ? story.clusters.filter((c: any) => c.id === selectedAngleId)
               : story.clusters
@@ -416,7 +416,7 @@ export default function ClusterDetailPage() {
               return (
                 <div
                   key={c.id}
-                  className="border border-gray-200 border-l-4 rounded-r-lg rounded-l-xs p-5 bg-gray-50/50"
+                  className="border border-gray-200 border-l-4 rounded-r-lg rounded-l-xs p-3.5 sm:p-5 bg-gray-50/50"
                   style={{ borderLeftColor: angleStyle.border }}
                 >
                   {/* Angle Header */}
@@ -445,12 +445,12 @@ export default function ClusterDetailPage() {
                   )}
 
                   {/* Angle Articles List */}
-                  <ul className="space-y-2.5 mt-3">
+                  <ul className="space-y-2 sm:space-y-2.5 mt-3">
                     {visibleArticles.map((article: any) => (
                       <li key={article.id}>
                         <a
                           href={article.url}
-                          className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 transition-all group"
+                          className="flex items-start gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-lg border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 transition-all group"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -525,7 +525,7 @@ export default function ClusterDetailPage() {
                     <li key={article.id}>
                       <a
                         href={article.url}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all group"
+                        className="flex items-start gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all group"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
