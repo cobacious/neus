@@ -88,8 +88,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Angle summary truncation**: Remove 2-line truncation (`line-clamp-2`) on angle summaries in cluster detail view so the full summary is visible.
 - [x] **Card footer layout & source wrap**: Reorder card footer with source logos first, `justify-between` article count and 8-icon limit.
 - [x] **About Page & Footer Navigation**: Created About page, hamburger drawer menu, persistent site footer, public-code licensing disclaimer and retired BetaBanner.
-- [x] **Open Graph & Social Previews**: Added serverless crawler handler for cluster pages, branded 1200x630 `og-image.png`, `summary_large_image` Twitter cards and dynamic document titles.
-- [ ] **Story Angle Filtering / Jump Links**: In cluster detail and card views, support filtering articles by angle or making angle pills act as jump links to that angle's section.
+- [x] **Story Angle Filtering & Navigation**: Interactive angle pills, mobile-friendly segmented filter tabs, URL synchronization (`?angle=<id>`), progressive disclosure (10 articles with expander) and newest-first chronological sorting.
 
 ### Track 2: Editorial Source Quality (`packages/db`)
 - [x] **Drop The Sun**: Deactivated in both local dev and production database sources and removed from active seed list.
