@@ -116,6 +116,11 @@ When starting a session or subagent, select from these decoupled tracks:
 - [ ] **Cluster merge and story grouping**: Support merging duplicate clusters and grouping related clusters into story umbrellas with distinct angles. (See handoff in [`docs/handoffs/admin-cluster-management.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/admin-cluster-management.md)).
 - [ ] **Yorkshire tiger incident consolidation**: Merge the two separate Yorkshire tiger enclosure clusters into one story umbrella. (See handoff in [`docs/handoffs/yorkshire-tiger-story-merge.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/yorkshire-tiger-story-merge.md)).
 
+### Track 7: Syndication, SEO and Soft Launch Distribution (`apps/web`, `apps/engine`)
+- [x] **Outbound RSS feed**: Created `/feed.xml` and `/rss.xml` with Atom namespace, story-angle grouping, RFC 822 pubDate and autodiscovery in `index.html`.
+- [x] **Dynamic sitemap & robots.txt**: Implemented `/sitemap.xml` conforming to Sitemap 0.9 protocol and `robots.txt` for search crawler indexing.
+- [x] **Weekly Substack markdown draft generator**: Built CLI tool (`pnpm substack:draft`) in [`apps/engine/lib/generateWeeklyDigest.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/lib/generateWeeklyDigest.ts) that synthesises top multi-angle stories and source breakdowns for zero-slop newsletters.
+
 ---
 
 ## Strict Development Rules & Constraints

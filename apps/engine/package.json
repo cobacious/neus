@@ -17,6 +17,7 @@
   "scripts": {
     "pipeline": "NODE_ENV=development tsx index.ts",
     "print": "NODE_ENV=development tsx lib/printClusters.ts",
+    "substack:draft": "NODE_ENV=development tsx lib/generateWeeklyDigest.ts",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --config ../../jest.config.ts"
   }
 }
