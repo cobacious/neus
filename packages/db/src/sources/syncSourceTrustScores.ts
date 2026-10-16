@@ -20,8 +20,8 @@ export const CANONICAL_SOURCE_TRUST: Record<string, number> = {
   'The Independent UK': 0.65,
   'Metro UK': 0.55,
   'Daily Mail': 0.35,
-  'Daily Express': 0.20,
-  'The Sun': 0.20,
+  'Daily Express': 0.05,
+  'The Sun': 0.05,
 };
 
 /**

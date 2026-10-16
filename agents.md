@@ -96,7 +96,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Google Favicon CDN migration**: Migrated `Source.faviconUrl` from `icon.horse` to Google's public Favicon CDN with defensive `<SourceFavicon>` fallback.
 
 ### Track 3: Ranking & Taxonomy Analysis (`apps/engine`, `packages/db`)
-- [ ] **Feed ranking & sorting**: Review and tune the scoring formula in [`scoreCluster.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/core/pipeline/scoreCluster.ts) and [`getRankedClusters.ts`](file:///Users/jwalton/Code/cobacious/neus/packages/db/src/clusters/getRankedClusters.ts). (See handoff in [`docs/handoffs/ranking-algorithm-review.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/ranking-algorithm-review.md)).
+- [x] **Feed ranking & sorting**: Implemented consensus recency to defeat single-source recency hijacking, enforced multi-source cluster gating (`uniqueSources >= 2`), activated canonical source trust scores, archived 292 legacy single-source/deactivated spam clusters and re-scored all active clusters with zero LLM API cost. (See [`docs/handoffs/ranking-algorithm-review.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/ranking-algorithm-review.md)).
 - [ ] **French Protests angle alignment**: Investigate article-to-angle assignments for the French education protests story. (See handoff in [`docs/handoffs/french-protests-angle-grouping.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/french-protests-angle-grouping.md)).
 
 ### Track 4: Pipeline Performance & Cost Optimization (`apps/engine`, `packages/db`)
@@ -114,7 +114,7 @@ When starting a session or subagent, select from these decoupled tracks:
 ### Track 6: Admin Editorial & Cluster Management (`apps/admin`, `apps/api`)
 - [ ] **Cluster browser and search**: List, filter and search active clusters across environments.
 - [ ] **Cluster merge and story grouping**: Support merging duplicate clusters and grouping related clusters into story umbrellas with distinct angles. (See handoff in [`docs/handoffs/admin-cluster-management.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/admin-cluster-management.md)).
-- [ ] **Yorkshire tiger incident consolidation**: Merge the two separate Yorkshire tiger enclosure clusters into one story umbrella. (See handoff in [`docs/handoffs/yorkshire-tiger-story-merge.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/yorkshire-tiger-story-merge.md)).
+- [x] **Yorkshire tiger incident consolidation**: Consolidated under single story umbrella "Fatal Tiger Enclosure Incident at Yorkshire Wildlife Park and Aftermath" with 3 distinct multi-source angles. (See handoff in [`docs/handoffs/yorkshire-tiger-story-merge.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/yorkshire-tiger-story-merge.md)).
 
 ### Track 7: Syndication, SEO and Soft Launch Distribution (`apps/web`, `apps/engine`)
 - [x] **Outbound RSS feed**: Created `/feed.xml` and `/rss.xml` with Atom namespace, story-angle grouping, RFC 822 pubDate and autodiscovery in `index.html`.
