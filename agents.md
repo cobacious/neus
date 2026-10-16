@@ -109,7 +109,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Article angle classification pre-filtering**: Use in-memory vector cosine similarity and incremental preservation to resolve article angles with minimal LLM calls.
 
 ### Track 5: CI/CD & Testing Automation (`.github/workflows`)
-- [ ] **PR test & build gating CI**: Add a GitHub Actions CI workflow that runs `pnpm test`, typecheck and build on pull requests and gates merging into `main`.
+- [x] **PR test & build gating CI**: Created GitHub Actions CI workflow in [`.github/workflows/ci.yml`](file:///Users/jwalton/Code/cobacious/neus/.github/workflows/ci.yml) that runs dependency caching, Prisma generation, `pnpm build` and `pnpm test` on pull requests and main pushes.
 
 ### Track 6: Admin Editorial & Cluster Management (`apps/admin`, `apps/api`)
 - [ ] **Cluster browser and search**: List, filter and search active clusters across environments.
