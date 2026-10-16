@@ -40,6 +40,57 @@ export interface AiUsageTotals {
 }
 
 /**
+ * AI Provider Rate Card (USD per 1,000,000 tokens).
+ *
+ * NOTE: As of 16/10/2026: Check and update periodically against official provider pricing sheets:
+ * - Google Cloud & AI Studio: https://ai.google.dev/pricing
+ * - OpenAI Platform: https://openai.com/api/pricing/
+ *
+ * NOTE ON GEMINI CALIBRATION:
+ * While Google AI Studio lists theoretical promotional rates of $0.075/1M input and $0.30/1M output
+ * for Flash-Lite, active Google Cloud Billing pay-as-you-go accounts deduct against standard Flash
+ * SKUs at up to $0.75/1M input and $3.75/1M output. We calculate generative Gemini spend at $0.75/$3.75
+ * so the pipeline telemetry reflects realistic worst-case billing deductions rather than under-reporting spend.
+ */
+export const PRICING_LAST_VERIFIED = '2026-10-16';
+
+export interface ModelPricing {
+  inputPerMillion: number;
+  outputPerMillion: number;
+  notes?: string;
+}
+
+export const AI_MODEL_PRICING: Record<string, ModelPricing> = {
+  // Google Gemini Models (as of 16/10/2026)
+  'gemini-embedding-2': {
+    inputPerMillion: 0.20,
+    outputPerMillion: 0,
+    notes: 'Standard text embedding rate',
+  },
+  'gemini-flash-latest': {
+    inputPerMillion: 0.75,
+    outputPerMillion: 3.75,
+    notes: 'Conservative Google Cloud Billing pay-as-you-go rate for Flash generative calls',
+  },
+  // OpenAI Models (as of 16/10/2026)
+  'gpt-4o-mini': {
+    inputPerMillion: 0.15,
+    outputPerMillion: 0.60,
+    notes: 'OpenAI gpt-4o-mini standard tier',
+  },
+  'text-embedding-3-large': {
+    inputPerMillion: 0.13,
+    outputPerMillion: 0,
+    notes: 'OpenAI 3072-dimension embeddings',
+  },
+  'text-embedding-3-small': {
+    inputPerMillion: 0.02,
+    outputPerMillion: 0,
+    notes: 'OpenAI 1536-dimension embeddings',
+  },
+};
+
+/**
  * Converts USD spend to GBP including 20% UK VAT (approx $1.30 per £1 exchange rate).
  */
 export function usdToGbpWithVat(usd: number): number {
@@ -57,26 +108,31 @@ export function estimateCostUsd(
 
   if (provider === 'gemini') {
     if (model.includes('embedding')) {
-      // Gemini Embeddings (gemini-embedding-2): $0.20/1M tokens
-      return (promptTokens * 0.20) / 1_000_000;
+      const rate = AI_MODEL_PRICING['gemini-embedding-2'].inputPerMillion;
+      return (promptTokens * rate) / 1_000_000;
     }
-    // Active Google Cloud Billing rate for Flash models: $0.75/1M input, $3.75/1M output.
-    // Calibrated conservatively to align with console prepay deductions.
-    return (promptTokens * 0.75 + totalOutput * 3.75) / 1_000_000;
+    const rate = AI_MODEL_PRICING['gemini-flash-latest'];
+    return (promptTokens * rate.inputPerMillion + totalOutput * rate.outputPerMillion) / 1_000_000;
   }
 
   if (provider === 'openai') {
     if (model.includes('gpt-4o-mini')) {
-      // gpt-4o-mini: $0.15/1M input, $0.60/1M output
-      return (promptTokens * 0.15 + totalOutput * 0.60) / 1_000_000;
+      const rate = AI_MODEL_PRICING['gpt-4o-mini'];
+      return (promptTokens * rate.inputPerMillion + totalOutput * rate.outputPerMillion) / 1_000_000;
     }
     if (model.includes('embedding-3-large')) {
-      return (promptTokens * 0.13) / 1_000_000;
+      const rate = AI_MODEL_PRICING['text-embedding-3-large'].inputPerMillion;
+      return (promptTokens * rate) / 1_000_000;
     }
     if (model.includes('embedding-3-small')) {
-      return (promptTokens * 0.02) / 1_000_000;
+      const rate = AI_MODEL_PRICING['text-embedding-3-small'].inputPerMillion;
+      return (promptTokens * rate) / 1_000_000;
     }
-    return (promptTokens * 0.15 + totalOutput * 0.60) / 1_000_000;
+    const fallbackRate = AI_MODEL_PRICING['gpt-4o-mini'];
+    return (
+      (promptTokens * fallbackRate.inputPerMillion + totalOutput * fallbackRate.outputPerMillion) /
+      1_000_000
+    );
   }
 
   return 0;
