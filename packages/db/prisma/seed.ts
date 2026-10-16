@@ -82,7 +82,7 @@ const feeds = [
     name: 'Evening Standard',
     homepageUrl: 'https://www.standard.co.uk',
     rssFeedUrl: 'https://www.standard.co.uk/news/rss',
-    trustScore: 0.70,
+    trustScore: 0.50,
   },
   {
     name: 'The Scotsman',

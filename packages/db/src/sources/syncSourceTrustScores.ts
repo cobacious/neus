@@ -16,7 +16,7 @@ export const CANONICAL_SOURCE_TRUST: Record<string, number> = {
   'The Scotsman': 0.75,
   'Al Jazeera English': 0.75,
   'ITV News UK': 0.75,
-  'Evening Standard': 0.70,
+  'Evening Standard': 0.50,
   'The Independent UK': 0.65,
   'Metro UK': 0.55,
   'Daily Mail': 0.35,
