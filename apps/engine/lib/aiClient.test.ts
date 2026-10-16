@@ -141,50 +141,18 @@ describe('aiClient', () => {
       expect(url).toContain('https://mock.gemini.api/v1beta/models/gemini-embedding-2:embedContent');
     });
 
-    it('falls back to OpenAI when Gemini fails with error, using 3072 dimensions', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        text: async () => 'Internal Server Error',
-      });
-
-      const spy = jest.spyOn(openai!.embeddings, 'create').mockResolvedValueOnce({
-        data: [{ embedding: [0.4, 0.5, 0.6] }],
-      } as any);
-
-      const emb = await generateEmbedding('fallback test');
-      expect(emb).toEqual([0.4, 0.5, 0.6]);
-      expect(spy).toHaveBeenCalledWith({
-        model: 'text-embedding-3-large',
-        input: 'fallback test',
-        dimensions: 3072,
-      });
-    });
-
-    it('disables Gemini on 402 and routes subsequent embedding calls directly to OpenAI', async () => {
+    it('throws error and does not fall back to OpenAI when Gemini embedding fails', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 402,
         text: async () => 'Your prepayment credits are depleted',
       });
 
-      const spy = jest.spyOn(openai!.embeddings, 'create').mockResolvedValue({
-        data: [{ embedding: [0.7, 0.8, 0.9] }],
-      } as any);
+      const spy = jest.spyOn(openai!.embeddings, 'create');
 
-      expect(isGeminiActive()).toBe(true);
-
-      // First call hits Gemini, gets 402, disables Gemini, falls back to OpenAI
-      const emb1 = await generateEmbedding('first call');
-      expect(emb1).toEqual([0.7, 0.8, 0.9]);
+      await expect(generateEmbedding('first call')).rejects.toThrow('Gemini embedding API error (402)');
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(isGeminiActive()).toBe(false);
-
-      // Second call skips Gemini completely and goes straight to OpenAI
-      const emb2 = await generateEmbedding('second call');
-      expect(emb2).toEqual([0.7, 0.8, 0.9]);
-      expect(mockFetch).toHaveBeenCalledTimes(1); // still 1, mockFetch was NOT called again
-      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 
@@ -220,30 +188,19 @@ describe('aiClient', () => {
       expect(body.requests[0].content.parts[0].text).toBe('first');
     });
 
-    it('falls back to OpenAI when Gemini batch fails', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('throws error when Gemini batch fails and does not fall back to OpenAI', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
         text: async () => 'Gemini error',
       });
 
-      const spy = jest.spyOn(openai!.embeddings, 'create').mockResolvedValueOnce({
-        data: [
-          { embedding: [0.5, 0.6] },
-          { embedding: [0.7, 0.8] },
-        ],
-      } as any);
+      const spy = jest.spyOn(openai!.embeddings, 'create');
 
-      const res = await generateEmbeddingsBatch(['first', 'second']);
-      expect(res).toEqual([
-        [0.5, 0.6],
-        [0.7, 0.8],
-      ]);
-      expect(spy).toHaveBeenCalledWith({
-        model: 'text-embedding-3-large',
-        input: ['first', 'second'],
-        dimensions: 3072,
-      });
+      await expect(generateEmbeddingsBatch(['first', 'second'])).rejects.toThrow(
+        'Gemini batch embedding API error (500)'
+      );
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 });

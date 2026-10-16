@@ -304,12 +304,6 @@ export async function generateEmbedding(
 
         if (!res.ok) {
           const errorText = await res.text();
-          if (res.status === 402 || res.status === 401 || res.status === 403) {
-            geminiDisabled = true;
-            logger.warn(
-              `[${PipelineStep.Embed}] Gemini embedding returned ${res.status}. Disabling Gemini for this run and falling back to OpenAI.`
-            );
-          }
           throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
         }
 
@@ -322,27 +316,14 @@ export async function generateEmbedding(
 
       throw new Error(`Exhausted ${maxRetries} retries for Gemini embedding`);
     } catch (geminiError: any) {
-      if (openai) {
-        logger.warn(
-          `[${PipelineStep.Embed}] Gemini embedding failed (${geminiError.message || geminiError}), falling back to OpenAI...`
-        );
-      } else {
-        throw geminiError;
-      }
+      logger.error(
+        `[${PipelineStep.Embed}] Gemini embedding failed: ${geminiError.message || geminiError}`
+      );
+      throw geminiError;
     }
   }
 
-  if (openai) {
-    const openaiModel = resolveEmbeddingModel('openai');
-    const response = await openai.embeddings.create({
-      model: openaiModel,
-      input: text,
-      ...(openaiModel === 'text-embedding-3-large' ? { dimensions: 3072 } : {}),
-    });
-    return response.data[0].embedding as number[];
-  }
-
-  throw new Error('No Gemini or OpenAI API key configured for embedding');
+  throw new Error('GEMINI_API_KEY is required for embedding generation (fallback disabled)');
 }
 
 /**
@@ -398,12 +379,6 @@ export async function generateEmbeddingsBatch(
 
           if (!res.ok) {
             const errorText = await res.text();
-            if (res.status === 402 || res.status === 401 || res.status === 403) {
-              geminiDisabled = true;
-              logger.warn(
-                `[${PipelineStep.Embed}] Gemini batch embedding returned ${res.status}. Disabling Gemini for this run and falling back to OpenAI.`
-              );
-            }
             throw new Error(`Gemini batch embedding API error (${res.status}): ${errorText}`);
           }
 
@@ -439,46 +414,22 @@ export async function generateEmbeddingsBatch(
           succeeded = true;
           break;
         } catch (err: any) {
-          if (attempt === maxRetries || geminiDisabled) {
-            if (openai) {
-              logger.warn(
-                `[${PipelineStep.Embed}] Gemini batch embedding failed (${err.message || err}), falling back to OpenAI...`
-              );
-              break;
-            } else {
-              throw err;
-            }
+          if (attempt === maxRetries) {
+            logger.error(
+              `[${PipelineStep.Embed}] Gemini batch embedding failed: ${err.message || err}`
+            );
+            throw err;
           }
         }
       }
 
-      if (succeeded) continue;
-    }
-
-    if (openai) {
-      const openaiModel = resolveEmbeddingModel('openai');
-      const openaiStartedAt = Date.now();
-      const response = await openai.embeddings.create({
-        model: openaiModel,
-        input: chunk,
-        ...(openaiModel === 'text-embedding-3-large' ? { dimensions: 3072 } : {}),
-      });
-      recordAiUsage({
-        step: PipelineStep.Embed,
-        provider: 'openai',
-        model: openaiModel,
-        operation: 'embed',
-        durationMs: Date.now() - openaiStartedAt,
-        promptTokens: response.usage?.prompt_tokens,
-        items: chunk.length,
-      });
-      for (const item of response.data) {
-        allEmbeddings.push(item.embedding as number[]);
+      if (!succeeded) {
+        throw new Error(`Failed to generate batch embeddings after ${maxRetries} attempts`);
       }
       continue;
     }
 
-    throw new Error('No Gemini or OpenAI API key configured for embedding');
+    throw new Error('GEMINI_API_KEY is required for batch embedding generation (fallback disabled)');
   }
 
   return allEmbeddings;
