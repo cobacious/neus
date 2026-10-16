@@ -414,7 +414,11 @@ export default function ClusterDetailPage() {
                 hasMoreArticles && !isExpanded ? angleArticles.slice(0, 10) : angleArticles;
 
               return (
-                <div key={c.id} className="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
+                <div
+                  key={c.id}
+                  className="border border-gray-200 border-l-4 rounded-r-lg rounded-l-xs p-5 bg-gray-50/50"
+                  style={{ borderLeftColor: angleStyle.border }}
+                >
                   {/* Angle Header */}
                   <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                     <div className="flex items-center gap-2">
@@ -446,8 +450,7 @@ export default function ClusterDetailPage() {
                       <li key={article.id}>
                         <a
                           href={article.url}
-                          className="flex items-start gap-3 p-3 rounded-r-lg rounded-l-xs border border-gray-200 border-l-[3px] bg-white hover:border-gray-300 hover:bg-gray-50 transition-all group"
-                          style={{ borderLeftColor: angleStyle.border }}
+                          className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 transition-all group"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
