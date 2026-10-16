@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
 import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './components/StatusBadge';
 import StoryAnglePills, { AngleItem } from './components/StoryAnglePills';
+import StoryAngleFilterTabs, { resolveActiveAngleId } from './components/StoryAngleFilterTabs';
 import ArticleTimelineSparkline, { TimelineArticle } from './components/ArticleTimelineSparkline';
 import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHistogram';
 import { createAngleColorMap, DEFAULT_ANGLE_COLOR } from './utils/angleColors';
@@ -85,7 +86,14 @@ export default function ClusterDetailPage() {
   const summary = isMultiAngleStory && story?.overview ? story.overview : cluster?.summary;
 
   const [expandedAngleIds, setExpandedAngleIds] = useState<Set<string>>(new Set());
-  const [selectedAngleId, setSelectedAngleId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const angleParam = searchParams.get('angle');
+
+  const validClusterIds =
+    isMultiAngleStory && story?.clusters ? story.clusters.map((c: any) => c.id) : [];
+  const selectedAngleId = isMultiAngleStory
+    ? resolveActiveAngleId(validClusterIds, angleParam)
+    : null;
 
   const toggleAngleExpansion = (angleId: string) => {
     setExpandedAngleIds((prev) => {
@@ -99,11 +107,20 @@ export default function ClusterDetailPage() {
     });
   };
 
-  const handleSelectAngle = (angleId: string) => {
-    setSelectedAngleId((prev) => (prev === angleId ? null : angleId));
-    const el = document.getElementById('articles-coverage');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+  const handleSelectAngle = (angleId: string | null, shouldScroll = false) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (!angleId || angleId === selectedAngleId) {
+      nextParams.delete('angle');
+    } else {
+      nextParams.set('angle', angleId);
+    }
+    setSearchParams(nextParams, { replace: false });
+
+    if (shouldScroll) {
+      const el = document.getElementById('articles-coverage');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
@@ -342,7 +359,7 @@ export default function ClusterDetailPage() {
             colorMap={colorMap}
             size="md"
             activeAngleId={selectedAngleId}
-            onSelectAngle={handleSelectAngle}
+            onSelectAngle={(angleId) => handleSelectAngle(angleId, true)}
           />
         </div>
       )}
@@ -372,20 +389,30 @@ export default function ClusterDetailPage() {
 
       {/* Articles grouped by Angle (Feature 3) */}
       <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-6">
-        <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-lg font-bold text-gray-900">
             {isMultiAngleStory ? 'Articles by Angle' : 'Articles Coverage'}
           </h3>
           {selectedAngleId && (
             <button
               type="button"
-              onClick={() => setSelectedAngleId(null)}
+              onClick={() => handleSelectAngle(null, false)}
               className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
             >
               Show all angles ✕
             </button>
           )}
         </div>
+
+        {isMultiAngleStory && (
+          <StoryAngleFilterTabs
+            angles={angles}
+            colorMap={colorMap}
+            selectedAngleId={selectedAngleId}
+            totalArticlesCount={allArticles.length}
+            onSelectAngle={(angleId) => handleSelectAngle(angleId, false)}
+          />
+        )}
 
         {isMultiAngleStory && story?.clusters ? (
           <div className="space-y-8">
