@@ -5,11 +5,13 @@ const feeds = [
     name: 'BBC News',
     homepageUrl: 'https://www.bbc.co.uk/news',
     rssFeedUrl: 'http://feeds.bbci.co.uk/news/rss.xml',
+    trustScore: 0.95,
   },
   {
     name: 'The Guardian',
     homepageUrl: 'https://www.theguardian.com/uk',
     rssFeedUrl: 'https://www.theguardian.com/uk/rss',
+    trustScore: 0.90,
   },
   {
     name: 'The Times',
@@ -17,89 +19,106 @@ const feeds = [
     rssFeedUrl: 'https://news.google.com/rss/search?q=when:24h+site:thetimes.com&hl=en-GB&gl=GB&ceid=GB:en',
     active: true,
     paywalled: true,
+    trustScore: 0.90,
   },
   {
     name: 'The Independent UK',
     homepageUrl: 'https://www.independent.co.uk',
     rssFeedUrl: 'https://www.independent.co.uk/news/rss',
+    trustScore: 0.65,
   },
   {
     name: 'The i Paper',
     homepageUrl: 'https://inews.co.uk',
     rssFeedUrl: 'https://inews.co.uk/feed',
+    trustScore: 0.80,
   },
   {
     name: 'Metro UK',
     homepageUrl: 'https://metro.co.uk',
     rssFeedUrl: 'https://metro.co.uk/news/feed/',
+    trustScore: 0.55,
   },
   {
     name: 'Sky News',
     homepageUrl: 'https://news.sky.com',
     rssFeedUrl: 'https://feeds.skynews.com/feeds/rss/home.xml',
+    trustScore: 0.80,
   },
   {
     name: 'ITV News UK',
     homepageUrl: 'https://www.itv.com/news',
     rssFeedUrl: 'https://www.itv.com/news/feeds/rss/uk/',
     active: false,
+    trustScore: 0.75,
   },
   {
     name: 'Financial Times',
     homepageUrl: 'https://www.ft.com',
     rssFeedUrl: 'https://www.ft.com/?format=rss',
     paywalled: true,
+    trustScore: 0.95,
   },
   {
     name: 'Daily Mail',
     homepageUrl: 'https://www.dailymail.co.uk',
     rssFeedUrl: 'https://www.dailymail.co.uk/news/index.rss',
+    trustScore: 0.35,
   },
   {
     name: 'The Telegraph',
     homepageUrl: 'https://www.telegraph.co.uk',
     rssFeedUrl: 'https://www.telegraph.co.uk/rss.xml',
     paywalled: true,
+    trustScore: 0.85,
   },
   {
     name: 'Channel 4 News',
     homepageUrl: 'https://www.channel4.com/news',
     rssFeedUrl: 'https://www.channel4.com/news/feed',
+    trustScore: 0.85,
   },
   {
     name: 'Evening Standard',
     homepageUrl: 'https://www.standard.co.uk',
     rssFeedUrl: 'https://www.standard.co.uk/news/rss',
+    trustScore: 0.70,
   },
   {
     name: 'The Scotsman',
     homepageUrl: 'https://www.scotsman.com',
     rssFeedUrl: 'https://www.scotsman.com/news/rss',
+    trustScore: 0.75,
   },
   {
     name: 'Politico Europe',
     homepageUrl: 'https://www.politico.eu',
     rssFeedUrl: 'https://www.politico.eu/feed/',
+    trustScore: 0.80,
   },
   {
     name: 'UK Parliament',
     homepageUrl: 'https://www.parliament.uk',
     rssFeedUrl: 'https://www.parliament.uk/site-information/rss-feeds/',
+    trustScore: 0.95,
   },
   {
     name: 'Reuters',
     homepageUrl: 'https://www.reuters.com',
     rssFeedUrl: 'https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best',
+    trustScore: 1.0,
   },
   {
     name: 'AP News',
     homepageUrl: 'https://apnews.com',
     rssFeedUrl: 'https://apnews.com/rss',
+    trustScore: 1.0,
   },
   {
     name: 'Al Jazeera English',
     homepageUrl: 'https://www.aljazeera.com',
     rssFeedUrl: 'https://www.aljazeera.com/xml/rss/all.xml',
+    trustScore: 0.75,
   },
 ];
 
@@ -117,6 +136,7 @@ async function main() {
         faviconUrl,
         active: (feed as any).active ?? true,
         paywalled: (feed as any).paywalled ?? false,
+        trustScore: feed.trustScore ?? 0.5,
       },
       create: {
         name: feed.name,
@@ -126,6 +146,7 @@ async function main() {
         active: (feed as any).active ?? true,
         paywalled: (feed as any).paywalled ?? false,
         faviconUrl,
+        trustScore: feed.trustScore ?? 0.5,
       },
     });
   }

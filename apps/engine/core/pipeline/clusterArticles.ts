@@ -125,17 +125,32 @@ function groupArticles(remainingArticles: UnclusteredArticle[]): string[][] {
 
 function filterUniqueClusters(
   clusters: string[][],
-  remainingArticles: UnclusteredArticle[]
-): { filteredClusters: string[][]; skippedDuplicates: number; skippedEmpty: number } {
+  remainingArticles: UnclusteredArticle[],
+  articleMap?: Map<string, UnclusteredArticle>
+): {
+  filteredClusters: string[][];
+  skippedDuplicates: number;
+  skippedEmpty: number;
+  skippedSingleSource: number;
+} {
   const minClusterSize = ALLOW_SINGLE_ARTICLE_CLUSTERS ? 1 : 2;
   const assignedArticles = new Set<string>();
   const filteredClusters: string[][] = [];
   let skippedDuplicates = 0;
   let skippedEmpty = 0;
+  let skippedSingleSource = 0;
 
   for (const cluster of clusters) {
     const unique = cluster.filter((id) => !assignedArticles.has(id));
-    if (unique.length >= minClusterSize) {
+
+    // Multi-source gating: require at least 2 distinct sources to form a new cluster
+    const sourceIds = new Set(
+      unique.map((id) => articleMap?.get(id)?.sourceId).filter(Boolean)
+    );
+    const hasEnoughSources =
+      ALLOW_SINGLE_ARTICLE_CLUSTERS || (articleMap ? sourceIds.size >= 2 : true);
+
+    if (unique.length >= minClusterSize && hasEnoughSources) {
       const isDuplicate = filteredClusters.some((existing) => jaccard(existing, unique) > 0.8);
       if (!isDuplicate) {
         unique.forEach((id) => assignedArticles.add(id));
@@ -146,6 +161,11 @@ function filterUniqueClusters(
           `[${PipelineStep.Cluster}]: Skipping near-duplicate cluster with articles: [${unique.join(', ')}]`
         );
       }
+    } else if (unique.length >= minClusterSize && !hasEnoughSources) {
+      skippedSingleSource++;
+      logger.info(
+        `[${PipelineStep.Cluster}]: Skipping cluster with ${unique.length} articles but only 1 unique source: [${Array.from(sourceIds).join(', ')}]`
+      );
     } else {
       skippedEmpty++;
     }
@@ -160,7 +180,7 @@ function filterUniqueClusters(
     });
   }
 
-  return { filteredClusters, skippedDuplicates, skippedEmpty };
+  return { filteredClusters, skippedDuplicates, skippedEmpty, skippedSingleSource };
 }
 
 async function createNewClusters(
@@ -254,12 +274,13 @@ export async function clusterRecentArticles() {
 
   const clusters = groupArticles(remainingArticles);
 
-  const { filteredClusters, skippedDuplicates, skippedEmpty } = filterUniqueClusters(clusters, remainingArticles);
+  const { filteredClusters, skippedDuplicates, skippedEmpty, skippedSingleSource } =
+    filterUniqueClusters(clusters, remainingArticles, articleMap);
 
   const createdClusters = await createNewClusters(filteredClusters, articleMap);
 
   logPipelineSection(
     PipelineStep.Cluster,
-    `Clustering complete. ${createdClusters} clusters created. ${skippedDuplicates} duplicates skipped, ${skippedEmpty} empty filtered.`
+    `Clustering complete. ${createdClusters} clusters created. ${skippedDuplicates} duplicates skipped, ${skippedSingleSource} single-source skipped, ${skippedEmpty} empty filtered.`
   );
 }

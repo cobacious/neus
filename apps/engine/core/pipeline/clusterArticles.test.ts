@@ -24,8 +24,8 @@ describe('clusterRecentArticles', () => {
 
   it('creates clusters for similar articles', async () => {
     mockDb.getUnclusteredArticles.mockResolvedValue([
-      { id: 'a1', embedding: [1, 0] },
-      { id: 'a2', embedding: [1, 0] },
+      { id: 'a1', sourceId: 's1', embedding: [1, 0] },
+      { id: 'a2', sourceId: 's2', embedding: [1, 0] },
     ]);
     mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([]);
     mockDb.createCluster.mockResolvedValue({ id: 'c1' });
@@ -44,10 +44,10 @@ describe('clusterRecentArticles', () => {
     );
   });
 
-  it('clusters all articles returned by the DB helper', async () => {
+  it('clusters all articles returned by the DB helper when sources are distinct', async () => {
     mockDb.getUnclusteredArticles.mockResolvedValue([
-      { id: 'a1', embedding: [1, 0], clusterAssignments: [] },
-      { id: 'a2', embedding: [1, 0], clusterAssignments: [{ clusterId: 'old' }] },
+      { id: 'a1', sourceId: 's1', embedding: [1, 0], clusterAssignments: [] },
+      { id: 'a2', sourceId: 's2', embedding: [1, 0], clusterAssignments: [{ clusterId: 'old' }] },
     ]);
     mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([]);
     mockDb.createCluster.mockResolvedValue({ id: 'c1' });
@@ -63,11 +63,25 @@ describe('clusterRecentArticles', () => {
     );
   });
 
+  it('does not create clusters when multiple similar articles come from the same single source', async () => {
+    mockDb.getUnclusteredArticles.mockResolvedValue([
+      { id: 'a1', sourceId: 's1', embedding: [1, 0] },
+      { id: 'a2', sourceId: 's1', embedding: [1, 0] },
+    ]);
+    mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([]);
+
+    await clusterRecentArticles();
+
+    expect(mockDb.createCluster).not.toHaveBeenCalled();
+    expect(mockDb.createArticleAssignments).not.toHaveBeenCalled();
+    expect(mockDb.updateClusterEmbedding).not.toHaveBeenCalled();
+  });
+
   it('does not create clusters for isolated single articles when ALLOW_SINGLE_ARTICLE_CLUSTERS is false', async () => {
     // Two articles with orthogonal embeddings (similarity = 0)
     mockDb.getUnclusteredArticles.mockResolvedValue([
-      { id: 'a1', embedding: [1, 0, 0] },
-      { id: 'a2', embedding: [0, 1, 0] },
+      { id: 'a1', sourceId: 's1', embedding: [1, 0, 0] },
+      { id: 'a2', sourceId: 's2', embedding: [0, 1, 0] },
     ]);
     mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([]);
 
