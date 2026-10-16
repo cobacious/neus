@@ -1,14 +1,29 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import GitHubIcon from './components/GitHubIcon';
 
 export default function AboutPage() {
+  const location = useLocation();
+
   useEffect(() => {
     document.title = 'About - Neus';
     return () => {
       document.title = 'Neus - Neutral News';
     };
   }, []);
+
+  useEffect(() => {
+    if (location.hash) {
+      const targetId = location.hash.slice(1);
+      const timer = setTimeout(() => {
+        const element = document.getElementById(targetId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [location.hash]);
   return (
     <article className="space-y-8 pb-12">
       {/* Back button */}
@@ -250,77 +265,78 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Support & Feedback */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-xs flex flex-col justify-between space-y-4">
-          <div>
-            <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
-              <svg className="h-5 w-5 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-.781-1.638-.394-.475-.898-.847-1.465-1.082C17.27 2.793 16.643 2.667 16 2.667H4c-.796 0-1.559.316-2.121.879C1.316 4.108 1 4.871 1 5.667v10.666c0 .796.316 1.559.879 2.122.562.562 1.325.878 2.121.878h10c.796 0 1.559-.316 2.121-.878.563-.563.879-1.326.879-2.122v-1.334h3.2c.742 0 1.454-.295 1.979-.82.525-.526.82-1.237.82-1.979V8.415a4.01 4.01 0 00-.783-2zm-3.216 6.252v-6.66h1c.477 0 .935.19 1.273.527.337.338.527.796.527 1.273v2.86c0 .478-.19.936-.527 1.273a1.799 1.799 0 01-1.273.527h-1z" />
-              </svg>
-              Support Neus
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-600 mt-2 leading-normal">
-              Neus is an independent, non-commercial prototype. If you find this project valuable
-              and would like to help offset hosting and LLM API costs, you can support development
-              on Ko-fi.
-            </p>
-          </div>
-          <div>
+      {/* Support Neus */}
+      <section className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-xs space-y-4">
+        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <svg className="h-5 w-5 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-.781-1.638-.394-.475-.898-.847-1.465-1.082C17.27 2.793 16.643 2.667 16 2.667H4c-.796 0-1.559.316-2.121.879C1.316 4.108 1 4.871 1 5.667v10.666c0 .796.316 1.559.879 2.122.562.562 1.325.878 2.121.878h10c.796 0 1.559-.316 2.121-.878.563-.563.879-1.326.879-2.122v-1.334h3.2c.742 0 1.454-.295 1.979-.82.525-.526.82-1.237.82-1.979V8.415a4.01 4.01 0 00-.783-2zm-3.216 6.252v-6.66h1c.477 0 .935.19 1.273.527.337.338.527.796.527 1.273v2.86c0 .478-.19.936-.527 1.273a1.799 1.799 0 01-1.273.527h-1z" />
+          </svg>
+          Support Neus
+        </h2>
+        <div className="space-y-4 text-gray-700 leading-relaxed text-sm sm:text-base">
+          <p>
+            Neus is an independent, non-commercial prototype. If you find this project valuable
+            and would like to help offset hosting and LLM API costs, you can support development
+            on Ko-fi.
+          </p>
+          <div className="pt-1">
             <a
               href="https://ko-fi.com/cobacious"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center w-full px-4 py-2 border border-orange-300 bg-orange-50 text-orange-800 font-medium rounded-lg text-sm hover:bg-orange-100 transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2 border border-orange-300 bg-orange-50 text-orange-800 font-medium rounded-lg text-sm hover:bg-orange-100 transition-colors"
             >
               Support on Ko-fi
             </a>
           </div>
         </div>
+      </section>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-xs flex flex-col justify-between space-y-4">
-          <div>
-            <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
-              <svg
-                className="h-5 w-5 text-gray-700"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                />
-              </svg>
-              Share Feedback
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-600 mt-2 leading-normal">
-              Have thoughts on our neutral summarization, want to suggest new editorial sources or
-              spotted a clustering anomaly? Direct feedback is warmly welcomed via email.
-            </p>
-          </div>
-          <div className="space-y-2">
+      {/* Share Feedback */}
+      <section
+        id="feedback"
+        className="scroll-mt-20 bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-xs space-y-4"
+      >
+        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <svg
+            className="h-5 w-5 text-gray-700"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+            />
+          </svg>
+          Share Feedback
+        </h2>
+        <div className="space-y-3 text-gray-700 leading-relaxed text-sm sm:text-base">
+          <p>
+            Have thoughts on our neutral summarization, want to suggest new editorial sources or
+            spotted a clustering anomaly? Direct feedback is warmly welcomed via email at{' '}
             <a
               href="mailto:feedback@neus.news?subject=Neus%20Feedback"
-              className="inline-flex items-center justify-center w-full px-4 py-2 border border-gray-300 bg-gray-50 text-gray-800 font-medium rounded-lg text-sm hover:bg-gray-100 transition-colors"
+              className="text-blue-600 hover:text-blue-800 underline font-medium"
             >
-              Email feedback@neus.news
+              feedback@neus.news
             </a>
-            <p className="text-[11px] text-gray-400 text-center">
-              For technical bugs and code contributions, you can also{' '}
-              <a
-                href="https://github.com/cobacious/neus/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-gray-600"
-              >
-                open a GitHub issue
-              </a>
-              .
-            </p>
-          </div>
+            .
+          </p>
+          <p className="text-xs sm:text-sm text-gray-500">
+            For technical bugs and code contributions, you can also{' '}
+            <a
+              href="https://github.com/cobacious/neus/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gray-700"
+            >
+              open a GitHub issue
+            </a>
+            .
+          </p>
         </div>
       </section>
     </article>

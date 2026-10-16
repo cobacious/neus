@@ -48,12 +48,12 @@ export default function Footer() {
             >
               <span>Ko-fi</span>
             </a>
-            <a
-              href="mailto:feedback@neus.news?subject=Neus%20Feedback"
+            <Link
+              to="/about#feedback"
               className="hover:text-gray-900 transition-colors"
             >
               Feedback
-            </a>
+            </Link>
           </nav>
         </div>
 
