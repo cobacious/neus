@@ -85,6 +85,7 @@ export default function ClusterDetailPage() {
   const summary = isMultiAngleStory && story?.overview ? story.overview : cluster?.summary;
 
   const [expandedAngleIds, setExpandedAngleIds] = useState<Set<string>>(new Set());
+  const [selectedAngleId, setSelectedAngleId] = useState<string | null>(null);
 
   const toggleAngleExpansion = (angleId: string) => {
     setExpandedAngleIds((prev) => {
@@ -96,6 +97,14 @@ export default function ClusterDetailPage() {
       }
       return next;
     });
+  };
+
+  const handleSelectAngle = (angleId: string) => {
+    setSelectedAngleId((prev) => (prev === angleId ? null : angleId));
+    const el = document.getElementById('articles-coverage');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
@@ -328,7 +337,13 @@ export default function ClusterDetailPage() {
           <div className="text-xs text-gray-500 font-medium mb-1.5 uppercase tracking-wider">
             Story Angles:
           </div>
-          <StoryAnglePills angles={angles} colorMap={colorMap} size="md" />
+          <StoryAnglePills
+            angles={angles}
+            colorMap={colorMap}
+            size="md"
+            activeAngleId={selectedAngleId}
+            onSelectAngle={handleSelectAngle}
+          />
         </div>
       )}
 
@@ -356,14 +371,28 @@ export default function ClusterDetailPage() {
       </div>
 
       {/* Articles grouped by Angle (Feature 3) */}
-      <div className="mt-8 pt-4 border-t border-gray-200">
-        <h3 className="text-lg font-bold text-gray-900 mb-5">
-          {isMultiAngleStory ? 'Articles by Angle' : 'Articles Coverage'}
-        </h3>
+      <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-6">
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+          <h3 className="text-lg font-bold text-gray-900">
+            {isMultiAngleStory ? 'Articles by Angle' : 'Articles Coverage'}
+          </h3>
+          {selectedAngleId && (
+            <button
+              type="button"
+              onClick={() => setSelectedAngleId(null)}
+              className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              Show all angles ✕
+            </button>
+          )}
+        </div>
 
         {isMultiAngleStory && story?.clusters ? (
           <div className="space-y-8">
-            {story.clusters.map((c: any) => {
+            {(selectedAngleId
+              ? story.clusters.filter((c: any) => c.id === selectedAngleId)
+              : story.clusters
+            ).map((c: any) => {
               const angleName = c.storyAngle || c.headline || 'Angle';
               const angleStyle =
                 colorMap.get(c.id) || colorMap.get(angleName) || DEFAULT_ANGLE_COLOR;

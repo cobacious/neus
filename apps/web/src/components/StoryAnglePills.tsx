@@ -7,11 +7,13 @@ export interface AngleItem {
   articleCount?: number;
 }
 
-interface StoryAnglePillsProps {
+export interface StoryAnglePillsProps {
   angles: AngleItem[];
   colorMap?: Map<string, AngleColorStyle>;
   size?: 'sm' | 'md';
   className?: string;
+  activeAngleId?: string | null;
+  onSelectAngle?: (angleId: string) => void;
 }
 
 export default function StoryAnglePills({
@@ -19,6 +21,8 @@ export default function StoryAnglePills({
   colorMap,
   size = 'sm',
   className = '',
+  activeAngleId,
+  onSelectAngle,
 }: StoryAnglePillsProps) {
   if (!angles || angles.length === 0) return null;
 
@@ -34,6 +38,8 @@ export default function StoryAnglePills({
       ? 'px-3 py-1 text-xs'
       : 'px-2.5 py-0.5 text-[11px]';
 
+  const isInteractive = typeof onSelectAngle === 'function';
+
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
       {angles.map((angle) => {
@@ -43,11 +49,28 @@ export default function StoryAnglePills({
           text: '#223842',
         };
         const label = angle.name || 'Angle';
+        const isActive = isInteractive && activeAngleId === angle.id;
+
+        const Component = isInteractive ? 'button' : 'span';
+        const interactiveProps = isInteractive
+          ? {
+              type: 'button' as const,
+              onClick: () => onSelectAngle(angle.id),
+              'aria-pressed': isActive,
+            }
+          : {};
 
         return (
-          <span
+          <Component
             key={angle.id}
-            className={`inline-flex items-center font-medium rounded-full border transition-colors select-none ${sizeClasses}`}
+            {...interactiveProps}
+            className={`inline-flex items-center font-medium rounded-full border transition-all select-none ${sizeClasses} ${
+              isInteractive
+                ? isActive
+                  ? 'ring-2 ring-gray-700 ring-offset-1 font-semibold cursor-pointer shadow-xs'
+                  : 'hover:opacity-80 cursor-pointer'
+                : ''
+            }`}
             style={{
               backgroundColor: style.bg,
               borderColor: style.border,
@@ -61,7 +84,7 @@ export default function StoryAnglePills({
                 ({angle.articleCount})
               </span>
             )}
-          </span>
+          </Component>
         );
       })}
     </div>
