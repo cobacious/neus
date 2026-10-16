@@ -24,11 +24,6 @@ const feeds = [
     rssFeedUrl: 'https://www.independent.co.uk/news/rss',
   },
   {
-    name: 'Daily Express',
-    homepageUrl: 'https://www.express.co.uk',
-    rssFeedUrl: 'https://news.google.com/rss/search?q=when:24h+site:express.co.uk&hl=en-GB&gl=GB&ceid=GB:en',
-  },
-  {
     name: 'The i Paper',
     homepageUrl: 'https://inews.co.uk',
     rssFeedUrl: 'https://inews.co.uk/feed',

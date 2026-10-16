@@ -92,6 +92,7 @@ When starting a session or subagent, select from these decoupled tracks:
 
 ### Track 2: Editorial Source Quality (`packages/db`)
 - [x] **Drop The Sun**: Deactivated in both local dev and production database sources and removed from active seed list.
+- [x] **Drop Daily Express**: Deactivated due to low editorial quality and high-frequency clickbait headline spam; removed from active seed list.
 - [x] **Google Favicon CDN migration**: Migrated `Source.faviconUrl` from `icon.horse` to Google's public Favicon CDN with defensive `<SourceFavicon>` fallback.
 
 ### Track 3: Ranking & Taxonomy Analysis (`apps/engine`, `packages/db`)
