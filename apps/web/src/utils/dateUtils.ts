@@ -1,7 +1,7 @@
 /**
  * Robust date utilities for parsing and formatting dates across Neus web.
  * Prevents "Invalid Date" bugs by handling ISO strings, numeric timestamps (ms and s),
- * Date objects, and nullish inputs safely.
+ * Date objects and nullish inputs safely.
  */
 
 export function parseDate(value: number | string | Date | null | undefined): Date | null {
@@ -72,5 +72,22 @@ export function formatDateHeader(value: number | string | Date | null | undefine
     weekday: 'short',
     month: 'short',
     day: 'numeric',
+  });
+}
+
+/**
+ * Sorts an array of articles in reverse chronological order (newest first).
+ * Defensively handles null, undefined or unparseable timestamps.
+ */
+export function sortArticlesNewestFirst<
+  T extends { publishedAt?: number | string | Date | null | undefined }
+>(articles: T[]): T[] {
+  return [...articles].sort((a, b) => {
+    const dateA = parseDate(a.publishedAt)?.getTime() ?? NaN;
+    const dateB = parseDate(b.publishedAt)?.getTime() ?? NaN;
+    if (isNaN(dateA) && isNaN(dateB)) return 0;
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+    return dateB - dateA;
   });
 }

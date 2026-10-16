@@ -1,8 +1,13 @@
-import { parseDate, formatRelativeTime, formatDateHeader } from './dateUtils';
+import {
+  parseDate,
+  formatRelativeTime,
+  formatDateHeader,
+  sortArticlesNewestFirst,
+} from './dateUtils';
 
 describe('dateUtils', () => {
   describe('parseDate', () => {
-    it('handles null, undefined, empty string, and invalid inputs safely', () => {
+    it('handles null, undefined, empty string and invalid inputs safely', () => {
       expect(parseDate(null)).toBeNull();
       expect(parseDate(undefined)).toBeNull();
       expect(parseDate('')).toBeNull();
@@ -99,6 +104,42 @@ describe('dateUtils', () => {
       const formatted = formatDateHeader(d);
       expect(formatted).toMatch(/Oct/);
       expect(formatted).not.toContain('Invalid');
+    });
+  });
+
+  describe('sortArticlesNewestFirst', () => {
+    it('sorts articles in descending order of publishedAt', () => {
+      const articles = [
+        { id: '1', title: 'Older', publishedAt: '2026-10-15T10:00:00.000Z' },
+        { id: '2', title: 'Newest', publishedAt: '2026-10-16T12:00:00.000Z' },
+        { id: '3', title: 'Middle', publishedAt: '2026-10-16T08:00:00.000Z' },
+      ];
+
+      const sorted = sortArticlesNewestFirst(articles);
+      expect(sorted.map((a) => a.id)).toEqual(['2', '3', '1']);
+    });
+
+    it('places articles with missing or invalid dates at the end', () => {
+      const articles = [
+        { id: '1', title: 'No Date', publishedAt: null },
+        { id: '2', title: 'Valid Date', publishedAt: '2026-10-16T12:00:00.000Z' },
+        { id: '3', title: 'Invalid Date', publishedAt: 'corrupted' },
+      ];
+
+      const sorted = sortArticlesNewestFirst(articles);
+      expect(sorted[0].id).toBe('2');
+      expect(['1', '3']).toContain(sorted[1].id);
+      expect(['1', '3']).toContain(sorted[2].id);
+    });
+
+    it('returns a new array without mutating the input', () => {
+      const articles = [
+        { id: '1', publishedAt: '2026-10-15T10:00:00.000Z' },
+        { id: '2', publishedAt: '2026-10-16T12:00:00.000Z' },
+      ];
+      const sorted = sortArticlesNewestFirst(articles);
+      expect(sorted).not.toBe(articles);
+      expect(articles[0].id).toBe('1');
     });
   });
 });

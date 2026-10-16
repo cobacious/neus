@@ -7,7 +7,12 @@ import StoryAnglePills, { AngleItem } from './components/StoryAnglePills';
 import ArticleTimelineSparkline, { TimelineArticle } from './components/ArticleTimelineSparkline';
 import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHistogram';
 import { createAngleColorMap, DEFAULT_ANGLE_COLOR } from './utils/angleColors';
-import { parseDate, formatRelativeTime, formatDateHeader } from './utils/dateUtils';
+import {
+  parseDate,
+  formatRelativeTime,
+  formatDateHeader,
+  sortArticlesNewestFirst,
+} from './utils/dateUtils';
 import { isPaywalled } from './utils/paywallUtils';
 import SourceFavicon from './components/SourceFavicon';
 
@@ -220,15 +225,8 @@ export default function ClusterDetailPage() {
     });
   }
 
-  // Fallback for standalone: group articles by publication date
-  const sortedStandaloneArticles = [...cluster.articles].sort((a: any, b: any) => {
-    const dateA = parseDate(a.publishedAt)?.getTime() ?? NaN;
-    const dateB = parseDate(b.publishedAt)?.getTime() ?? NaN;
-    if (isNaN(dateA) && isNaN(dateB)) return 0;
-    if (isNaN(dateA)) return 1;
-    if (isNaN(dateB)) return -1;
-    return dateB - dateA;
-  });
+  // Fallback for standalone: group articles by publication date (newest first)
+  const sortedStandaloneArticles = sortArticlesNewestFirst(cluster.articles || []);
 
   const standaloneArticlesByDate: { [date: string]: any[] } = {};
   sortedStandaloneArticles.forEach((article: any) => {
@@ -355,7 +353,7 @@ export default function ClusterDetailPage() {
               const angleName = c.storyAngle || c.headline || 'Angle';
               const angleStyle =
                 colorMap.get(c.id) || colorMap.get(angleName) || DEFAULT_ANGLE_COLOR;
-              const angleArticles = c.articles || [];
+              const angleArticles = sortArticlesNewestFirst(c.articles || []);
 
               return (
                 <div key={c.id} className="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
