@@ -5,7 +5,19 @@
       "destination": "/index.html"
     },
     {
-      "source": "/:slug((?!api/|assets/|favicon\\.svg|og-image\\.png|apple-touch-icon\\.png|robots\\.txt).*)",
+      "source": "/feed.xml",
+      "destination": "/api/feed"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "/api/feed"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/:slug((?!api/|assets/|favicon\\.svg|og-image\\.png|apple-touch-icon\\.png|robots\\.txt|feed\\.xml|rss\\.xml|sitemap\\.xml).*)",
       "destination": "/api/og-preview?slug=:slug"
     },
     {
