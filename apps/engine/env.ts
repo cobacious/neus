@@ -5,9 +5,11 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+
 import { logger } from './lib/pipelineLogger';
 
-logger.info('Node env', process.env.NODE_ENV);
+logger.info(`Node env: ${process.env.NODE_ENV}`);
 logger.info('GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? 'set' : 'unset');
 logger.info('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'set' : 'unset');
 if (process.env.TOKEN_LIMIT) {

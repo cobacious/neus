@@ -57,9 +57,17 @@ export async function runPipeline() {
         logger.info(
           `[${PipelineStep.Summary}] Published new #1 top story to Bluesky: "${syndication.title}" (${syndication.uri})`
         );
+      } else if (syndication.dryRun) {
+        logger.info(
+          `[${PipelineStep.Summary}] Bluesky syndication dry-run: "${syndication.title}" (NODE_ENV=${process.env.NODE_ENV}; no post published)`
+        );
       } else if (syndication.skipped) {
         logger.info(
           `[${PipelineStep.Summary}] Bluesky syndication skipped (${syndication.reason}): "${syndication.title || 'N/A'}"`
+        );
+      } else {
+        logger.warn(
+          `[${PipelineStep.Summary}] Bluesky syndication not published (${syndication.reason || 'unknown'}): "${syndication.title || 'N/A'}"`
         );
       }
     } catch (err: any) {

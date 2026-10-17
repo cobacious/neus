@@ -15,10 +15,10 @@
     "sqlite3": "^5.1.7"
   },
   "scripts": {
-    "pipeline": "NODE_ENV=development tsx index.ts",
-    "print": "NODE_ENV=development tsx lib/printClusters.ts",
-    "substack:draft": "NODE_ENV=development tsx lib/generateWeeklyDigest.ts",
-    "bluesky:post": "NODE_ENV=development tsx lib/bluesky.ts",
+    "pipeline": "tsx index.ts",
+    "print": "tsx lib/printClusters.ts",
+    "substack:draft": "tsx lib/generateWeeklyDigest.ts",
+    "bluesky:post": "tsx lib/bluesky.ts",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --config ../../jest.config.ts"
   }
 }
