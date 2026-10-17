@@ -1,4 +1,4 @@
-import { getRankedClusters } from '@neus/db';
+import { getRankedClusters, markStorySyndicated } from '@neus/db';
 
 export interface BlueskyAngle {
   headline?: string | null;
@@ -15,6 +15,11 @@ export interface BlueskyStoryData {
   angles: BlueskyAngle[];
 }
 
+export interface BlueskyFacet {
+  index: { byteStart: number; byteEnd: number };
+  features: Array<{ $type: 'app.bsky.richtext.facet#link'; uri: string }>;
+}
+
 export interface BlueskyPostResult {
   success: boolean;
   uri?: string;
@@ -26,6 +31,8 @@ export interface BlueskyPostResult {
 }
 
 const SITE_URL = 'https://neus.news';
+const DEFAULT_OG_IMAGE = 'https://neus.news/og-image.png';
+export const LINK_ANCHOR_TEXT = 'Read on neus.news ↗';
 const MAX_GRAPHEMES = 300;
 
 export function getGraphemeLength(text: string): number {
@@ -36,16 +43,32 @@ export function getGraphemeLength(text: string): number {
   return Array.from(text).length;
 }
 
-export function getUrlFacets(text: string): Array<{
-  index: { byteStart: number; byteEnd: number };
-  features: Array<{ $type: 'app.bsky.richtext.facet#link'; uri: string }>;
-}> {
+export function createLinkFacet(
+  fullText: string,
+  anchorText: string,
+  targetUrl: string
+): BlueskyFacet | null {
+  const encoder = new TextEncoder();
+  const charIndex = fullText.indexOf(anchorText);
+  if (charIndex === -1) return null;
+
+  const prefix = fullText.slice(0, charIndex);
+  const byteStart = encoder.encode(prefix).byteLength;
+  const byteEnd = byteStart + encoder.encode(anchorText).byteLength;
+
+  return {
+    index: { byteStart, byteEnd },
+    features: [{ $type: 'app.bsky.richtext.facet#link', uri: targetUrl }],
+  };
+}
+
+export function getUrlFacets(
+  text: string,
+  baseFacets?: BlueskyFacet[]
+): BlueskyFacet[] {
   const encoder = new TextEncoder();
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const facets: Array<{
-    index: { byteStart: number; byteEnd: number };
-    features: Array<{ $type: 'app.bsky.richtext.facet#link'; uri: string }>;
-  }> = [];
+  const facets: BlueskyFacet[] = baseFacets ? [...baseFacets] : [];
 
   let match;
   while ((match = urlRegex.exec(text)) !== null) {
@@ -53,10 +76,19 @@ export function getUrlFacets(text: string): Array<{
     const prefix = text.slice(0, match.index);
     const byteStart = encoder.encode(prefix).byteLength;
     const byteEnd = byteStart + encoder.encode(url).byteLength;
-    facets.push({
-      index: { byteStart, byteEnd },
-      features: [{ $type: 'app.bsky.richtext.facet#link', uri: url }],
-    });
+
+    const overlap = facets.some(
+      (f) =>
+        (byteStart >= f.index.byteStart && byteStart < f.index.byteEnd) ||
+        (byteEnd > f.index.byteStart && byteEnd <= f.index.byteEnd)
+    );
+
+    if (!overlap) {
+      facets.push({
+        index: { byteStart, byteEnd },
+        features: [{ $type: 'app.bsky.richtext.facet#link', uri: url }],
+      });
+    }
   }
   return facets;
 }
@@ -66,18 +98,20 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
   url: string;
   title: string;
   description: string;
+  thumbUrl: string;
+  facets: BlueskyFacet[];
 } {
   const url = `${SITE_URL}/${story.slug}`;
   const totalArts = story.totalArticles;
   const numAngles = story.angles.length;
 
-  // Candidate title
+  // Reclaimed budget: title can safely be up to 85 characters
   let cleanTitle = story.title.trim();
-  if (cleanTitle.length > 70) {
-    cleanTitle = cleanTitle.slice(0, 67) + '...';
+  if (cleanTitle.length > 85) {
+    cleanTitle = cleanTitle.slice(0, 82) + '...';
   }
 
-  // Helper to build post text given a list of angle lines
+  // Helper to build post text with anchor text instead of naked URL
   const buildText = (titleStr: string, angleLines: string[]) => {
     const parts = [
       `📰 Top Story: ${titleStr}`,
@@ -85,25 +119,24 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
       `${totalArts} articles across ${numAngles} threads:`,
       ...angleLines,
       '',
-      `Balanced breakdown:`,
-      url,
+      LINK_ANCHOR_TEXT,
     ];
     return parts.join('\n');
   };
 
-  // Try with top 3 angles
+  // Up to 3 threads with generous 45-char names
   const candidateAngles = story.angles.slice(0, 3);
   let angleLines = candidateAngles.map((a) => {
     let name = (a.storyAngle || a.headline || 'Thread').trim();
-    if (name.length > 32) {
-      name = name.slice(0, 30) + '..';
+    if (name.length > 45) {
+      name = name.slice(0, 43) + '..';
     }
     return `• ${name} (${a.articleCount})`;
   });
 
   let postText = buildText(cleanTitle, angleLines);
 
-  // If over 300 graphemes, drop to top 2 angles
+  // If over 300 graphemes, drop to top 2 threads
   if (getGraphemeLength(postText) > MAX_GRAPHEMES && angleLines.length > 2) {
     angleLines = angleLines.slice(0, 2);
     postText = buildText(cleanTitle, angleLines);
@@ -111,11 +144,11 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
 
   // If still over 300 graphemes, tighten title
   if (getGraphemeLength(postText) > MAX_GRAPHEMES) {
-    cleanTitle = cleanTitle.slice(0, 45) + '...';
+    cleanTitle = cleanTitle.slice(0, 50) + '...';
     postText = buildText(cleanTitle, angleLines);
   }
 
-  // If still over (e.g. exceptionally long slug), drop to 1 angle
+  // If still over, drop to 1 thread
   if (getGraphemeLength(postText) > MAX_GRAPHEMES && angleLines.length > 1) {
     angleLines = angleLines.slice(0, 1);
     postText = buildText(cleanTitle, angleLines);
@@ -125,12 +158,60 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
     story.overview ||
     `Exploring ${totalArts} articles across ${numAngles} reporting threads on Neus.`;
 
+  const anchorFacet = createLinkFacet(postText, LINK_ANCHOR_TEXT, url);
+  const facets = anchorFacet ? [anchorFacet] : getUrlFacets(postText);
+
   return {
     text: postText,
     url,
     title: story.title,
     description,
+    thumbUrl: DEFAULT_OG_IMAGE,
+    facets,
   };
+}
+
+export async function uploadBlobToBluesky(
+  accessJwt: string,
+  imageUrl: string
+): Promise<any | null> {
+  try {
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) {
+      console.warn(`[BLUESKY] Failed to fetch thumbnail image (${imgRes.status}): ${imageUrl}`);
+      return null;
+    }
+    const contentType = imgRes.headers.get('content-type') || 'image/png';
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // 1MB limit for Bluesky thumbnail blobs
+    if (buffer.length > 1000000) {
+      console.warn(`[BLUESKY] Thumbnail image exceeds 1MB limit (${buffer.length} bytes)`);
+      return null;
+    }
+
+    const uploadRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.uploadBlob', {
+      method: 'POST',
+      headers: {
+        'Content-Type': contentType,
+        Authorization: `Bearer ${accessJwt}`,
+      },
+      body: buffer,
+    });
+
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      console.warn(`[BLUESKY] uploadBlob failed (${uploadRes.status}): ${errText}`);
+      return null;
+    }
+
+    const uploadData = (await uploadRes.json()) as any;
+    return uploadData?.blob || null;
+  } catch (err: any) {
+    console.warn(`[BLUESKY] Error uploading thumbnail blob: ${err?.message || err}`);
+    return null;
+  }
 }
 
 export async function postToBluesky(options: {
@@ -140,9 +221,11 @@ export async function postToBluesky(options: {
   url: string;
   title: string;
   description: string;
+  thumbUrl?: string;
+  facets?: BlueskyFacet[];
   dryRun?: boolean;
 }): Promise<BlueskyPostResult> {
-  const { handle, password, text, url, title, description, dryRun = false } = options;
+  const { handle, password, text, url, title, description, thumbUrl, facets, dryRun = false } = options;
   const charCount = getGraphemeLength(text);
 
   if (charCount > MAX_GRAPHEMES) {
@@ -192,26 +275,37 @@ export async function postToBluesky(options: {
     const accessJwt = sessionData.accessJwt;
     const did = sessionData.did;
 
-    // 2. Generate facets for clickable links
-    const facets = getUrlFacets(text);
+    // 2. Upload thumbnail blob if provided
+    let thumbBlob = null;
+    if (thumbUrl) {
+      thumbBlob = await uploadBlobToBluesky(accessJwt, thumbUrl);
+    }
 
-    // 3. Construct record with link card embed
+    // 3. Generate facets for clickable links
+    const postFacets = facets || getUrlFacets(text);
+
+    // 4. Construct record with rich external link card embed
+    const externalEmbed: any = {
+      uri: url,
+      title,
+      description,
+    };
+    if (thumbBlob) {
+      externalEmbed.thumb = thumbBlob;
+    }
+
     const record: any = {
       $type: 'app.bsky.feed.post',
       text,
       createdAt: new Date().toISOString(),
-      facets: facets.length > 0 ? facets : undefined,
+      facets: postFacets.length > 0 ? postFacets : undefined,
       embed: {
         $type: 'app.bsky.embed.external',
-        external: {
-          uri: url,
-          title,
-          description,
-        },
+        external: externalEmbed,
       },
     };
 
-    // 4. Create post record
+    // 5. Create post record
     const postRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
       method: 'POST',
       headers: {
@@ -306,14 +400,29 @@ export function isStoryAlreadyPosted(
   story: { slug: string; primaryClusterSlug?: string; id?: string },
   postedUrls: Set<string>
 ): boolean {
-  const slugsToCheck = [story.slug, story.primaryClusterSlug]
-    .filter(Boolean)
-    .map((s) => s!.toLowerCase().trim());
+  const targetSlugs = new Set(
+    [story.slug, story.primaryClusterSlug]
+      .filter((s): s is string => Boolean(s))
+      .map((s) => s.toLowerCase().trim())
+  );
 
-  for (const postedUrl of postedUrls) {
-    const lowerUrl = postedUrl.toLowerCase();
-    for (const slug of slugsToCheck) {
-      if (lowerUrl.includes(`/${slug}`) || lowerUrl.endsWith(slug) || lowerUrl === slug) {
+  for (const rawUrl of postedUrls) {
+    let pathname = rawUrl;
+    try {
+      const parsed = new URL(rawUrl, 'https://neus.news');
+      pathname = parsed.pathname;
+    } catch {
+      // Fallback if URL constructor fails
+    }
+
+    const segments = pathname
+      .toLowerCase()
+      .split('/')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    for (const segment of segments) {
+      if (targetSlugs.has(segment)) {
         return true;
       }
     }
@@ -382,24 +491,37 @@ export async function checkAndPublishTopStory(options?: {
     return { attempted: true, published: false, skipped: true, reason: 'missing_slug' };
   }
 
-  // 2. Check if already posted to Bluesky
-  const postedUrls = await getRecentBlueskyPostUrls(handle);
-  const alreadyPosted = isStoryAlreadyPosted(
-    { slug: story.slug, primaryClusterSlug: primarySlug, id: story.id },
-    postedUrls
-  );
-
-  if (alreadyPosted) {
+  // 2. Primary check: Database persistence
+  if (story.postedToBlueskyAt || (story as any).blueskyUri) {
     return {
       attempted: true,
       published: false,
       skipped: true,
-      reason: 'already_posted',
+      reason: 'already_posted_db',
       title: story.title,
     };
   }
 
-  // 3. Prepare story data
+  // 3. Secondary check: Live Bluesky feed (defense-in-depth)
+  const postedUrls = await getRecentBlueskyPostUrls(handle);
+  const alreadyPostedInFeed = isStoryAlreadyPosted(
+    { slug: story.slug, primaryClusterSlug: primarySlug, id: story.id },
+    postedUrls
+  );
+
+  if (alreadyPostedInFeed) {
+    // Backfill database so subsequent cron cycles skip immediately
+    await markStorySyndicated(story.id, 'at://existing').catch(() => {});
+    return {
+      attempted: true,
+      published: false,
+      skipped: true,
+      reason: 'already_posted_feed',
+      title: story.title,
+    };
+  }
+
+  // 4. Prepare story data
   const angles: BlueskyAngle[] = activeClusters
     .map((c) => ({
       headline: c.headline,
@@ -417,9 +539,9 @@ export async function checkAndPublishTopStory(options?: {
     angles,
   };
 
-  const { text, url, title, description } = formatBlueskyPost(storyData);
+  const { text, url, title, description, thumbUrl, facets } = formatBlueskyPost(storyData);
 
-  // 4. Post or Dry Run
+  // 5. Post or Dry Run
   const postResult = await postToBluesky({
     handle,
     password,
@@ -427,10 +549,19 @@ export async function checkAndPublishTopStory(options?: {
     url,
     title,
     description,
+    thumbUrl,
+    facets,
     dryRun: isDryRun,
   });
 
   if (postResult.success) {
+    // 6. Record successful syndication in database
+    if (!postResult.dryRun && postResult.uri) {
+      await markStorySyndicated(story.id, postResult.uri).catch((err) => {
+        console.warn(`[BLUESKY] Could not update story syndication state in db: ${err?.message || err}`);
+      });
+    }
+
     return {
       attempted: true,
       published: !postResult.dryRun,

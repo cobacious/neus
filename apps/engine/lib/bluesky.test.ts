@@ -1,9 +1,11 @@
+import { jest } from '@jest/globals';
 import {
   getGraphemeLength,
   getUrlFacets,
   formatBlueskyPost,
   postToBluesky,
   isStoryAlreadyPosted,
+  uploadBlobToBluesky,
   BlueskyStoryData,
 } from './bluesky';
 
@@ -39,14 +41,17 @@ describe('Bluesky Publisher', () => {
       ],
     };
 
-    const { text, url, title } = formatBlueskyPost(story);
+    const { text, url, title, facets } = formatBlueskyPost(story);
 
     const len = getGraphemeLength(text);
     expect(len).toBeLessThanOrEqual(300);
     expect(text).toContain('📰 Top Story:');
     expect(text).toContain('127 articles across 4 threads:');
     expect(text).toContain('• Initial Attack Incident (39)');
-    expect(text).toContain(url);
+    expect(text).toContain('Read on neus.news ↗');
+    expect(text).not.toContain(url);
+    expect(facets).toHaveLength(1);
+    expect(facets[0].features[0].uri).toBe(url);
     expect(title).toBe(story.title);
   });
 
@@ -69,6 +74,37 @@ describe('Bluesky Publisher', () => {
         postedUrls
       )
     ).toBe(false);
+  });
+
+  it('correctly matches exact path segments and rejects false-positive substrings', () => {
+    const postedUrls = new Set([
+      'https://neus.news/us-interest-rates-cut',
+      'https://neus.news/s/bank-of-england-decision',
+    ]);
+
+    // Substring matching would falsely match 'us-interest-rates' inside 'us-interest-rates-cut'
+    expect(
+      isStoryAlreadyPosted(
+        { slug: 'us-interest-rates' },
+        postedUrls
+      )
+    ).toBe(false);
+
+    // Exact match on full slug
+    expect(
+      isStoryAlreadyPosted(
+        { slug: 'us-interest-rates-cut' },
+        postedUrls
+      )
+    ).toBe(true);
+
+    // Exact match in shortlink path (/s/...)
+    expect(
+      isStoryAlreadyPosted(
+        { slug: 'bank-of-england-decision' },
+        postedUrls
+      )
+    ).toBe(true);
   });
 
   it('supports dry-run mode without sending HTTP requests', async () => {
@@ -97,5 +133,54 @@ describe('Bluesky Publisher', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('exceeds Bluesky limit');
+  });
+
+  describe('uploadBlobToBluesky', () => {
+    const originalFetch = global.fetch;
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('uploads image buffer and returns blob descriptor on success', async () => {
+      const mockBlob = {
+        $type: 'blob',
+        ref: { $link: 'bafkreib...' },
+        mimeType: 'image/png',
+        size: 1024,
+      };
+
+      global.fetch = jest.fn().mockImplementation((url: string) => {
+        if (url === 'https://neus.news/og-image.png') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Map([['content-type', 'image/png']]),
+            arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
+          });
+        }
+        if (url === 'https://bsky.social/xrpc/com.atproto.repo.uploadBlob') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ blob: mockBlob }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL: ' + url));
+      }) as any;
+
+      const blob = await uploadBlobToBluesky('jwt-token-123', 'https://neus.news/og-image.png');
+      expect(blob).toEqual(mockBlob);
+    });
+
+    it('gracefully returns null if fetching thumbnail image fails', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      }) as any;
+
+      const blob = await uploadBlobToBluesky('jwt-token-123', 'https://neus.news/not-found.png');
+      expect(blob).toBeNull();
+    });
   });
 });

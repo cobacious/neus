@@ -43,6 +43,7 @@ export * from './stories/getStoriesForMatching';
 export * from './stories/realignStoryArticles';
 export * from './stories/dissociateClusters';
 export * from './stories/disbandUnderpopulatedStories';
+export * from './stories/markStorySyndicated';
 export * from './maintenance/vacuumDatabase';
 export * from './maintenance/reembedMigration';
 export * from './maintenance/cleanSpamClusters';

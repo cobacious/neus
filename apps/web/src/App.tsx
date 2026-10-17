@@ -16,6 +16,7 @@ export default function App() {
             <Route path="/" element={<ClusterList />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/clusters/:id" element={<ClusterRedirect />} />
+            <Route path="/s/:slug" element={<ClusterDetailPage />} />
             <Route path="/:slug" element={<ClusterDetailPage />} />
           </Routes>
         </main>
