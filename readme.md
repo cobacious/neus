@@ -172,7 +172,10 @@ neus/
 ![Neus Desktop Interface](./screenshots/neus-desktop.png)
 
 ### Mobile View
-![Neus Mobile Interface](./screenshots/neus-mobile.png)
+
+<p align="center">
+  <img src="./screenshots/neus-mobile.png" alt="Neus Mobile Interface" width="340" />
+</p>
 
 ---
 
