@@ -87,6 +87,8 @@ jobs:
           MAX_CONTENT_EXTRACTION: 0
           TOKEN_LIMIT: 0
           NODE_ENV: production
+          BLUESKY_HANDLE: ${{ vars.BLUESKY_HANDLE || secrets.BLUESKY_HANDLE || 'neus.news' }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
 
       # Report pipeline completion & send webhook alert if configured
       - name: Pipeline Summary & Alert

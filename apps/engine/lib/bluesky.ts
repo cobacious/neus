@@ -80,9 +80,9 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
   // Helper to build post text given a list of angle lines
   const buildText = (titleStr: string, angleLines: string[]) => {
     const parts = [
-      `📰 Media Framing: ${titleStr}`,
+      `📰 Top Story: ${titleStr}`,
       '',
-      `${totalArts} articles across ${numAngles} perspectives:`,
+      `${totalArts} articles across ${numAngles} threads:`,
       ...angleLines,
       '',
       `Balanced breakdown:`,
@@ -94,11 +94,11 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
   // Try with top 3 angles
   const candidateAngles = story.angles.slice(0, 3);
   let angleLines = candidateAngles.map((a) => {
-    let name = (a.storyAngle || a.headline || 'Perspective').trim();
+    let name = (a.storyAngle || a.headline || 'Thread').trim();
     if (name.length > 32) {
       name = name.slice(0, 30) + '..';
     }
-    return `• ${name} (${a.articleCount} arts)`;
+    return `• ${name} (${a.articleCount})`;
   });
 
   let postText = buildText(cleanTitle, angleLines);
@@ -123,7 +123,7 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
 
   const description =
     story.overview ||
-    `Exploring ${totalArts} articles across ${numAngles} reporting perspectives on Neus.`;
+    `Exploring ${totalArts} articles across ${numAngles} reporting threads on Neus.`;
 
   return {
     text: postText,
@@ -248,64 +248,224 @@ export async function postToBluesky(options: {
   }
 }
 
-export async function draftOrPublishTopStory(options?: {
-  dryRun?: boolean;
-}): Promise<BlueskyPostResult | null> {
-  const isDryRun = options?.dryRun ?? true;
-  const clusters = await getRankedClusters(25);
+export async function getRecentBlueskyPostUrls(handle: string): Promise<Set<string>> {
+  const postedUrls = new Set<string>();
+  try {
+    const actor = handle.replace(/^@/, '');
+    const res = await fetch(
+      `https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(actor)}&limit=50`,
+      {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Neus-Engine/1.0',
+        },
+      }
+    );
+    if (!res.ok) {
+      console.warn(`[BLUESKY] Could not fetch author feed (${res.status}): ${await res.text()}`);
+      return postedUrls;
+    }
+    const data = (await res.json()) as any;
+    const feed = data?.feed || [];
+    for (const item of feed) {
+      const record = item?.post?.record;
+      // 1. External link card embed URI
+      const embedUri = record?.embed?.external?.uri || item?.post?.embed?.external?.uri;
+      if (embedUri && typeof embedUri === 'string') {
+        postedUrls.add(embedUri.toLowerCase().trim());
+      }
+      // 2. Clickable link facets
+      if (Array.isArray(record?.facets)) {
+        for (const facet of record.facets) {
+          if (Array.isArray(facet.features)) {
+            for (const feature of facet.features) {
+              if (feature?.$type === 'app.bsky.richtext.facet#link' && feature.uri) {
+                postedUrls.add(feature.uri.toLowerCase().trim());
+              }
+            }
+          }
+        }
+      }
+      // 3. Fallback regex in post text
+      if (record?.text && typeof record.text === 'string') {
+        const matches = record.text.match(/https?:\/\/[^\s]+/g);
+        if (matches) {
+          for (const m of matches) {
+            postedUrls.add(m.toLowerCase().trim());
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[BLUESKY] Error fetching author feed: ${err?.message || err}`);
+  }
+  return postedUrls;
+}
 
-  // Find the top multi-angle story
-  let selectedStory: BlueskyStoryData | null = null;
+export function isStoryAlreadyPosted(
+  story: { slug: string; primaryClusterSlug?: string; id?: string },
+  postedUrls: Set<string>
+): boolean {
+  const slugsToCheck = [story.slug, story.primaryClusterSlug]
+    .filter(Boolean)
+    .map((s) => s!.toLowerCase().trim());
 
-  for (const cluster of clusters) {
-    if (!cluster.slug) continue;
-    const story = cluster.story;
-    if (story && story.clusters && story.clusters.length > 1) {
-      const angles = (story.clusters || [])
-        .filter((c) => Boolean(c.slug))
-        .map((c) => ({
-          headline: c.headline,
-          storyAngle: c.storyAngle,
-          articleCount: c.articleAssignments?.length || 0,
-        }))
-        .sort((a, b) => b.articleCount - a.articleCount);
-
-      const totalArticles = angles.reduce((sum, a) => sum + a.articleCount, 0);
-      const primarySlug = cluster.slug || (story.clusters[0] as any)?.slug || '';
-
-      selectedStory = {
-        id: story.id,
-        title: story.title,
-        slug: primarySlug,
-        overview: story.overview,
-        totalArticles,
-        angles,
-      };
-      break;
+  for (const postedUrl of postedUrls) {
+    const lowerUrl = postedUrl.toLowerCase();
+    for (const slug of slugsToCheck) {
+      if (lowerUrl.includes(`/${slug}`) || lowerUrl.endsWith(slug) || lowerUrl === slug) {
+        return true;
+      }
     }
   }
+  return false;
+}
 
-  if (!selectedStory) {
-    console.log('No eligible multi-angle stories found to post.');
-    return null;
+export interface SyndicationResult {
+  attempted: boolean;
+  published: boolean;
+  skipped: boolean;
+  reason?: string;
+  uri?: string;
+  title?: string;
+  dryRun?: boolean;
+}
+
+export async function checkAndPublishTopStory(options?: {
+  dryRun?: boolean;
+  minArticles?: number;
+}): Promise<SyndicationResult> {
+  const handle = process.env.BLUESKY_HANDLE || 'neus.news';
+  const password = process.env.BLUESKY_APP_PASSWORD;
+  const isDryRun = options?.dryRun ?? (!password || process.env.NODE_ENV !== 'production');
+  const minArticles = options?.minArticles ?? 8;
+
+  // 1. Fetch top representative cluster from the ranked feed
+  const rankedClusters = await getRankedClusters(1);
+  if (!rankedClusters || rankedClusters.length === 0) {
+    return { attempted: true, published: false, skipped: true, reason: 'no_clusters' };
   }
 
-  const { text, url, title, description } = formatBlueskyPost(selectedStory);
+  const topCluster = rankedClusters[0];
+  const story = topCluster.story;
 
-  const handle = process.env.BLUESKY_HANDLE;
-  const password = process.env.BLUESKY_APP_PASSWORD;
+  // Quality gate: Must be a multi-thread story
+  if (!story || !story.clusters || story.clusters.length < 2) {
+    return {
+      attempted: true,
+      published: false,
+      skipped: true,
+      reason: 'top_story_not_multi_thread',
+      title: topCluster.headline || undefined,
+    };
+  }
 
-  const result = await postToBluesky({
+  // Count active articles across threads
+  const activeClusters = story.clusters.filter((c) => !c.archived && c.slug);
+  const totalArticles = activeClusters.reduce(
+    (sum, c) => sum + (c.articleAssignments?.length || 0),
+    0
+  );
+
+  if (totalArticles < minArticles) {
+    return {
+      attempted: true,
+      published: false,
+      skipped: true,
+      reason: `insufficient_articles_${totalArticles}_below_${minArticles}`,
+      title: story.title,
+    };
+  }
+
+  const primarySlug = topCluster.slug || activeClusters[0]?.slug || story.slug;
+  if (!primarySlug) {
+    return { attempted: true, published: false, skipped: true, reason: 'missing_slug' };
+  }
+
+  // 2. Check if already posted to Bluesky
+  const postedUrls = await getRecentBlueskyPostUrls(handle);
+  const alreadyPosted = isStoryAlreadyPosted(
+    { slug: story.slug, primaryClusterSlug: primarySlug, id: story.id },
+    postedUrls
+  );
+
+  if (alreadyPosted) {
+    return {
+      attempted: true,
+      published: false,
+      skipped: true,
+      reason: 'already_posted',
+      title: story.title,
+    };
+  }
+
+  // 3. Prepare story data
+  const angles: BlueskyAngle[] = activeClusters
+    .map((c) => ({
+      headline: c.headline,
+      storyAngle: c.storyAngle,
+      articleCount: c.articleAssignments?.length || 0,
+    }))
+    .sort((a, b) => b.articleCount - a.articleCount);
+
+  const storyData: BlueskyStoryData = {
+    id: story.id,
+    title: story.title,
+    slug: primarySlug,
+    overview: story.overview,
+    totalArticles,
+    angles,
+  };
+
+  const { text, url, title, description } = formatBlueskyPost(storyData);
+
+  // 4. Post or Dry Run
+  const postResult = await postToBluesky({
     handle,
     password,
     text,
     url,
     title,
     description,
-    dryRun: isDryRun || (!handle || !password),
+    dryRun: isDryRun,
   });
 
-  return result;
+  if (postResult.success) {
+    return {
+      attempted: true,
+      published: !postResult.dryRun,
+      skipped: false,
+      uri: postResult.uri,
+      title: story.title,
+      dryRun: postResult.dryRun,
+    };
+  } else {
+    return {
+      attempted: true,
+      published: false,
+      skipped: false,
+      reason: postResult.error,
+      title: story.title,
+    };
+  }
+}
+
+export async function draftOrPublishTopStory(options?: {
+  dryRun?: boolean;
+}): Promise<BlueskyPostResult | null> {
+  const result = await checkAndPublishTopStory(options);
+  if (result.skipped) {
+    console.log(`[Bluesky] Story skipped: ${result.reason} ("${result.title || 'N/A'}")`);
+    return null;
+  }
+  return {
+    success: result.published || Boolean(result.dryRun),
+    uri: result.uri,
+    dryRun: result.dryRun,
+    text: result.title || '',
+    charCount: 0,
+    error: result.reason,
+  };
 }
 
 // CLI Execution entry point
@@ -317,26 +477,22 @@ if (isDirectCall) {
   const isPublish = process.argv.includes('--publish');
   const isDryRun = !isPublish;
 
-  console.log(`\n--- BLUESKY POST GENERATOR [Mode: ${isDryRun ? 'DRY RUN' : 'PUBLISH'}] ---\n`);
+  console.log(`\n--- BLUESKY TOP STORY CHECK [Mode: ${isDryRun ? 'DRY RUN' : 'PUBLISH'}] ---\n`);
 
-  draftOrPublishTopStory({ dryRun: isDryRun })
+  checkAndPublishTopStory({ dryRun: isDryRun })
     .then((result) => {
-      if (!result) {
+      if (result.skipped) {
+        console.log(`[Skipped]: Reason = ${result.reason} | Title = "${result.title || 'N/A'}"`);
         process.exit(0);
       }
 
-      console.log('--- FORMATTED POST CONTENT ---');
-      console.log(result.text);
-      console.log('------------------------------');
-      console.log(`Character count: ${result.charCount} / ${MAX_GRAPHEMES} graphemes`);
-
       if (result.dryRun) {
-        console.log('\n[Dry Run]: No network request was made to Bluesky.');
+        console.log(`\n[Dry Run Success]: Eligible top story = "${result.title}"`);
         console.log('To publish for real, set BLUESKY_HANDLE and BLUESKY_APP_PASSWORD in .env, then run with --publish.');
-      } else if (result.success) {
-        console.log(`\nSuccessfully posted to Bluesky! URI: ${result.uri}`);
+      } else if (result.published) {
+        console.log(`\nSuccessfully posted to Bluesky! URI: ${result.uri} | Title: "${result.title}"`);
       } else {
-        console.error(`\nFailed to post: ${result.error}`);
+        console.error(`\nFailed to post: ${result.reason}`);
         process.exit(1);
       }
       process.exit(0);

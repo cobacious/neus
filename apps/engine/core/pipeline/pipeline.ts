@@ -15,6 +15,7 @@ import { purgeOldUnclusteredArticles } from './purgeOldUnclusteredArticles';
 import { vacuumDb } from './vacuumDb';
 import { resetPipelineLogger, logger, PipelineStep, emitWorkflowAnnotation } from '../../lib/pipelineLogger';
 import { resetAiUsage, formatAiUsageLines, getTotalAiCostUsd } from '../../lib/aiUsage';
+import { checkAndPublishTopStory } from '../../lib/bluesky';
 import fs from 'fs';
 
 export async function runPipeline() {
@@ -47,6 +48,24 @@ export async function runPipeline() {
   await timed('prune', () => pruneArchivedPayloads());
   await timed('purge', () => purgeOldUnclusteredArticles());
   await timed('vacuum', () => vacuumDb());
+
+  // Step 16: Syndication (Bluesky automated post for new #1 top story)
+  await timed('syndicate-bluesky', async () => {
+    try {
+      const syndication = await checkAndPublishTopStory();
+      if (syndication.published) {
+        logger.info(
+          `[${PipelineStep.Summary}] Published new #1 top story to Bluesky: "${syndication.title}" (${syndication.uri})`
+        );
+      } else if (syndication.skipped) {
+        logger.info(
+          `[${PipelineStep.Summary}] Bluesky syndication skipped (${syndication.reason}): "${syndication.title || 'N/A'}"`
+        );
+      }
+    } catch (err: any) {
+      logger.warn(`[${PipelineStep.Summary}] Bluesky syndication error (non-fatal): ${err?.message || err}`);
+    }
+  });
 
   const durationSec = Math.round((Date.now() - startTime) / 1000);
   const metrics = await getDatabaseUsageMetrics();
