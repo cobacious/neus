@@ -48,7 +48,7 @@ export default function StoryAnglePills({
           border: '#4F6D7A',
           text: '#223842',
         };
-        const label = angle.name || 'Angle';
+        const label = angle.name || 'Thread';
         const isActive = isInteractive && activeAngleId === angle.id;
 
         const Component = isInteractive ? 'button' : 'span';

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import GitHubIcon from './GitHubIcon';
+import BlueskyIcon from './BlueskyIcon';
 
 const BRAND_COLORS = [
   '#4F6D7A', // Blue Slate
@@ -209,6 +210,15 @@ export default function Header() {
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Community & Code
                 </p>
+                <a
+                  href="https://bsky.app/profile/neus.news"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                >
+                  <BlueskyIcon className="h-4 w-4 text-blue-500" />
+                  <span>Bluesky (@neus.news)</span>
+                </a>
                 <a
                   href="https://github.com/cobacious/neus"
                   target="_blank"

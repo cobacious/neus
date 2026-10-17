@@ -37,7 +37,7 @@ export default function StoryAngleFilterTabs({
       <div
         className="flex flex-wrap items-center gap-2"
         role="tablist"
-        aria-label="Story angle filter pills"
+        aria-label="Story thread filter pills"
       >
         {angles.map((angle) => {
           const style =
@@ -82,7 +82,7 @@ export default function StoryAngleFilterTabs({
                 </span>
               )}
               {isActive && (
-                <span className="text-[10px] ml-0.5 opacity-70" aria-label="Clear angle filter">
+                <span className="text-[10px] ml-0.5 opacity-70" aria-label="Clear thread filter">
                   ✕
                 </span>
               )}

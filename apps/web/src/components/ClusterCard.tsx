@@ -84,7 +84,7 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   const angles: AngleItem[] = isMultiAngleStory && story?.clusters
     ? story.clusters.map((c) => ({
         id: c.id,
-        name: c.storyAngle || c.headline || 'Angle',
+        name: c.storyAngle || c.headline || 'Thread',
         articleCount: c.articles ? c.articles.length : undefined,
       }))
     : [];

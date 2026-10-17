@@ -47,7 +47,7 @@ describe('Prerender Handler', () => {
     expect(html).toContain('<div id="root">');
     expect(html).toContain('<h1>Yorkshire Wildlife Park Incident</h1>');
     expect(html).toContain('<p style="font-size: 1.125rem; line-height: 1.6; color: #374151; margin-bottom: 1.5rem;">Overview of the incident and subsequent inquiries.</p>');
-    expect(html).toContain('Tracked Reporting Perspectives (2 angles)');
+    expect(html).toContain('Tracked Reporting Perspectives (2 threads)');
     expect(html).toContain('Initial Attack Details (39 articles)');
     expect(html).toContain('Family Tribute (29 articles)');
     expect(html).toContain('Referenced News Coverage (1 sources)');

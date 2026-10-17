@@ -116,7 +116,7 @@ describe('RSS Feed Generator', () => {
     expect(xml).toContain('<link>https://neus.news/tiger-incident-reopening</link>');
     expect(xml).toContain('<pubDate>Fri, 16 Oct 2026 11:45:00 GMT</pubDate>');
     expect(xml).toContain('A fatal tiger encounter led to park closures and council investigations.');
-    expect(xml).toContain('Tracked Perspectives and Angles:');
+    expect(xml).toContain('Tracked Perspectives and Threads:');
     expect(xml).toContain('<strong>Park Reopening</strong> (10 articles): Park management reopened the enclosure following the fatal event.');
     expect(xml).toContain('<strong>Family Tribute</strong> (29 articles): Relatives remembered the former actor and noted his mental health struggles.');
   });

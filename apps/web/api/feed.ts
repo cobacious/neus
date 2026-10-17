@@ -84,7 +84,7 @@ export function generateRssXml(clusters: ClusterFeedItem[], buildDate = new Date
 
       const angleLines = angles
         .map((a) => {
-          const label = escapeXml(a.storyAngle || a.headline || 'General Angle');
+          const label = escapeXml(a.storyAngle || a.headline || 'General Thread');
           const count = a.articleCount ? ` (${a.articleCount} articles)` : '';
           const summary = a.summary ? `: ${escapeXml(a.summary)}` : '';
           return `<li><strong>${label}</strong>${count}${summary}</li>`;
@@ -99,7 +99,7 @@ export function generateRssXml(clusters: ClusterFeedItem[], buildDate = new Date
 
       const contentHtml = [
         overviewHtml,
-        angles.length > 0 ? `<p><strong>Tracked Perspectives and Angles:</strong></p><ul>${angleLines}</ul>` : '',
+        angles.length > 0 ? `<p><strong>Tracked Perspectives and Threads:</strong></p><ul>${angleLines}</ul>` : '',
         `<p><a href="${itemUrl}">Read full coverage and explore balanced perspectives on Neus</a></p>`,
       ]
         .filter(Boolean)

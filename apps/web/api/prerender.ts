@@ -74,7 +74,7 @@ export function buildSemanticHtml(
       .join('\n');
 
     anglesSection = `\n    <section aria-label="Tracked Perspectives" style="margin-top: 2rem;">
-      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Tracked Reporting Perspectives (${angles.length} angles)</h2>
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Tracked Reporting Perspectives (${angles.length} threads)</h2>
 ${angleCards}
     </section>`;
   }

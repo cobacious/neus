@@ -217,7 +217,7 @@ export default function ClusterDetailPage() {
     isMultiAngleStory && story?.clusters
       ? story.clusters.map((c: any) => ({
           id: c.id,
-          name: c.storyAngle || c.headline || 'Angle',
+          name: c.storyAngle || c.headline || 'Thread',
           articleCount: c.articles ? c.articles.length : 0,
         }))
       : [];
@@ -375,7 +375,7 @@ export default function ClusterDetailPage() {
       <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-6">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-lg font-bold text-gray-900">
-            {isMultiAngleStory ? 'Articles by Angle' : 'Articles Coverage'}
+            {isMultiAngleStory ? 'Articles by Thread' : 'Articles Coverage'}
           </h3>
           {selectedAngleId && (
             <button
@@ -383,7 +383,7 @@ export default function ClusterDetailPage() {
               onClick={() => handleSelectAngle(null, false)}
               className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
             >
-              Show all angles ✕
+              Show all threads ✕
             </button>
           )}
         </div>
@@ -404,7 +404,7 @@ export default function ClusterDetailPage() {
               ? story.clusters.filter((c: any) => c.id === selectedAngleId)
               : story.clusters
             ).map((c: any) => {
-              const angleName = c.storyAngle || c.headline || 'Angle';
+              const angleName = c.storyAngle || c.headline || 'Thread';
               const angleStyle =
                 colorMap.get(c.id) || colorMap.get(angleName) || DEFAULT_ANGLE_COLOR;
               const angleArticles = sortArticlesNewestFirst(c.articles || []);

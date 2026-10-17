@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import GitHubIcon from './GitHubIcon';
+import BlueskyIcon from './BlueskyIcon';
 import Logo from './Logo';
 
 export default function Footer() {
@@ -31,6 +32,15 @@ export default function Footer() {
             <Link to="/about" className="hover:text-gray-900 transition-colors">
               About
             </Link>
+            <a
+              href="https://bsky.app/profile/neus.news"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-gray-900 transition-colors inline-flex items-center gap-1.5"
+            >
+              <BlueskyIcon className="h-3.5 w-3.5 text-blue-500" />
+              <span>Bluesky</span>
+            </a>
             <a
               href="https://github.com/cobacious/neus"
               target="_blank"

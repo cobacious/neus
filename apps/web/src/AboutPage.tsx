@@ -84,11 +84,11 @@ export default function AboutPage() {
           <div className="p-4 rounded-lg bg-gray-50 border border-gray-100 space-y-1.5">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
               <span className="w-2 h-2 rounded-full bg-[#DD6E42]" />
-              Multi-Angle Structure
+              Story Threads
             </h3>
             <p className="text-xs sm:text-sm text-gray-600 leading-normal">
               Rather than collapsing everything into a single headline, stories with multiple
-              distinct viewpoints are organized into explicit angles under an overarching
+              distinct viewpoints and developments are organized into explicit threads under an overarching
               macro-overview.
             </p>
           </div>
@@ -110,7 +110,7 @@ export default function AboutPage() {
               Source Attribution
             </h3>
             <p className="text-xs sm:text-sm text-gray-600 leading-normal">
-              We never conceal original reporting. Every angle explicitly cites its source
+              We never conceal original reporting. Every thread explicitly cites its source
               publications with favicons, timestamps and paywall indicators.
             </p>
           </div>
@@ -156,10 +156,10 @@ export default function AboutPage() {
             <span className="absolute flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 rounded-full -left-3 ring-4 ring-white text-xs font-semibold">
               3
             </span>
-            <h3 className="font-semibold text-gray-900 text-sm">Story Angle Organization</h3>
+            <h3 className="font-semibold text-gray-900 text-sm">Story Thread Organization</h3>
             <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-normal">
-              Related clusters are grouped under umbrella stories. Stories with insufficient angle
-              variety are pruned and articles are realigned to their most coherent angle.
+              Related clusters are grouped under umbrella stories. Stories with insufficient thread
+              variety are pruned and articles are realigned to their most coherent thread.
             </p>
           </li>
 
@@ -169,7 +169,7 @@ export default function AboutPage() {
             </span>
             <h3 className="font-semibold text-gray-900 text-sm">Neutral AI Synthesis</h3>
             <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-normal">
-              Google Gemini generates neutral, factual headlines, angle summaries and high-level
+              Google Gemini generates neutral, factual headlines, thread summaries and high-level
               macro-overviews based strictly on cross-source reporting evidence.
             </p>
           </li>
@@ -202,7 +202,7 @@ export default function AboutPage() {
               multiple independent publications receive higher visibility than solitary reports.
             </li>
             <li>
-              <strong className="text-gray-800">Coverage Depth & Angles:</strong> Stories spanning
+              <strong className="text-gray-800">Coverage Depth & Threads:</strong> Stories spanning
               multiple distinct editorial facets naturally bubble up.
             </li>
             <li>
@@ -322,11 +322,20 @@ export default function AboutPage() {
               className="text-blue-600 hover:text-blue-800 underline font-medium"
             >
               feedback@neus.news
+            </a>{' '}
+            or connect with us on Bluesky at{' '}
+            <a
+              href="https://bsky.app/profile/neus.news"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline font-medium"
+            >
+              @neus.news
             </a>
             .
           </p>
           <p className="text-xs sm:text-sm text-gray-500">
-            For technical bugs and code contributions, you can also{' '}
+            For technical bug reports, you can also{' '}
             <a
               href="https://github.com/cobacious/neus/issues"
               target="_blank"

@@ -247,7 +247,7 @@ export default function StoryAngleHistogram({
     >
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-          Publication Timeline & Angles
+          Publication Timeline & Threads
         </h4>
         <span className="text-xs text-gray-500">
           {validArticles.length} {validArticles.length === 1 ? 'article' : 'articles'} total
@@ -272,7 +272,7 @@ export default function StoryAngleHistogram({
                   className="w-2.5 h-2.5 rounded-xs flex-shrink-0"
                   style={{ backgroundColor: style.color }}
                 />
-                <span className="font-medium">{angle.name || 'Angle'}</span>
+                <span className="font-medium">{angle.name || 'Thread'}</span>
                 <span className="text-gray-400">({count})</span>
               </div>
             );

@@ -1,0 +1,29 @@
+<svg width="1500" height="500" viewBox="0 0 1500 500" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1500" height="500" fill="#0F172A"/>
+  
+  <!-- Top brand editorial palette strip -->
+  <rect x="0" y="0" width="250" height="8" fill="#4F6D7A"/>
+  <rect x="250" y="0" width="250" height="8" fill="#DD6E42"/>
+  <rect x="500" y="0" width="250" height="8" fill="#B8C7B7"/>
+  <rect x="750" y="0" width="250" height="8" fill="#D2BFDE"/>
+  <rect x="1000" y="0" width="250" height="8" fill="#805448"/>
+  <rect x="1250" y="0" width="250" height="8" fill="#575353"/>
+  
+  <!-- Subtle ambient glow on right -->
+  <circle cx="1260" cy="250" r="320" fill="#4F6D7A" opacity="0.09"/>
+  
+  <!-- Right side: subtle large 'n' watermark -->
+  <g transform="translate(1080, 50) scale(6.0)" opacity="0.05">
+    <path d="M0 1.792H14.592V11.648H14.848C16.2133 8.576 18.56 5.888 21.888 3.584C25.3013 1.19467 29.312 0 33.92 0C37.9307 0 41.344 0.725333 44.16 2.176C47.0613 3.54133 49.408 5.376 51.2 7.68C53.0773 9.984 54.4427 12.6293 55.296 15.616C56.1493 18.6027 56.576 21.6747 56.576 24.832V63.232H41.216V29.184C41.216 27.392 41.088 25.5147 40.832 23.552C40.576 21.5893 40.0213 19.84 39.168 18.304C38.3147 16.6827 37.12 15.36 35.584 14.336C34.1333 13.312 32.1707 12.8 29.696 12.8C27.2213 12.8 25.088 13.312 23.296 14.336C21.504 15.2747 20.0107 16.512 18.816 18.048C17.7067 19.584 16.8533 21.376 16.256 23.424C15.6587 25.3867 15.36 27.392 15.36 29.44V63.232H0V1.792Z" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Content shifted right to clear bottom-left profile avatar zone -->
+  <g transform="translate(260, 150)">
+    <text x="0" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="86" font-weight="900" letter-spacing="-3" fill="#FFFFFF">neus</text>
+    <text x="215" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="200" fill="#64748B">|</text>
+    <text x="250" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="42" font-weight="500" fill="#94A3B8">Neutral news</text>
+    
+    <text x="0" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="400" fill="#CBD5E1">AI-clustered, multi-perspective news aggregation</text>
+    <text x="0" y="198" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="600" fill="#DD6E42">neus.news</text>
+  </g>
+</svg>
