@@ -115,7 +115,7 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
   // Helper to build post text with anchor text instead of naked URL
   const buildText = (titleStr: string, angleLines: string[]) => {
     const parts = [
-      `Top Story: ${titleStr}`,
+      titleStr,
       '',
       `${totalArts} articles across ${numAngles} threads:`,
       ...angleLines,

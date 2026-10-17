@@ -56,7 +56,8 @@ describe('Bluesky Publisher', () => {
 
     const len = getGraphemeLength(text);
     expect(len).toBeLessThanOrEqual(300);
-    expect(text).toContain('Top Story:');
+    expect(text).toContain(story.title);
+    expect(text).not.toContain('Top Story:');
     expect(text).not.toContain('📰');
     expect(text).toContain('127 articles across 4 threads:');
     expect(text).toContain('• Initial Attack Incident (39)');
