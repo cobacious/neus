@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 import {
   getGraphemeLength,
   getUrlFacets,
+  createLinkFacet,
   formatBlueskyPost,
   postToBluesky,
   isStoryAlreadyPosted,
@@ -24,6 +25,16 @@ describe('Bluesky Publisher', () => {
     expect(facets[0].features[0].uri).toBe('https://neus.news/story-1');
     expect(facets[0].index.byteStart).toBe(18);
     expect(facets[0].index.byteEnd).toBe(43);
+  });
+
+  it('binds anchor facet to the final CTA when anchor text appears multiple times', () => {
+    const text = 'Read on neus.news ↗ headline discussion\n\nRead on neus.news ↗';
+    const facet = createLinkFacet(text, 'Read on neus.news ↗', 'https://neus.news/target');
+
+    expect(facet).not.toBeNull();
+    const encoder = new TextEncoder();
+    const expectedByteStart = encoder.encode('Read on neus.news ↗ headline discussion\n\n').byteLength;
+    expect(facet!.index.byteStart).toBe(expectedByteStart);
   });
 
   it('formats post within 300-grapheme limit with thread breakdowns and link', () => {
@@ -76,10 +87,11 @@ describe('Bluesky Publisher', () => {
     ).toBe(false);
   });
 
-  it('correctly matches exact path segments and rejects false-positive substrings', () => {
+  it('correctly matches exact path segments and rejects false-positive substrings and third-party domains', () => {
     const postedUrls = new Set([
       'https://neus.news/us-interest-rates-cut',
-      'https://neus.news/s/bank-of-england-decision',
+      'https://theguardian.com/world/us-interest-rates',
+      'https://neus.news/bank-of-england-decision',
     ]);
 
     // Substring matching would falsely match 'us-interest-rates' inside 'us-interest-rates-cut'
@@ -87,6 +99,14 @@ describe('Bluesky Publisher', () => {
       isStoryAlreadyPosted(
         { slug: 'us-interest-rates' },
         postedUrls
+      )
+    ).toBe(false);
+
+    // Third-party domain matching 'us-interest-rates' should be skipped
+    expect(
+      isStoryAlreadyPosted(
+        { slug: 'us-interest-rates' },
+        new Set(['https://theguardian.com/world/us-interest-rates'])
       )
     ).toBe(false);
 
@@ -98,7 +118,7 @@ describe('Bluesky Publisher', () => {
       )
     ).toBe(true);
 
-    // Exact match in shortlink path (/s/...)
+    // Exact match on direct path
     expect(
       isStoryAlreadyPosted(
         { slug: 'bank-of-england-decision' },
@@ -181,6 +201,65 @@ describe('Bluesky Publisher', () => {
 
       const blob = await uploadBlobToBluesky('jwt-token-123', 'https://neus.news/not-found.png');
       expect(blob).toBeNull();
+    });
+
+    it('sanitises content-type header with parameter directives', async () => {
+      let passedContentType = '';
+      global.fetch = jest.fn().mockImplementation((url: string, init?: any) => {
+        if (url === 'https://neus.news/og-image.png') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Map([['content-type', 'image/png; charset=utf-8']]),
+            arrayBuffer: () => Promise.resolve(new ArrayBuffer(512)),
+          });
+        }
+        if (url === 'https://bsky.social/xrpc/com.atproto.repo.uploadBlob') {
+          passedContentType = init?.headers?.['Content-Type'];
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ blob: { $type: 'blob' } }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL: ' + url));
+      }) as any;
+
+      await uploadBlobToBluesky('jwt-token-123', 'https://neus.news/og-image.png');
+      expect(passedContentType).toBe('image/png');
+    });
+
+    it('falls back to default OG image if custom image URL returns non-image', async () => {
+      const mockBlob = { $type: 'blob', ref: { $link: 'default-og' } };
+      global.fetch = jest.fn().mockImplementation((url: string) => {
+        if (url === 'https://neus.news/dynamic-og-route') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Map([['content-type', 'text/html; charset=utf-8']]),
+            arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
+          });
+        }
+        if (url === 'https://neus.news/og-image.png') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Map([['content-type', 'image/png']]),
+            arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
+          });
+        }
+        if (url === 'https://bsky.social/xrpc/com.atproto.repo.uploadBlob') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ blob: mockBlob }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL: ' + url));
+      }) as any;
+
+      const blob = await uploadBlobToBluesky('jwt-token-123', 'https://neus.news/dynamic-og-route');
+      expect(blob).toEqual(mockBlob);
     });
   });
 });

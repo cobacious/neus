@@ -13,6 +13,7 @@ export interface BlueskyStoryData {
   overview?: string | null;
   totalArticles: number;
   angles: BlueskyAngle[];
+  ogImageUrl?: string;
 }
 
 export interface BlueskyFacet {
@@ -49,7 +50,7 @@ export function createLinkFacet(
   targetUrl: string
 ): BlueskyFacet | null {
   const encoder = new TextEncoder();
-  const charIndex = fullText.indexOf(anchorText);
+  const charIndex = fullText.lastIndexOf(anchorText);
   if (charIndex === -1) return null;
 
   const prefix = fullText.slice(0, charIndex);
@@ -166,7 +167,7 @@ export function formatBlueskyPost(story: BlueskyStoryData): {
     url,
     title: story.title,
     description,
-    thumbUrl: DEFAULT_OG_IMAGE,
+    thumbUrl: story.ogImageUrl || DEFAULT_OG_IMAGE,
     facets,
   };
 }
@@ -175,43 +176,64 @@ export async function uploadBlobToBluesky(
   accessJwt: string,
   imageUrl: string
 ): Promise<any | null> {
-  try {
-    const imgRes = await fetch(imageUrl);
-    if (!imgRes.ok) {
-      console.warn(`[BLUESKY] Failed to fetch thumbnail image (${imgRes.status}): ${imageUrl}`);
+  const tryUpload = async (targetUrl: string): Promise<any | null> => {
+    try {
+      const imgRes = await fetch(targetUrl);
+      if (!imgRes.ok) {
+        console.warn(`[BLUESKY] Failed to fetch thumbnail image (${imgRes.status}): ${targetUrl}`);
+        return null;
+      }
+      const rawContentType = imgRes.headers.get('content-type') || 'image/png';
+      const contentType = rawContentType.split(';')[0].trim().toLowerCase();
+
+      // AT Protocol XRPC rejects non-image MIME types
+      if (!contentType.startsWith('image/')) {
+        console.warn(`[BLUESKY] Thumbnail returned non-image content-type (${contentType}): ${targetUrl}`);
+        return null;
+      }
+
+      const arrayBuffer = await imgRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // 1MB limit for Bluesky thumbnail blobs
+      if (buffer.length > 1000000) {
+        console.warn(`[BLUESKY] Thumbnail image exceeds 1MB limit (${buffer.length} bytes)`);
+        return null;
+      }
+
+      const uploadRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.uploadBlob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': contentType,
+          Authorization: `Bearer ${accessJwt}`,
+        },
+        body: buffer,
+      });
+
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        console.warn(`[BLUESKY] uploadBlob failed (${uploadRes.status}): ${errText}`);
+        return null;
+      }
+
+      const uploadData = (await uploadRes.json()) as any;
+      return uploadData?.blob || null;
+    } catch (err: any) {
+      console.warn(`[BLUESKY] Error uploading thumbnail blob: ${err?.message || err}`);
       return null;
     }
-    const contentType = imgRes.headers.get('content-type') || 'image/png';
-    const arrayBuffer = await imgRes.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+  };
 
-    // 1MB limit for Bluesky thumbnail blobs
-    if (buffer.length > 1000000) {
-      console.warn(`[BLUESKY] Thumbnail image exceeds 1MB limit (${buffer.length} bytes)`);
-      return null;
-    }
+  const primaryBlob = await tryUpload(imageUrl);
+  if (primaryBlob) return primaryBlob;
 
-    const uploadRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.uploadBlob', {
-      method: 'POST',
-      headers: {
-        'Content-Type': contentType,
-        Authorization: `Bearer ${accessJwt}`,
-      },
-      body: buffer,
-    });
-
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text();
-      console.warn(`[BLUESKY] uploadBlob failed (${uploadRes.status}): ${errText}`);
-      return null;
-    }
-
-    const uploadData = (await uploadRes.json()) as any;
-    return uploadData?.blob || null;
-  } catch (err: any) {
-    console.warn(`[BLUESKY] Error uploading thumbnail blob: ${err?.message || err}`);
-    return null;
+  // Fall back to DEFAULT_OG_IMAGE if a custom image URL failed or returned non-image
+  if (imageUrl !== DEFAULT_OG_IMAGE) {
+    console.info(`[BLUESKY] Falling back to default OG image: ${DEFAULT_OG_IMAGE}`);
+    return await tryUpload(DEFAULT_OG_IMAGE);
   }
+
+  return null;
 }
 
 export async function postToBluesky(options: {
@@ -407,23 +429,34 @@ export function isStoryAlreadyPosted(
   );
 
   for (const rawUrl of postedUrls) {
-    let pathname = rawUrl;
     try {
-      const parsed = new URL(rawUrl, 'https://neus.news');
-      pathname = parsed.pathname;
-    } catch {
-      // Fallback if URL constructor fails
-    }
+      const parsed = new URL(rawUrl, SITE_URL);
+      // Skip third-party links that might appear in the author feed
+      if (parsed.hostname !== 'neus.news' && parsed.hostname !== 'www.neus.news') {
+        continue;
+      }
 
-    const segments = pathname
-      .toLowerCase()
-      .split('/')
-      .map((s) => s.trim())
-      .filter(Boolean);
+      // Normalise pathname by stripping leading and trailing slashes
+      const normalizedPath = parsed.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
 
-    for (const segment of segments) {
-      if (targetSlugs.has(segment)) {
+      // Check direct match on normalizedPath
+      if (targetSlugs.has(normalizedPath)) {
         return true;
+      }
+
+      // Also check last path segment in case of nested route like /clusters/:slug
+      const segments = normalizedPath.split('/').filter(Boolean);
+      const lastSegment = segments[segments.length - 1];
+      if (lastSegment && targetSlugs.has(lastSegment)) {
+        return true;
+      }
+    } catch {
+      // Fallback: check exact string match
+      const clean = rawUrl.toLowerCase().trim();
+      for (const slug of targetSlugs) {
+        if (clean === slug || clean === `/${slug}`) {
+          return true;
+        }
       }
     }
   }
