@@ -231,8 +231,7 @@ describe('Bluesky Publisher', () => {
       expect(passedContentType).toBe('image/png');
     });
 
-    it('falls back to default OG image if custom image URL returns non-image', async () => {
-      const mockBlob = { $type: 'blob', ref: { $link: 'default-og' } };
+    it('returns null if custom image URL returns non-image', async () => {
       global.fetch = jest.fn().mockImplementation((url: string) => {
         if (url === 'https://neus.news/dynamic-og-route') {
           return Promise.resolve({
@@ -242,26 +241,71 @@ describe('Bluesky Publisher', () => {
             arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
           });
         }
-        if (url === 'https://neus.news/og-image.png') {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'image/png']]),
-            arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
-          });
-        }
-        if (url === 'https://bsky.social/xrpc/com.atproto.repo.uploadBlob') {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve({ blob: mockBlob }),
-          });
-        }
         return Promise.reject(new Error('Unknown URL: ' + url));
       }) as any;
 
       const blob = await uploadBlobToBluesky('jwt-token-123', 'https://neus.news/dynamic-og-route');
-      expect(blob).toEqual(mockBlob);
+      expect(blob).toBeNull();
     });
+  });
+
+  it('omits thumbUrl in formatBlueskyPost for clean compact link embeds', () => {
+    const story: BlueskyStoryData = {
+      id: 's1',
+      title: 'French Protests Erupt Across Paris',
+      slug: 'french-protests-erupt-across-paris',
+      overview: 'Protests continue across multiple cities.',
+      totalArticles: 15,
+      angles: [
+        { headline: 'Protests and Police Clashes', storyAngle: 'Protests and Police Clashes', articleCount: 10 },
+        { headline: 'Government Response', storyAngle: 'Government Response', articleCount: 5 },
+      ],
+    };
+
+    const formatted = formatBlueskyPost(story);
+    expect((formatted as any).thumbUrl).toBeUndefined();
+    expect(formatted.title).toBe(story.title);
+  });
+
+  it('constructs external embed record without thumb property when thumbUrl is omitted', async () => {
+    let capturedRecord: any = null;
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockImplementation((url: string, init?: any) => {
+      if (url === 'https://bsky.social/xrpc/com.atproto.server.createSession') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ accessJwt: 'token', did: 'did:plc:123' }),
+        });
+      }
+      if (url === 'https://bsky.social/xrpc/com.atproto.repo.createRecord') {
+        capturedRecord = JSON.parse(init.body).record;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ uri: 'at://did:plc:123/app.bsky.feed.post/123', cid: 'cid123' }),
+        });
+      }
+      return Promise.reject(new Error('Unknown URL: ' + url));
+    }) as any;
+
+    try {
+      const result = await postToBluesky({
+        handle: 'test.bsky.social',
+        password: 'password123',
+        text: 'Headline text',
+        url: 'https://neus.news/slug',
+        title: 'Headline Title',
+        description: 'Overview description',
+      });
+
+      expect(result.success).toBe(true);
+      expect(capturedRecord).toBeDefined();
+      expect(capturedRecord.embed.$type).toBe('app.bsky.embed.external');
+      expect(capturedRecord.embed.external.thumb).toBeUndefined();
+      expect(capturedRecord.embed.external.title).toBe('Headline Title');
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });
