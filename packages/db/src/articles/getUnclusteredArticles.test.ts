@@ -40,6 +40,22 @@ describe('getUnclusteredArticles', () => {
     expect(daysDiff).toBeCloseTo(3, 1);
   });
 
+  it('selects sourceId and source for multi-source cluster gating', async () => {
+    findMany.mockResolvedValue([]);
+
+    await getUnclusteredArticles();
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    const query = findMany.mock.calls[0][0] as any;
+    expect(query.select).toEqual({
+      id: true,
+      embedding: true,
+      createdAt: true,
+      sourceId: true,
+      source: true,
+    });
+  });
+
   it('respects custom daysBack parameter', async () => {
     findMany.mockResolvedValue([]);
     const beforeCall = Date.now();

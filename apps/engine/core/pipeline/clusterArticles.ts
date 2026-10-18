@@ -16,7 +16,7 @@ import {
 
 const SIMILARITY_THRESHOLD = process.env.CLUSTER_SIMILARITY_THRESHOLD
   ? parseFloat(process.env.CLUSTER_SIMILARITY_THRESHOLD)
-  : 0.88;
+  : 0.87;
 const ALLOW_SINGLE_ARTICLE_CLUSTERS = false; // Set to false to skip single article clusters
 
 type UnclusteredArticle = Awaited<ReturnType<typeof getUnclusteredArticles>>[number];
@@ -145,7 +145,7 @@ function filterUniqueClusters(
 
     // Multi-source gating: require at least 2 distinct sources to form a new cluster
     const sourceIds = new Set(
-      unique.map((id) => articleMap?.get(id)?.sourceId).filter(Boolean)
+      unique.map((id) => articleMap?.get(id)?.sourceId || articleMap?.get(id)?.source).filter(Boolean)
     );
     const hasEnoughSources =
       ALLOW_SINGLE_ARTICLE_CLUSTERS || (articleMap ? sourceIds.size >= 2 : true);

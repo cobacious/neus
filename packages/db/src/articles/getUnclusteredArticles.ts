@@ -34,6 +34,8 @@ export async function getUnclusteredArticles(daysBack?: number) {
       id: true,
       embedding: true,
       createdAt: true,
+      sourceId: true,
+      source: true,
     },
     orderBy: {
       createdAt: 'desc',
