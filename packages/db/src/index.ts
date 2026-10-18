@@ -25,6 +25,7 @@ export * from './clusters/getRankedClusters';
 export * from './clusters/updateClusterSlug';
 export * from './clusters/updateClusterSummary';
 export * from './clusters/updateClusterScore';
+export * from './clusters/updateClusterScoresBatch';
 export * from './clusters/updateClusterEmbedding';
 export * from './clusters/mergeClusters';
 export * from './sources/getActiveSources';

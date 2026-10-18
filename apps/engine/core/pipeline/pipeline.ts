@@ -39,12 +39,12 @@ export async function runPipeline() {
   await timed('fetch', () => fillMissingContent());
   await timed('embed', () => embedNewArticles());
   await timed('cluster', () => clusterRecentArticles());
-  await timed('score', () => scoreClusters());
   await timed('summarise', () => summarizeClusters());
   await timed('organize', () => organizeStoryAngles());
   await timed('cleanup', () => cleanupEmptyClusters());
   await timed('disband', () => disbandSingleClusters());
   await timed('archive', () => archiveOldClusters());
+  await timed('score', () => scoreClusters());
   await timed('prune', () => pruneArchivedPayloads());
   await timed('purge', () => purgeOldUnclusteredArticles());
   await timed('vacuum', () => vacuumDb());

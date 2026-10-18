@@ -25,6 +25,18 @@ export async function getClustersForScoring() {
     },
     select: {
       id: true,
+      story: {
+        select: {
+          clusters: {
+            where: {
+              archived: false,
+            },
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
       articleAssignments: {
         select: {
           article: {

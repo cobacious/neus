@@ -102,28 +102,75 @@ describe('scoreCluster', () => {
     expect(score).toBeLessThan(0.3);
   });
 
-  it('averages trust across unique sources rather than raw article count to prevent spam dilution', () => {
+  it('caps article volume at 2.5x unique sources to prevent single-source spam gaming', () => {
     const now = Date.now();
 
-    // 1 high-trust article + 1 low-trust article
-    const balancedStory = {
+    // 1 article from BBC + 4 articles from tabloid (total 5 articles, exactly 2.5 * 2)
+    const cappedStory = {
       articleAssignments: [
         { article: { publishedAt: new Date(now), sourceId: 'bbc', sourceRel: { trustScore: 0.95 } } },
-        { article: { publishedAt: new Date(now), sourceId: 'tabloid', sourceRel: { trustScore: 0.35 } } },
-      ],
-    } as any;
-
-    // 1 high-trust article + 10 low-trust articles from the same single tabloid source
-    const spammedStory = {
-      articleAssignments: [
-        { article: { publishedAt: new Date(now), sourceId: 'bbc', sourceRel: { trustScore: 0.95 } } },
-        ...Array.from({ length: 10 }, () => ({
+        ...Array.from({ length: 4 }, () => ({
           article: { publishedAt: new Date(now), sourceId: 'tabloid', sourceRel: { trustScore: 0.35 } },
         })),
       ],
     } as any;
 
-    // The base quality and trust score should be identical because the unique source set is the same
-    expect(scoreCluster(spammedStory, now)).toBeCloseTo(scoreCluster(balancedStory, now), 5);
+    // 1 article from BBC + 20 articles from tabloid (total 21 articles, should be capped at 5)
+    const spammedStory = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now), sourceId: 'bbc', sourceRel: { trustScore: 0.95 } } },
+        ...Array.from({ length: 20 }, () => ({
+          article: { publishedAt: new Date(now), sourceId: 'tabloid', sourceRel: { trustScore: 0.35 } },
+        })),
+      ],
+    } as any;
+
+    // The score should be identical because effective articles are strictly capped at 2.5 * uniqueSources
+    expect(scoreCluster(spammedStory, now)).toBeCloseTo(scoreCluster(cappedStory, now), 5);
+  });
+
+  it('ranks an 18-hour 12-source major event above a 1.5-hour 2-source brief', () => {
+    const now = Date.now();
+    const EIGHTEEN_HOURS_MS = 18 * 60 * 60 * 1000;
+    const NINETY_MINS_MS = 90 * 60 * 1000;
+
+    const majorWorldStory = {
+      articleAssignments: Array.from({ length: 12 }, (_, i) => ({
+        article: {
+          publishedAt: new Date(now - EIGHTEEN_HOURS_MS),
+          sourceId: `major_source_${i}`,
+          sourceRel: { trustScore: 0.88 },
+        },
+      })),
+    } as any;
+
+    const minorSportsBrief = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - NINETY_MINS_MS), sourceId: 'bbc', sourceRel: { trustScore: 0.90 } } },
+        { article: { publishedAt: new Date(now - NINETY_MINS_MS), sourceId: 'aljazeera', sourceRel: { trustScore: 0.80 } } },
+      ],
+    } as any;
+
+    expect(scoreCluster(majorWorldStory, now)).toBeGreaterThan(scoreCluster(minorSportsBrief, now));
+  });
+
+  it('applies umbrella factor when cluster belongs to a multi-angle story', () => {
+    const now = Date.now();
+    const standalone = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now), sourceId: 's1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now), sourceId: 's2', sourceRel: { trustScore: 0.8 } } },
+      ],
+    } as any;
+
+    const multiAngle = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now), sourceId: 's1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now), sourceId: 's2', sourceRel: { trustScore: 0.8 } } },
+      ],
+      storyAngleCount: 3,
+    } as any;
+
+    expect(scoreCluster(multiAngle, now)).toBeGreaterThan(scoreCluster(standalone, now));
   });
 });

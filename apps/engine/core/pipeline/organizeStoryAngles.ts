@@ -322,7 +322,7 @@ Analyze these clusters and determine:
 2. STORIES (Multi-angle saga): After accounting for any merges, do 2 or more distinct remaining clusters represent DIFFERENT ANGLES, chronological developments, or sub-stories of the SAME overarching news saga?
    - If yes, provide for each story:
      - "existingStoryId": If this saga matches or develops an EXISTING STORY listed in the CANDIDATE STORIES below, specify its id. Otherwise null.
-     - "storyTitle": A concise, neutral title for the overarching saga.
+     - "storyTitle": An objective, neutral overarching news headline synthesizing what happened across the saga.
      - "status": One of "breaking" (first 12-24h of newly emerging breaking news where details are still arriving) or "developing" (multi-angle saga actively expanding in scope with related spin-offs/fallout).
      - "overview": A neutral 2-sentence macro-summary synthesizing the whole saga across all its angles.
      - "angles": Array of member clusters with:
@@ -335,8 +335,9 @@ A multi-angle "Story" is an overarching news topic that brings together 2 or mor
 2. Major Scheduled Macro-Events: Significant calendar events with multiple major speeches, announcements, or debates (e.g. party conferences, bilateral summits, legislative budget sessions, tournaments).
 
 CRITICAL TITLING & OVERVIEW RULES:
-- The "storyTitle" MUST be an objective, balanced MACRO-UMBRELLA headline representing the whole story or event (e.g., "Conservative Party Conference: Speeches, Policy Debates, and Reactions", "Botched Execution of Christa Pike and Fallout").
-- NEVER name the "storyTitle" after a single specific sub-angle, individual policy pledge, or single participant (e.g. DO NOT name a multi-angle conference story after one specific policy pledge like "Badenoch Pledges to Scrap Inheritance Tax" — that subordinates the other angles!).
+- The "storyTitle" MUST read like a real, neutral news headline with an active verb describing the overarching event or development (e.g. "Clashes Erupt Across France Over Student Protests and Rising Living Costs", "Vatican Confirms Pope Leo Diagnosed with Lung Cancer Following Surgery").
+- DO NOT format "storyTitle" as an abstract topic label, Wikipedia category or list of nouns ending in "... and Fallout", "...: Speeches, Debates and Reactions" or "...: Court Proceedings and Witness Testimony". It must read like a real, neutral news headline.
+- NEVER narrow the "storyTitle" to a single minor sub-angle or individual pledge (e.g. DO NOT name a party conference story after one specific tax pledge like "Badenoch Pledges to Scrap Inheritance Tax"; instead write "Conservative Party Opens Annual Conference Amid Debates Over Economic Strategy and Leadership").
 - The "overview" must synthesize the entire overarching saga or event across all member angles.
 
 FALSE POSITIVES TO KEEP STANDALONE (Return "stories": []):
