@@ -218,4 +218,39 @@ describe('scoreCluster', () => {
 
     expect(scoreCluster(withinWindowStory, now)).toBeGreaterThan(scoreCluster(outsideWindowStory, now));
   });
+
+  it('scales consensus recency adaptively with story breadth so a single straggler cannot keep an 8-source story fresh', () => {
+    const now = Date.now();
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+    // Story with 8 sources where only 1 or 2 sources published recently, while the rest are from 24h ago
+    const trailingStory = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - ONE_HOUR_MS), sourceId: 'src_0', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now - ONE_HOUR_MS), sourceId: 'src_1', sourceRel: { trustScore: 0.8 } } },
+        ...Array.from({ length: 6 }, (_, i) => ({
+          article: { publishedAt: new Date(now - TWENTY_FOUR_HOURS_MS), sourceId: `src_${i + 2}`, sourceRel: { trustScore: 0.8 } },
+        })),
+      ],
+    } as any;
+
+    // Active story with 8 sources where the majority (at least 3 sources) published 1 hour ago
+    const activeStory = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - ONE_HOUR_MS), sourceId: 'src_0', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now - ONE_HOUR_MS), sourceId: 'src_1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now - ONE_HOUR_MS), sourceId: 'src_2', sourceRel: { trustScore: 0.8 } } },
+        ...Array.from({ length: 5 }, (_, i) => ({
+          article: { publishedAt: new Date(now - TWENTY_FOUR_HOURS_MS), sourceId: `src_${i + 3}`, sourceRel: { trustScore: 0.8 } },
+        })),
+      ],
+    } as any;
+
+    // For 8 sources, consensus index is Math.floor(8 / 3) = 2 (the 3rd newest source).
+    // In activeStory, the 3rd source is 1h old (recency = 1.0 within freshness window).
+    // In trailingStory, the 3rd source is 24h old (recency decays past 4h window).
+    expect(scoreCluster(activeStory, now)).toBeGreaterThan(scoreCluster(trailingStory, now));
+  });
 });
+

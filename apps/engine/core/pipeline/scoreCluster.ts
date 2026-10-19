@@ -43,11 +43,18 @@ export function scoreCluster(cluster: ScorableCluster, now: number = Date.now())
   }
 
   // Consensus Recency:
-  // For multi-source clusters, use the 2nd newest source timestamp to establish consensus recency.
-  // This prevents a single outlet from resetting the clock with high-frequency follow-up churn.
+  // Prevent single-source churn from resetting the recency clock while ensuring broad stories
+  // require meaningful consensus rather than a single straggler.
+  // For 2-5 sources: requires the 2nd newest source.
+  // For 6-8 sources: requires the 3rd newest source (top 1/3).
+  // For 9+ sources: requires at least the top tercile (Math.floor(uniqueSources / 3)).
+  const uniqueSources = sourceLatestMap.size;
   const sortedSourceTimes = Array.from(sourceLatestMap.values()).sort((a, b) => b - a);
-  const consensusLatest =
-    sortedSourceTimes.length >= 2 ? sortedSourceTimes[1] : sortedSourceTimes[0];
+  const consensusIndex =
+    sortedSourceTimes.length >= 2
+      ? Math.min(sortedSourceTimes.length - 1, Math.max(1, Math.floor(uniqueSources / 3)))
+      : 0;
+  const consensusLatest = sortedSourceTimes[consensusIndex];
 
   const hoursSince = Math.max(0, (now - consensusLatest) / HOUR_MS);
 
@@ -57,7 +64,6 @@ export function scoreCluster(cluster: ScorableCluster, now: number = Date.now())
   const recency = Math.exp(-decayHours / HALF_LIFE_HOURS);
 
   // 1. Source breadth with expanded dynamic range
-  const uniqueSources = sourceLatestMap.size;
   const coverage = Math.pow(uniqueSources, 0.75);
 
   // 2. Multiplicative trust normalized to [0.55, 1.00]
