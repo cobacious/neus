@@ -173,4 +173,49 @@ describe('scoreCluster', () => {
 
     expect(scoreCluster(multiAngle, now)).toBeGreaterThan(scoreCluster(standalone, now));
   });
+
+  it('treats stories within the freshness plateau with equal recency to eliminate cron timing penalties', () => {
+    const now = Date.now();
+    const FIFTEEN_MINS_MS = 15 * 60 * 1000;
+    const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+
+    const storyFifteenMinsOld = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - FIFTEEN_MINS_MS), sourceId: 's1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now - FIFTEEN_MINS_MS), sourceId: 's2', sourceRel: { trustScore: 0.8 } } },
+      ],
+    } as any;
+
+    const storyThreeHoursOld = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - THREE_HOURS_MS), sourceId: 's1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now - THREE_HOURS_MS), sourceId: 's2', sourceRel: { trustScore: 0.8 } } },
+      ],
+    } as any;
+
+    // Both fall within the 4-hour freshness window, so recency is 1.0 for both
+    expect(scoreCluster(storyFifteenMinsOld, now)).toBeCloseTo(scoreCluster(storyThreeHoursOld, now), 5);
+  });
+
+  it('begins exponential decay once the freshness plateau has elapsed', () => {
+    const now = Date.now();
+    const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+    const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
+
+    const withinWindowStory = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - THREE_HOURS_MS), sourceId: 's1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now - THREE_HOURS_MS), sourceId: 's2', sourceRel: { trustScore: 0.8 } } },
+      ],
+    } as any;
+
+    const outsideWindowStory = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - FIVE_HOURS_MS), sourceId: 's1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now - FIVE_HOURS_MS), sourceId: 's2', sourceRel: { trustScore: 0.8 } } },
+      ],
+    } as any;
+
+    expect(scoreCluster(withinWindowStory, now)).toBeGreaterThan(scoreCluster(outsideWindowStory, now));
+  });
 });

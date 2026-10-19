@@ -19,6 +19,10 @@ export const HALF_LIFE_HOURS = process.env.CLUSTER_SCORE_HALF_LIFE_HOURS
   ? parseFloat(process.env.CLUSTER_SCORE_HALF_LIFE_HOURS)
   : 28; // 28-hour half-life balances 24h story retention with day-2 turnover
 
+export const FRESHNESS_WINDOW_HOURS = process.env.CLUSTER_SCORE_FRESHNESS_HOURS
+  ? parseFloat(process.env.CLUSTER_SCORE_FRESHNESS_HOURS)
+  : 4; // Configurable freshness plateau neutralises cron timing differences
+
 export function scoreCluster(cluster: ScorableCluster, now: number = Date.now()): number {
   const assignments = cluster.articleAssignments;
   if (!assignments || assignments.length === 0) return 0;
@@ -47,8 +51,10 @@ export function scoreCluster(cluster: ScorableCluster, now: number = Date.now())
 
   const hoursSince = Math.max(0, (now - consensusLatest) / HOUR_MS);
 
-  // Exponential recency decay so older clusters decay smoothly towards 0
-  const recency = Math.exp(-hoursSince / HALF_LIFE_HOURS);
+  // Exponential recency decay begins only after the freshness grace period has elapsed.
+  // This ensures stories breaking anytime within the cron cycle enter the feed with recency = 1.0.
+  const decayHours = Math.max(0, hoursSince - FRESHNESS_WINDOW_HOURS);
+  const recency = Math.exp(-decayHours / HALF_LIFE_HOURS);
 
   // 1. Source breadth with expanded dynamic range
   const uniqueSources = sourceLatestMap.size;
