@@ -155,6 +155,11 @@ export default async function handler(req: any, res?: any) {
   // Clean slug
   slug = slug.trim().replace(/^\/+|\/+$/g, '');
 
+  // Validate slug format (alphanumeric and hyphens only) to prevent injection
+  if (slug && !/^[a-zA-Z0-9\-]+$/.test(slug)) {
+    slug = '';
+  }
+
   let title = DEFAULT_TITLE;
   let description = DEFAULT_DESCRIPTION;
   const canonicalUrl = slug ? `${SITE_URL}/${slug}` : SITE_URL;
