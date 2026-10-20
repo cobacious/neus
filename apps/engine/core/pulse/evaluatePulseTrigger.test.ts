@@ -49,7 +49,7 @@ describe('evaluatePulseTrigger', () => {
 
     const result = evaluatePulseTrigger({
       isRunInProgress: false,
-      minutesSinceLastRun: 75,
+      minutesSinceLastRun: 130,
       unclusteredArticleCount: 10,
       recentArticles,
       now,
@@ -71,7 +71,7 @@ describe('evaluatePulseTrigger', () => {
 
     const result = evaluatePulseTrigger({
       isRunInProgress: false,
-      minutesSinceLastRun: 75,
+      minutesSinceLastRun: 130,
       unclusteredArticleCount: 10,
       recentArticles,
       now,
@@ -91,7 +91,7 @@ describe('evaluatePulseTrigger', () => {
 
     const result = evaluatePulseTrigger({
       isRunInProgress: false,
-      minutesSinceLastRun: 75,
+      minutesSinceLastRun: 130,
       unclusteredArticleCount: 10,
       recentArticles,
       now,
@@ -110,7 +110,7 @@ describe('evaluatePulseTrigger', () => {
 
     const result = evaluatePulseTrigger({
       isRunInProgress: false,
-      minutesSinceLastRun: 75,
+      minutesSinceLastRun: 130,
       unclusteredArticleCount: 10,
       recentArticles,
       now,
@@ -120,11 +120,11 @@ describe('evaluatePulseTrigger', () => {
     expect(result.reason).toBe('insufficient_activity');
   });
 
-  it('triggers on batch accumulation threshold when unclustered articles >= 45', () => {
+  it('triggers on batch accumulation threshold when unclustered articles >= 85', () => {
     const result = evaluatePulseTrigger({
       isRunInProgress: false,
-      minutesSinceLastRun: 90,
-      unclusteredArticleCount: 45,
+      minutesSinceLastRun: 130,
+      unclusteredArticleCount: 85,
       recentArticles: [],
       now,
     });
@@ -149,7 +149,7 @@ describe('evaluatePulseTrigger', () => {
   it('returns insufficient_activity during quiet periods', () => {
     const result = evaluatePulseTrigger({
       isRunInProgress: false,
-      minutesSinceLastRun: 120, // 2 hours
+      minutesSinceLastRun: 130, // beyond cooldown
       unclusteredArticleCount: 15,
       recentArticles: [],
       now,

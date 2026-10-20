@@ -7,8 +7,8 @@ export interface PulseArticle {
 }
 
 export interface PulseConfig {
-  cooldownMinutes?: number; // default: 60
-  batchArticleThreshold?: number; // default: 45
+  cooldownMinutes?: number; // default: 120 (2 hours)
+  batchArticleThreshold?: number; // default: 85
   heartbeatStalenessHours?: number; // default: 6
   surgeSourceThreshold?: number; // default: 3
   surgeWindowMinutes?: number; // default: 45
@@ -227,8 +227,8 @@ export function evaluatePulseTrigger(input: PulseTriggerInput): PulseTriggerResu
     config = {},
   } = input;
 
-  const cooldownMinutes = config.cooldownMinutes ?? 60;
-  const batchArticleThreshold = config.batchArticleThreshold ?? 45;
+  const cooldownMinutes = config.cooldownMinutes ?? 120;
+  const batchArticleThreshold = config.batchArticleThreshold ?? 85;
   const heartbeatStalenessHours = config.heartbeatStalenessHours ?? 6;
   const surgeSourceThreshold = config.surgeSourceThreshold ?? 3;
   const surgeWindowMinutes = config.surgeWindowMinutes ?? 45;

@@ -230,8 +230,14 @@ export async function executePulse(options: PulseOptions = {}): Promise<PulseExe
   const targetRef = options.ref || process.env.PULSE_GITHUB_REF || 'main';
   const githubToken = process.env.PULSE_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
 
-  // 1. Fetch active sources from database
-  const activeSources = await getActiveSources();
+  // 1. Fetch active sources from database (with retry for Neon serverless cold-start)
+  let activeSources;
+  try {
+    activeSources = await getActiveSources();
+  } catch (err: any) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    activeSources = await getActiveSources();
+  }
   let successfulFeeds = 0;
   let failedFeeds = 0;
   const allArticles: any[] = [];
@@ -293,6 +299,18 @@ export async function executePulse(options: PulseOptions = {}): Promise<PulseExe
   ]);
 
   // 5. Evaluate Pulse trigger policies
+  const pulseConfig = {
+    cooldownMinutes: process.env.PULSE_COOLDOWN_MINUTES
+      ? parseInt(process.env.PULSE_COOLDOWN_MINUTES, 10)
+      : 120,
+    batchArticleThreshold: process.env.PULSE_BATCH_THRESHOLD
+      ? parseInt(process.env.PULSE_BATCH_THRESHOLD, 10)
+      : 85,
+    heartbeatStalenessHours: process.env.PULSE_HEARTBEAT_HOURS
+      ? parseInt(process.env.PULSE_HEARTBEAT_HOURS, 10)
+      : 6,
+  };
+
   const evaluation = evaluatePulseTrigger({
     isRunInProgress: workflowStatus.isRunInProgress,
     minutesSinceLastRun: workflowStatus.minutesSinceLastRun,
@@ -304,6 +322,7 @@ export async function executePulse(options: PulseOptions = {}): Promise<PulseExe
       publishedAt: r.publishedAt,
       embedding: r.embedding,
     })),
+    config: pulseConfig,
   });
 
   // 6. Handle dispatch decision

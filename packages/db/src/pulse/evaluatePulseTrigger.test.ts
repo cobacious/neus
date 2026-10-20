@@ -87,10 +87,10 @@ describe('Pulse Trigger Evaluator', () => {
       expect(res.reason).toBe('run_in_progress');
     });
 
-    it('blocks trigger when cooldown is active (< 60m)', () => {
+    it('blocks trigger when cooldown is active (< 120m)', () => {
       const res = evaluatePulseTrigger({
         isRunInProgress: false,
-        minutesSinceLastRun: 35,
+        minutesSinceLastRun: 45,
         unclusteredArticleCount: 100,
         recentArticles: [],
         now: NOW,
@@ -109,7 +109,7 @@ describe('Pulse Trigger Evaluator', () => {
 
       const res = evaluatePulseTrigger({
         isRunInProgress: false,
-        minutesSinceLastRun: 75,
+        minutesSinceLastRun: 130,
         unclusteredArticleCount: 10,
         recentArticles,
         now: NOW,
@@ -120,11 +120,11 @@ describe('Pulse Trigger Evaluator', () => {
       expect(res.surgeCluster?.uniqueSources).toBe(3);
     });
 
-    it('triggers on batch volume threshold (>= 45 unclustered articles)', () => {
+    it('triggers on batch volume threshold (>= 85 unclustered articles)', () => {
       const res = evaluatePulseTrigger({
         isRunInProgress: false,
-        minutesSinceLastRun: 90,
-        unclusteredArticleCount: 48,
+        minutesSinceLastRun: 130,
+        unclusteredArticleCount: 90,
         recentArticles: [],
         now: NOW,
       });
@@ -146,10 +146,10 @@ describe('Pulse Trigger Evaluator', () => {
       expect(res.reason).toBe('heartbeat_staleness');
     });
 
-    it('returns insufficient_activity during quiet periods under cooldown', () => {
+    it('returns insufficient_activity during quiet periods when cooldown has elapsed', () => {
       const res = evaluatePulseTrigger({
         isRunInProgress: false,
-        minutesSinceLastRun: 70,
+        minutesSinceLastRun: 130,
         unclusteredArticleCount: 15,
         recentArticles: [],
         now: NOW,
