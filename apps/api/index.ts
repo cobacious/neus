@@ -56,6 +56,7 @@ export const yoga = createYoga({
 
 export const requestListener = (req: any, res: any) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  console.log(`[HTTP] ${req.method} ${url.pathname}`);
   if (url.pathname === '/api/pulse' || url.pathname === '/pulse') {
     return handlePulseHttpRequest(req, res);
   }
