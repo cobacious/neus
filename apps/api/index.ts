@@ -4,6 +4,7 @@ import { createYoga, Plugin } from 'graphql-yoga';
 import { useDisableIntrospection } from '@graphql-yoga/plugin-disable-introspection';
 import { GraphQLError, getOperationAST } from 'graphql';
 import { schema } from './schema';
+import { handlePulseHttpRequest } from './pulse';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -53,10 +54,18 @@ export const yoga = createYoga({
   plugins,
 });
 
+export const requestListener = (req: any, res: any) => {
+  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  if (url.pathname === '/api/pulse' || url.pathname === '/pulse') {
+    return handlePulseHttpRequest(req, res);
+  }
+  return yoga(req, res);
+};
+
 if (process.env.NODE_ENV !== 'test') {
-  const server = createServer(yoga);
+  const server = createServer(requestListener);
   const port = parseInt(process.env.PORT || '4000', 10);
   server.listen(port, () => {
-    console.log(`GraphQL server running at http://localhost:${port}/graphql`);
+    console.log(`API server running at http://localhost:${port} (GraphQL at /graphql, Pulse at /api/pulse)`);
   });
 }

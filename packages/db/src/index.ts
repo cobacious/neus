@@ -51,4 +51,8 @@ export * from './maintenance/cleanSpamClusters';
 export * from './maintenance/purgeDeactivatedSourceArticles';
 export * from './sources/syncSourceTrustScores';
 export * from './metrics/getDatabaseUsageMetrics';
+export * from './articles/countUnclusteredArticles';
+export * from './articles/getRecentArticlesForPulse';
+export * from './clusters/getLatestPipelineRunTime';
+export * from './pulse/evaluatePulseTrigger';
 export type { Source, Cluster, Story } from '@prisma/client';
