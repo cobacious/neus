@@ -8,6 +8,7 @@ export interface TimelineArticle {
   title?: string | null;
   publishedAt?: string | number | null;
   source?: string | null;
+  url?: string | null;
   sourceRel?: {
     id?: string;
     name?: string | null;
