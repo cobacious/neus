@@ -107,6 +107,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Batch embeddings & parallel summaries**: Gemini `batchEmbedContents` (up to 100 per call) and `mapConcurrent(clusters, 3)` for summaries.
 - [x] **Settled neighborhood skip**: Skip inactive candidate neighborhoods (< 48h) in `organizeStoryAngles.ts` before calling Gemini.
 - [x] **Article angle classification pre-filtering**: Use in-memory vector cosine similarity and incremental preservation to resolve article angles with minimal LLM calls.
+- [x] **Pulse Sentinel continuous ingestion & tri-trigger policy**: Built continuous zero-cost RSS feed watcher in [`apps/api/pulse.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/api/pulse.ts) and [`packages/db`](file:///Users/jwalton/Code/cobacious/neus/packages/db) with breaking surge, batch accumulation and heartbeat staleness policies; currently shadow testing in preview sandbox. (See [`docs/handoffs/pulse-sentinel-architecture.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/pulse-sentinel-architecture.md)).
 
 ### Track 5: CI/CD & Testing Automation (`.github/workflows`)
 - [x] **PR test & build gating CI**: Created GitHub Actions CI workflow in [`.github/workflows/ci.yml`](file:///Users/jwalton/Code/cobacious/neus/.github/workflows/ci.yml) that runs dependency caching, Prisma generation, `pnpm build` and `pnpm test` on pull requests and main pushes.
