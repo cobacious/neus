@@ -68,9 +68,26 @@ The Pulse architecture separates fast, continuous ingestion from heavy editorial
 
 ---
 
-## 5. Documentation & UI Updates Required Upon Launch
+## 5. Implementation Status & Live Sandbox
 
-When Pulse is rolled out, the following documentation and public-facing pages must be updated:
+Phase 1 and Phase 2 are complete and operating in a production-identical isolated sandbox:
+- **Git Branch**: [`feat/pulse-sentinel`](file:///Users/jwalton/Code/cobacious/neus)
+- **Database Branch**: Neon `preview/pulse` (`ep-shy-band-abzebmx3`)
+- **API Container**: Railway Preview at `https://neusapi-preview.up.railway.app`
+- **Frontend Prototype**: Vercel Preview at `https://neus-git-feat-pulse-sentinel-shipsharp.vercel.app`
+- **Shadow Ingestion Watcher**: Configured on `cron-job.org` running every 20 minutes with `?dryRun=true&secret=<API_KEY>`.
+
+### Verified Verification Run (20/10/2026 11:18 UTC)
+- **Ingestion**: 14 feeds parsed, 734 articles fetched, 101 new articles synced into `preview/pulse` in 6s. Follow-up run skipped all 732 existing articles in 1.3s.
+- **Breaking Surge**: Lexical headline matcher detected real-world breaking event (*"UK to deploy fighter jets to protect Saudi Arabia from Houthi attacks"*) across 5 distinct sources within 45m.
+- **Trigger Decision**: Evaluated `shouldTrigger: true`, `reason: 'breaking_surge'`, with GitHub dispatch cleanly bypassed by `dryRun: true`.
+- **Compute Cost**: $0 AI tokens.
+
+---
+
+## 6. Documentation & UI Updates Required Upon Production Promotion
+
+When Pulse is promoted from sandbox to `main`, the following documentation and public-facing pages must be updated:
 1. [`docs/architecture/pipeline.md`](file:///Users/jwalton/Code/cobacious/neus/docs/architecture/pipeline.md):
    - Update the pipeline flowchart showing the decoupled Pulse ingestion loop and on-demand GitHub Actions trigger.
    - Update the Cadence reference from "Every 4 hours" to "Event-Driven Pulse (20m ingestion, adaptive synthesis)".
