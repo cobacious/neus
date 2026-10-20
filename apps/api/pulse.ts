@@ -331,6 +331,10 @@ export async function executePulse(options: PulseOptions = {}): Promise<PulseExe
     dispatch = await dispatchGitHubWorkflow(targetRef, githubToken);
   }
 
+  console.log(
+    `[Pulse] Ingested ${validArticles.length} articles (${newArticles} new, ${updatedArticles} updated, ${unchangedArticles} unchanged). Decision: ${evaluation.reason} (trigger=${evaluation.shouldTrigger}, dryRun=${dryRun})`
+  );
+
   return {
     success: true,
     timestamp: new Date().toISOString(),
