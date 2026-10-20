@@ -41,7 +41,7 @@ export default function StoryAngleFilterTabs({
       >
         {angles.map((angle) => {
           const style =
-            colorMap?.get(angle.id) || colorMap?.get(angle.name) || DEFAULT_ANGLE_COLOR;
+            colorMap?.get(angle.id) || (angle.name ? colorMap?.get(angle.name) : undefined) || DEFAULT_ANGLE_COLOR;
           const isActive = selectedAngleId === angle.id;
 
           return (
