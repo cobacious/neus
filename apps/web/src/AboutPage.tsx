@@ -169,7 +169,7 @@ export default function AboutPage() {
             </span>
             <h3 className="font-semibold text-gray-900 text-sm">Neutral AI Synthesis</h3>
             <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-normal">
-              Google Gemini generates neutral, factual headlines, thread summaries and high-level
+              Large language models generate neutral, factual headlines, thread summaries and high-level
               macro-overviews based strictly on cross-source reporting evidence.
             </p>
           </li>
@@ -196,7 +196,7 @@ export default function AboutPage() {
             Rather than relying on click-through algorithms or virality signals, Neus ranks stories
             using a newsworthiness formula designed around journalistic weight:
           </p>
-          <ul className="list-disc list-inside space-y-1.5 pl-1 text-xs sm:text-sm text-gray-600">
+          <ul className="list-disc list-outside space-y-1.5 pl-5 text-xs sm:text-sm text-gray-600">
             <li>
               <strong className="text-gray-800">Cross-Source Consensus:</strong> Stories covered by
               multiple independent publications receive higher visibility than solitary reports.
