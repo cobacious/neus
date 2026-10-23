@@ -13,7 +13,7 @@ const DEFAULT_DESCRIPTION =
 const DEFAULT_IMAGE = 'https://neus.news/og-image.png';
 const SITE_URL = 'https://neus.news';
 
-export interface PrerenderAngle {
+export interface PrerenderThread {
   id: string;
   headline?: string | null;
   summary?: string | null;
@@ -42,7 +42,7 @@ export interface PrerenderClusterData {
     id: string;
     title: string;
     overview?: string | null;
-    clusters?: PrerenderAngle[] | null;
+    clusters?: PrerenderThread[] | null;
   } | null;
   articles?: PrerenderArticle[] | null;
 }
@@ -56,26 +56,26 @@ export function buildSemanticHtml(
   const safeDescription = escapeHtml(description);
 
   const story = cluster?.story;
-  const isMultiAngle = Boolean(story && story.clusters && story.clusters.length > 1);
-  const angles = (story?.clusters || []).filter(Boolean);
+  const isMultiThread = Boolean(story && story.clusters && story.clusters.length > 1);
+  const threads = (story?.clusters || []).filter(Boolean);
   const articles = (cluster?.articles || []).filter(Boolean);
 
-  let anglesSection = '';
-  if (isMultiAngle && angles.length > 0) {
-    const angleCards = angles
-      .map((angle) => {
-        const angleTitle = escapeHtml(angle.storyAngle || angle.headline || 'General Perspective');
-        const countText = angle.articleCount ? ` (${angle.articleCount} articles)` : '';
-        const summaryText = angle.summary ? `\n        <p style="font-size: 0.9375rem; color: #4b5563; line-height: 1.5; margin-top: 0.25rem;">${escapeHtml(angle.summary)}</p>` : '';
+  let threadsSection = '';
+  if (isMultiThread && threads.length > 0) {
+    const threadCards = threads
+      .map((thread) => {
+        const threadTitle = escapeHtml(thread.storyAngle || thread.headline || 'General Perspective');
+        const countText = thread.articleCount ? ` (${thread.articleCount} articles)` : '';
+        const summaryText = thread.summary ? `\n        <p style="font-size: 0.9375rem; color: #4b5563; line-height: 1.5; margin-top: 0.25rem;">${escapeHtml(thread.summary)}</p>` : '';
         return `      <div style="margin-bottom: 1rem; padding: 1rem; background-color: #f9fafb; border-left: 4px solid #4F6D7A; border-radius: 0.375rem;">
-        <h3 style="font-size: 1rem; font-weight: 600; margin: 0;">${angleTitle}${countText}</h3>${summaryText}
+        <h3 style="font-size: 1rem; font-weight: 600; margin: 0;">${threadTitle}${countText}</h3>${summaryText}
       </div>`;
       })
       .join('\n');
 
-    anglesSection = `\n    <section aria-label="Tracked Perspectives" style="margin-top: 2rem;">
-      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Tracked Reporting Perspectives (${angles.length} threads)</h2>
-${angleCards}
+    threadsSection = `\n    <section aria-label="Tracked Perspectives" style="margin-top: 2rem;">
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Tracked Reporting Perspectives (${threads.length} threads)</h2>
+${threadCards}
     </section>`;
   }
 
@@ -105,7 +105,7 @@ ${articleList}
       <p style="font-size: 0.875rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Neus · Neutral News Analysis</p>
       <h1>${safeTitle}</h1>
       <p style="font-size: 1.125rem; line-height: 1.6; color: #374151; margin-bottom: 1.5rem;">${safeDescription}</p>
-    </header>${anglesSection}${articlesSection}
+    </header>${threadsSection}${articlesSection}
   </article>
 </div>`;
 }
@@ -229,8 +229,8 @@ export default async function handler(req: any, res?: any) {
         if (cluster) {
           clusterData = cluster;
           const story = cluster.story;
-          const isMultiAngle = Boolean(story && story.clusters && story.clusters.length > 1);
-          if (isMultiAngle && story?.title) {
+          const isMultiThread = Boolean(story && story.clusters && story.clusters.length > 1);
+          if (isMultiThread && story?.title) {
             title = story.title;
             description = story.overview || cluster.summary || DEFAULT_DESCRIPTION;
           } else if (cluster.headline) {

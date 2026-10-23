@@ -1,36 +1,36 @@
-import { AngleItem } from './StoryAnglePills';
-import { AngleColorStyle, DEFAULT_ANGLE_COLOR } from '../utils/angleColors';
+import { ThreadItem } from './StoryThreadPills';
+import { ThreadColorStyle, DEFAULT_THREAD_COLOR } from '../utils/threadColors';
 
-export interface StoryAngleFilterTabsProps {
-  angles: AngleItem[];
-  colorMap?: Map<string, AngleColorStyle>;
-  selectedAngleId: string | null;
+export interface StoryThreadFilterTabsProps {
+  threads: ThreadItem[];
+  colorMap?: Map<string, ThreadColorStyle>;
+  selectedThreadId: string | null;
   totalArticlesCount?: number;
-  onSelectAngle: (angleId: string | null) => void;
+  onSelectThread: (threadId: string | null) => void;
   className?: string;
 }
 
 /**
- * Resolves the active angle ID against valid cluster IDs.
+ * Resolves the active thread ID against valid cluster IDs.
  * Returns null if the param is missing or not present in the valid IDs.
  */
-export function resolveActiveAngleId(
-  validAngleIds: Iterable<string>,
-  angleParam: string | null | undefined
+export function resolveActiveThreadId(
+  validThreadIds: Iterable<string>,
+  threadParam: string | null | undefined
 ): string | null {
-  if (!angleParam) return null;
-  const set = validAngleIds instanceof Set ? validAngleIds : new Set(validAngleIds);
-  return set.has(angleParam) ? angleParam : null;
+  if (!threadParam) return null;
+  const set = validThreadIds instanceof Set ? validThreadIds : new Set(validThreadIds);
+  return set.has(threadParam) ? threadParam : null;
 }
 
-export default function StoryAngleFilterTabs({
-  angles,
+export default function StoryThreadFilterTabs({
+  threads,
   colorMap,
-  selectedAngleId,
-  onSelectAngle,
+  selectedThreadId,
+  onSelectThread,
   className = '',
-}: StoryAngleFilterTabsProps) {
-  if (!angles || angles.length === 0) return null;
+}: StoryThreadFilterTabsProps) {
+  if (!threads || threads.length === 0) return null;
 
   return (
     <div className={`relative mb-6 ${className}`}>
@@ -39,18 +39,20 @@ export default function StoryAngleFilterTabs({
         role="tablist"
         aria-label="Story thread filter pills"
       >
-        {angles.map((angle) => {
+        {threads.map((thread) => {
           const style =
-            colorMap?.get(angle.id) || (angle.name ? colorMap?.get(angle.name) : undefined) || DEFAULT_ANGLE_COLOR;
-          const isActive = selectedAngleId === angle.id;
+            colorMap?.get(thread.id) ||
+            (thread.name ? colorMap?.get(thread.name) : undefined) ||
+            DEFAULT_THREAD_COLOR;
+          const isActive = selectedThreadId === thread.id;
 
           return (
             <button
-              key={angle.id}
+              key={thread.id}
               type="button"
               role="tab"
               aria-selected={isActive}
-              onClick={() => onSelectAngle(isActive ? null : angle.id)}
+              onClick={() => onSelectThread(isActive ? null : thread.id)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none ${
                 isActive
                   ? 'border-2 font-semibold shadow-xs'
@@ -71,14 +73,12 @@ export default function StoryAngleFilterTabs({
                 style={{ backgroundColor: style.border }}
                 aria-hidden="true"
               />
-              <span>{angle.name}</span>
-              {typeof angle.articleCount === 'number' && (
+              <span>{thread.name}</span>
+              {typeof thread.articleCount === 'number' && (
                 <span
-                  className={`text-[11px] font-normal ${
-                    isActive ? 'opacity-80' : 'text-gray-400'
-                  }`}
+                  className={`text-[11px] font-normal ${isActive ? 'opacity-80' : 'text-gray-400'}`}
                 >
-                  ({angle.articleCount})
+                  ({thread.articleCount})
                 </span>
               )}
               {isActive && (

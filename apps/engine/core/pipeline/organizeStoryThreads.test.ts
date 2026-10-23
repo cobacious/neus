@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 
 const mockDb = {
   getActiveClustersForStories: jest.fn(),
+  syncStoryWithThreads: jest.fn(),
   syncStoryWithAngles: jest.fn(),
   mergeClusters: jest.fn(),
   getStoriesForMatching: jest.fn(),
@@ -18,85 +19,15 @@ jest.unstable_mockModule('@neus/db', () => mockDb);
 const mockFetch = jest.fn();
 global.fetch = mockFetch as any;
 
-let organizeStoryAngles: typeof import('./organizeStoryAngles').organizeStoryAngles;
-let buildNeighborhoods: typeof import('./organizeStoryAngles').buildNeighborhoods;
-let computeCentroidEmbedding: typeof import('./organizeStoryAngles').computeCentroidEmbedding;
-let findCandidateStoriesForNeighborhood: typeof import('./organizeStoryAngles').findCandidateStoriesForNeighborhood;
-let isSettledNeighborhood: typeof import('./organizeStoryAngles').isSettledNeighborhood;
-let classifyArticleAngles: typeof import('./organizeStoryAngles').classifyArticleAngles;
+let organizeStoryThreads: typeof import('./organizeStoryThreads').organizeStoryThreads;
 
 beforeAll(async () => {
   process.env.GEMINI_API_KEY = 'mock-gemini-key';
   process.env.SUMMARY_MODEL = 'gemini-flash-latest';
-  ({
-    organizeStoryAngles,
-    buildNeighborhoods,
-    computeCentroidEmbedding,
-    findCandidateStoriesForNeighborhood,
-    isSettledNeighborhood,
-    classifyArticleAngles,
-  } = await import('./organizeStoryAngles'));
+  ({ organizeStoryThreads } = await import('./organizeStoryThreads'));
 });
 
-describe('buildNeighborhoods', () => {
-  it('returns empty array when fewer than 2 clusters have embeddings', () => {
-    const res = buildNeighborhoods([
-      { id: 'c1', createdAt: new Date(), embedding: [1, 0] },
-      { id: 'c2', createdAt: new Date(), embedding: null },
-    ]);
-    expect(res).toEqual([]);
-  });
-
-  it('groups clusters with cosine similarity >= threshold and ignores distant clusters', () => {
-    const clusters = [
-      { id: 'c1', createdAt: new Date(), embedding: [1, 0] },
-      { id: 'c2', createdAt: new Date(), embedding: [1, 0] },
-      { id: 'c3', createdAt: new Date(), embedding: [0, 1] },
-    ];
-
-    const neighborhoods = buildNeighborhoods(clusters, 0.78);
-    expect(neighborhoods).toHaveLength(1);
-    expect(neighborhoods[0].map((c) => c.id)).toEqual(['c1', 'c2']);
-  });
-});
-
-describe('computeCentroidEmbedding', () => {
-  it('computes mean vector across cluster embeddings', () => {
-    const clusters = [
-      { id: 'c1', createdAt: new Date(), embedding: [1, 0] },
-      { id: 'c2', createdAt: new Date(), embedding: [0.5, 0.5] },
-    ];
-    const centroid = computeCentroidEmbedding(clusters);
-    expect(centroid).toEqual([0.75, 0.25]);
-  });
-
-  it('returns null if no clusters have embeddings', () => {
-    expect(computeCentroidEmbedding([])).toBeNull();
-  });
-});
-
-describe('findCandidateStoriesForNeighborhood', () => {
-  it('matches existing stories by storyId on cluster or by vector similarity', () => {
-    const neighborhood = [
-      { id: 'c1', createdAt: new Date(), storyId: 's-existing', embedding: [1, 0] },
-      { id: 'c2', createdAt: new Date(), storyId: null, embedding: [0, 1] },
-    ];
-
-    const existingStories = [
-      { id: 's-existing', title: 'Story by ID', status: 'developing', overview: 'O1' },
-      { id: 's-vector', title: 'Story by Vector', status: 'dormant', overview: 'O2', embedding: [0, 1] },
-      { id: 's-unrelated', title: 'Unrelated', status: 'dormant', overview: 'O3', embedding: [-1, 0] },
-    ];
-
-    const candidates = findCandidateStoriesForNeighborhood(neighborhood, existingStories);
-
-    expect(candidates).toHaveLength(2);
-    expect(candidates.map((c) => c.id)).toContain('s-existing');
-    expect(candidates.map((c) => c.id)).toContain('s-vector');
-  });
-});
-
-describe('organizeStoryAngles', () => {
+describe('organizeStoryThreads', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     (mockDb.getStoriesForMatching as jest.Mock).mockResolvedValue([]);
@@ -115,10 +46,10 @@ describe('organizeStoryAngles', () => {
       { id: 'c1', headline: 'Lone Cluster', summary: 'Summary', embedding: [1, 0], createdAt: new Date() },
     ]);
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+    expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
     expect(mockDb.mergeClusters).not.toHaveBeenCalled();
   });
 
@@ -128,10 +59,10 @@ describe('organizeStoryAngles', () => {
       { id: 'c2', headline: 'Cluster 2', summary: 'S2', embedding: [0, 1], createdAt: new Date() },
     ]);
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+    expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
     expect(mockDb.mergeClusters).not.toHaveBeenCalled();
     expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
   });
@@ -183,23 +114,23 @@ describe('organizeStoryAngles', () => {
     });
 
     (mockDb.mergeClusters as jest.Mock).mockResolvedValue(2);
-    (mockDb.syncStoryWithAngles as jest.Mock).mockResolvedValue({ id: 'dormant-story-1' });
+    (mockDb.syncStoryWithThreads as jest.Mock).mockResolvedValue({ id: 'dormant-story-1' });
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     // 1. mergeClusters called with target c1 and source [c2]
     expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
 
     // 2. syncStoryWithAngles called with existingStoryId to reactivate the story
-    expect(mockDb.syncStoryWithAngles).toHaveBeenCalledWith({
+    expect(mockDb.syncStoryWithThreads).toHaveBeenCalledWith({
       existingStoryId: 'dormant-story-1',
       storyTitle: 'Christa Pike Execution Attempt and Aftermath',
       status: 'developing',
       overview: 'Macro overview of the event.',
       embedding: [1, 0],
-      angles: [
-        { clusterId: 'c1', angle: 'Botched Execution Attempt' },
-        { clusterId: 'c3', angle: 'Hospital Awakening' },
+      threads: [
+        { clusterId: 'c1', thread: 'Botched Execution Attempt' },
+        { clusterId: 'c3', thread: 'Hospital Awakening' },
       ],
     });
 
@@ -240,10 +171,10 @@ describe('organizeStoryAngles', () => {
 
     (mockDb.mergeClusters as jest.Mock).mockResolvedValue(1);
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
-    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+    expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
     expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
   });
 
@@ -309,7 +240,7 @@ describe('organizeStoryAngles', () => {
         json: async () => mockRealignmentResponse,
       });
 
-    (mockDb.syncStoryWithAngles as jest.Mock).mockResolvedValue({ id: 'story-1' });
+    (mockDb.syncStoryWithThreads as jest.Mock).mockResolvedValue({ id: 'story-1' });
     (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([
       { articleId: 'art-1', currentClusterId: 'c1', title: 'Chief steps down' },
       { articleId: 'art-2', currentClusterId: 'c1', title: 'Pike on ventilator in ICU' },
@@ -319,7 +250,7 @@ describe('organizeStoryAngles', () => {
       affectedClusters: ['c1', 'c2'],
     });
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     expect(mockDb.getStoryArticlesForRealignment).toHaveBeenCalledWith(['c1', 'c2']);
     expect(mockDb.realignStoryArticles).toHaveBeenCalledWith([
@@ -376,14 +307,14 @@ describe('organizeStoryAngles', () => {
       dissociatedClustersCount: 0,
     });
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     // Both clusters should be dissociated since they had storyIds but were not included in any story angles
     expect(mockDb.dissociateClusters).toHaveBeenCalledWith([
       'c-badenoch-scrutiny',
       'c-badenoch-tax',
     ]);
-    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+    expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
     expect(mockDb.disbandUnderpopulatedStories).toHaveBeenCalled();
   });
 
@@ -395,10 +326,10 @@ describe('organizeStoryAngles', () => {
         { id: 'c2', headline: 'B', summary: 'S2', embedding: [1, 0], createdAt: new Date() },
       ]);
 
-      await organizeStoryAngles();
+      await organizeStoryThreads();
 
       expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+      expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
       expect(mockDb.mergeClusters).not.toHaveBeenCalled();
       expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
     } finally {
@@ -423,7 +354,7 @@ describe('organizeStoryAngles', () => {
       }),
     });
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const firstBody = (mockFetch.mock.calls[0] as [string, any])[1].body as string;
@@ -467,207 +398,15 @@ describe('organizeStoryAngles', () => {
       },
     ]);
 
-    await organizeStoryAngles();
+    await organizeStoryThreads();
 
     // LLM must NOT be called for settled stories
     expect(mockFetch).not.toHaveBeenCalled();
     // syncStoryWithAngles must NOT be called (preserving updatedAt)
-    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+    expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
     // No clusters merged
     expect(mockDb.mergeClusters).not.toHaveBeenCalled();
     // Realignment not invoked
     expect(mockDb.realignStoryArticles).not.toHaveBeenCalled();
   });
 });
-
-describe('isSettledNeighborhood', () => {
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
-  const oldDate = new Date(Date.now() - 72 * 60 * 60 * 1000);
-  const recentDate = new Date();
-
-  const stories = [
-    {
-      id: 's1',
-      title: 'Story 1',
-      status: 'developing',
-      overview: 'Overview 1',
-      _count: { clusters: 2 },
-    },
-  ];
-
-  it('returns true when all clusters belong to same story, have angles, and are older than cutoff', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-    ];
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
-    expect(res.settled).toBe(true);
-    expect(res.storyTitle).toBe('Story 1');
-  });
-
-  it('returns false when any cluster lacks storyId', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
-      { id: 'c2', storyId: null, storyAngle: null, createdAt: oldDate },
-    ];
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
-    expect(res.settled).toBe(false);
-  });
-
-  it('returns false when clusters belong to different stories', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
-      { id: 'c2', storyId: 's2', storyAngle: 'A2', createdAt: oldDate },
-    ];
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
-    expect(res.settled).toBe(false);
-  });
-
-  it('returns false when any cluster is missing storyAngle', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
-      { id: 'c2', storyId: 's1', storyAngle: null, createdAt: oldDate },
-    ];
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
-    expect(res.settled).toBe(false);
-  });
-
-  it('returns false when a cluster was created recently', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate },
-      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: recentDate },
-    ];
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
-    expect(res.settled).toBe(false);
-  });
-
-  it('returns false when a cluster received a new article assignment recently', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: recentDate }] },
-    ];
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
-    expect(res.settled).toBe(false);
-  });
-
-  it('returns false when the story has more clusters in the DB than in this neighborhood', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-    ];
-    // DB story has 2 clusters, but neighborhood only has 1
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff);
-    expect(res.settled).toBe(false);
-  });
-
-  it('treats neighborhood as settled when activeStoryClusterCounts matches neighborhood, ignoring older DB clusters', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-    ];
-    // DB story has 15 historical clusters, but active window only has 2
-    const storiesWithManyDbClusters = [
-      { id: 's1', title: 'Story 1', status: 'developing', overview: 'Overview', _count: { clusters: 15 } },
-    ];
-    const activeMap = new Map<string, number>([['s1', 2]]);
-    const res = isSettledNeighborhood(neighborhood, storiesWithManyDbClusters, cutoff, activeMap);
-    expect(res.settled).toBe(true);
-    expect(res.storyTitle).toBe('Story 1');
-  });
-
-  it('returns false when activeStoryClusterCounts shows more active clusters outside the neighborhood', () => {
-    const neighborhood = [
-      { id: 'c1', storyId: 's1', storyAngle: 'A1', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-      { id: 'c2', storyId: 's1', storyAngle: 'A2', createdAt: oldDate, articleAssignments: [{ createdAt: oldDate }] },
-    ];
-    const activeMap = new Map<string, number>([['s1', 3]]);
-    const res = isSettledNeighborhood(neighborhood, stories, cutoff, activeMap);
-    expect(res.settled).toBe(false);
-  });
-});
-
-describe('classifyArticleAngles', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-  });
-
-  const angles = [
-    { clusterId: 'c1', angle: 'Legal Proceedings', headline: 'Trial begins', embedding: [1, 0, 0] },
-    { clusterId: 'c2', angle: 'Political Fallout', headline: 'Ministers respond', embedding: [0, 1, 0] },
-  ];
-
-  it('resolves confident articles via vector cosine similarity without making LLM calls', async () => {
-    const articles = [
-      { articleId: 'a1', currentClusterId: 'c1', title: 'Court hearing day one', embedding: [0.99, 0.05, 0] },
-      { articleId: 'a2', currentClusterId: 'c1', title: 'PM faces questions in parliament', embedding: [0.05, 0.99, 0] }, // misclassified into c1, clearly c2
-    ];
-
-    const assignments = await classifyArticleAngles('Major Political Trial', angles, articles);
-
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(assignments).toEqual([
-      { articleId: 'a1', targetClusterId: 'c1' },
-      { articleId: 'a2', targetClusterId: 'c2' },
-    ]);
-  });
-
-  it('defers ambiguous articles to LLM while resolving confident ones locally', async () => {
-    const articles = [
-      { articleId: 'a1', currentClusterId: 'c1', title: 'Court hearing day one', embedding: [0.99, 0.05, 0] }, // clear match for c1
-      { articleId: 'a2', currentClusterId: 'c1', title: 'Ambiguous reaction piece', embedding: [0.6, 0.58, 0] }, // ambiguous margin < 0.04
-    ];
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify({
-                    assignments: [{ articleId: 'a2', targetClusterId: 'c2' }],
-                  }),
-                },
-              ],
-            },
-          },
-        ],
-      }),
-    });
-
-    const assignments = await classifyArticleAngles('Major Political Trial', angles, articles);
-
-    // LLM should only have been called once for the single ambiguous article a2
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(assignments).toEqual([
-      { articleId: 'a1', targetClusterId: 'c1' },
-      { articleId: 'a2', targetClusterId: 'c2' },
-    ]);
-  });
-
-  it('preserves established articles in existing stories without LLM calls', async () => {
-    const articles = [
-      { articleId: 'a-old', currentClusterId: 'c1', title: 'Historic piece', embedding: null },
-      { articleId: 'a-new', currentClusterId: 'c-incoming', title: 'New development', embedding: [0.05, 0.98, 0] },
-    ];
-
-    const extendedAngles = [
-      ...angles,
-      { clusterId: 'c-incoming', angle: 'Public Opinion', headline: 'Voters react', embedding: [0, 0, 1] },
-    ];
-
-    const assignments = await classifyArticleAngles('Major Political Trial', extendedAngles, articles, {
-      isExistingStory: true,
-      newClusterIds: new Set(['c-incoming']),
-    });
-
-    // No LLM call needed: a-old is preserved incrementally; a-new is resolved via vector similarity
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(assignments).toEqual([
-      { articleId: 'a-old', targetClusterId: 'c1' },
-      { articleId: 'a-new', targetClusterId: 'c2' },
-    ]);
-  });
-});
-

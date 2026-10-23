@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './StatusBadge';
-import StoryAnglePills, { AngleItem } from './StoryAnglePills';
+import StoryThreadPills, { ThreadItem } from './StoryThreadPills';
 import ArticleTimelineSparkline, { TimelineArticle } from './ArticleTimelineSparkline';
-import { createAngleColorMap } from '../utils/angleColors';
+import { createThreadColorMap } from '../utils/threadColors';
 import { parseDate } from '../utils/dateUtils';
 import { isPaywalled } from '../utils/paywallUtils';
 import SourceFavicon from './SourceFavicon';
@@ -44,8 +44,12 @@ interface Story {
 export interface Cluster {
   id: string;
   headline: string;
-  slug: string | null;
   summary: string;
+  slug?: string | null;
+  articleCount?: number;
+  uniqueSources?: number;
+  consensusRatio?: number;
+  firstSeenAt?: string | number | null;
   createdAt: string | number;
   lastUpdatedAt?: string | number | null;
   origin: string;
@@ -57,12 +61,12 @@ export interface Cluster {
 
 export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   const story = cluster.story;
-  // If part of a multi-angle story, aggregate all sibling clusters
-  const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
+  // If part of a multi-thread story, aggregate all sibling clusters
+  const isMultiThreadStory = Boolean(story && story.clusters && story.clusters.length > 1);
 
   // Compute story-level inception to ensure multi-day stories decay from breaking to developing
   let earliestCreatedAt = cluster.createdAt;
-  if (isMultiAngleStory && story?.clusters) {
+  if (isMultiThreadStory && story?.clusters) {
     story.clusters.forEach((c) => {
       if (c.createdAt) {
         const cTime = parseDate(c.createdAt)?.getTime();
@@ -77,28 +81,29 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   const status = resolveStoryStatus(story?.status, {
     createdAt: earliestCreatedAt,
     lastUpdatedAt: cluster.lastUpdatedAt,
-    isMultiAngle: isMultiAngleStory,
+    isMultiThread: isMultiThreadStory,
   });
 
-  // Extract angles
-  const angles: AngleItem[] = isMultiAngleStory && story?.clusters
-    ? story.clusters.map((c) => ({
-        id: c.id,
-        name: c.storyAngle || c.headline || 'Thread',
-        articleCount: c.articles ? c.articles.length : undefined,
-      }))
-    : [];
+  // Extract threads
+  const threads: ThreadItem[] =
+    isMultiThreadStory && story?.clusters
+      ? story.clusters.map((c) => ({
+          id: c.id,
+          name: c.storyAngle || c.headline || 'Thread',
+          articleCount: c.articles ? c.articles.length : undefined,
+        }))
+      : [];
 
-  const colorMap = createAngleColorMap(angles);
+  const colorMap = createThreadColorMap(threads);
 
   // Aggregate articles for the timeline sparkline
   let timelineArticles: TimelineArticle[] = [];
   let sourcesMap = new Map<string, Source>();
 
-  if (isMultiAngleStory && story?.clusters) {
+  if (isMultiThreadStory && story?.clusters) {
     story.clusters.forEach((c) => {
-      const angleId = c.id;
-      const angleName = c.storyAngle || c.headline || undefined;
+      const threadId = c.id;
+      const threadName = c.storyAngle || c.headline || undefined;
       (c.articles || []).forEach((a) => {
         timelineArticles.push({
           id: a.id,
@@ -106,8 +111,8 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
           publishedAt: a.publishedAt,
           source: a.source,
           sourceRel: a.sourceRel,
-          angleId,
-          angleName,
+          threadId,
+          threadName,
         });
         if (a.sourceRel?.id) {
           sourcesMap.set(a.sourceRel.id, a.sourceRel);
@@ -125,8 +130,8 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
         publishedAt: a.publishedAt,
         source: a.source,
         sourceRel: a.sourceRel,
-        angleId: cluster.id,
-        angleName: cluster.storyAngle || undefined,
+        threadId: cluster.id,
+        threadName: cluster.storyAngle || undefined,
       };
     });
   }
@@ -141,7 +146,9 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
     <Link
       to={`/${cluster.slug || cluster.id}`}
       className="relative block bg-white border border-gray-200 shadow-xs hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
-      style={statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined}
+      style={
+        statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined
+      }
     >
       {/* Straddling Top-Border Status Badge */}
       {status && (
@@ -152,18 +159,18 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
 
       {/* Main Headline */}
       <h2 className="text-xl font-bold text-gray-900 mb-2 leading-snug">
-        {isMultiAngleStory && story ? story.title : cluster.headline}
+        {isMultiThreadStory && story ? story.title : cluster.headline}
       </h2>
 
       {/* Summary */}
       <p className="text-gray-700 mb-3 line-clamp-3 text-sm leading-relaxed">
-        {isMultiAngleStory && story?.overview ? story.overview : cluster.summary}
+        {isMultiThreadStory && story?.overview ? story.overview : cluster.summary}
       </p>
 
-      {/* Representation of angles on multi-angle stories */}
-      {angles.length > 1 && (
+      {/* Representation of threads on multi-thread stories */}
+      {threads.length > 1 && (
         <div className="mb-3">
-          <StoryAnglePills angles={angles} colorMap={colorMap} size="sm" />
+          <StoryThreadPills threads={threads} colorMap={colorMap} size="sm" />
         </div>
       )}
 
@@ -184,7 +191,9 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
             {visibleSources.map((source) => (
               <SourceFavicon key={source.id} source={source} showPaywallBadge />
             ))}
-            {extraSources > 0 && <span className="text-xs text-gray-500 font-medium">+{extraSources}</span>}
+            {extraSources > 0 && (
+              <span className="text-xs text-gray-500 font-medium">+{extraSources}</span>
+            )}
           </div>
         )}
         <span className="text-xs text-gray-500 font-medium shrink-0">

@@ -11,7 +11,7 @@ function wrapCdata(content: string): string {
   return `<![CDATA[${content.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
 }
 
-export interface AngleItem {
+export interface ThreadItem {
   id: string;
   headline?: string | null;
   slug?: string | null;
@@ -26,7 +26,7 @@ export interface StoryData {
   id: string;
   title: string;
   overview?: string | null;
-  clusters?: AngleItem[] | null;
+  clusters?: ThreadItem[] | null;
 }
 
 export interface ClusterFeedItem {
@@ -59,34 +59,34 @@ export function generateRssXml(clusters: ClusterFeedItem[], buildDate = new Date
       continue;
     }
 
-    const isMultiAngleStory =
+    const isMultiThreadStory =
       Boolean(storyId && story?.clusters && story.clusters.length > 1);
 
-    if (isMultiAngleStory && story) {
+    if (isMultiThreadStory && story) {
       seenStoryIds.add(story.id);
 
-      const angles = (story.clusters || []).filter((c) => Boolean(c.slug));
-      const primarySlug = cluster.slug || angles[0]?.slug;
+      const threads = (story.clusters || []).filter((c) => Boolean(c.slug));
+      const primarySlug = cluster.slug || threads[0]?.slug;
       if (!primarySlug) continue;
 
       const title = escapeXml(story.title || cluster.headline || 'Developing Story');
       const itemUrl = `${SITE_URL}/${primarySlug}`;
 
-      // Calculate latest timestamp across all angles
+      // Calculate latest timestamp across all threads
       const timestamps = [
         cluster.lastUpdatedAt,
         cluster.createdAt,
-        ...angles.map((a) => a.lastUpdatedAt || a.createdAt),
+        ...threads.map((t) => t.lastUpdatedAt || t.createdAt),
       ].filter((ts): ts is number => typeof ts === 'number' && !isNaN(ts) && ts > 0);
 
       const latestTime = timestamps.length > 0 ? Math.max(...timestamps) : Date.now();
       const pubDate = new Date(latestTime).toUTCString();
 
-      const angleLines = angles
-        .map((a) => {
-          const label = escapeXml(a.storyAngle || a.headline || 'General Thread');
-          const count = a.articleCount ? ` (${a.articleCount} articles)` : '';
-          const summary = a.summary ? `: ${escapeXml(a.summary)}` : '';
+      const threadLines = threads
+        .map((t) => {
+          const label = escapeXml(t.storyAngle || t.headline || 'General Thread');
+          const count = t.articleCount ? ` (${t.articleCount} articles)` : '';
+          const summary = t.summary ? `: ${escapeXml(t.summary)}` : '';
           return `<li><strong>${label}</strong>${count}${summary}</li>`;
         })
         .join('');
@@ -99,7 +99,7 @@ export function generateRssXml(clusters: ClusterFeedItem[], buildDate = new Date
 
       const contentHtml = [
         overviewHtml,
-        angles.length > 0 ? `<p><strong>Tracked Perspectives and Threads:</strong></p><ul>${angleLines}</ul>` : '',
+        threads.length > 0 ? `<p><strong>Tracked Perspectives and Threads:</strong></p><ul>${threadLines}</ul>` : '',
         `<p><a href="${itemUrl}">Read full coverage and explore balanced perspectives on Neus</a></p>`,
       ]
         .filter(Boolean)

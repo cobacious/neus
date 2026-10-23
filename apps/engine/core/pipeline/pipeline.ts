@@ -6,14 +6,19 @@ import { embedNewArticles } from './embedArticles';
 import { clusterRecentArticles } from './clusterArticles';
 import { scoreClusters } from './scoreClusters';
 import { summarizeClusters } from './summarizeClusters';
-import { organizeStoryAngles } from './organizeStoryAngles';
+import { organizeStoryThreads } from './organizeStoryThreads';
 import { cleanupEmptyClusters } from './cleanupEmptyClusters';
 import { disbandSingleClusters } from './disbandSingleClusters';
 import { archiveOldClusters } from './archiveOldClusters';
 import { pruneArchivedPayloads } from './pruneArchivedPayloads';
 import { purgeOldUnclusteredArticles } from './purgeOldUnclusteredArticles';
 import { vacuumDb } from './vacuumDb';
-import { resetPipelineLogger, logger, PipelineStep, emitWorkflowAnnotation } from '../../lib/pipelineLogger';
+import {
+  resetPipelineLogger,
+  logger,
+  PipelineStep,
+  emitWorkflowAnnotation,
+} from '../../lib/pipelineLogger';
 import { resetAiUsage, formatAiUsageLines, getTotalAiCostUsd } from '../../lib/aiUsage';
 import { checkAndPublishTopStory } from '../../lib/bluesky';
 import fs from 'fs';
@@ -40,7 +45,7 @@ export async function runPipeline() {
   await timed('embed', () => embedNewArticles());
   await timed('cluster', () => clusterRecentArticles());
   await timed('summarise', () => summarizeClusters());
-  await timed('organize', () => organizeStoryAngles());
+  await timed('organize', () => organizeStoryThreads());
   await timed('cleanup', () => cleanupEmptyClusters());
   await timed('disband', () => disbandSingleClusters());
   await timed('archive', () => archiveOldClusters());
@@ -71,7 +76,9 @@ export async function runPipeline() {
         );
       }
     } catch (err: any) {
-      logger.warn(`[${PipelineStep.Summary}] Bluesky syndication error (non-fatal): ${err?.message || err}`);
+      logger.warn(
+        `[${PipelineStep.Summary}] Bluesky syndication error (non-fatal): ${err?.message || err}`
+      );
     }
   });
 
@@ -141,4 +148,3 @@ ${metrics.storageBytes > 750 * 1024 * 1024 ? `> ⚠️ **Warning**: Database sto
     }
   }
 }
-

@@ -3,11 +3,11 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
 import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './components/StatusBadge';
-import { AngleItem } from './components/StoryAnglePills';
-import StoryAngleFilterTabs, { resolveActiveAngleId } from './components/StoryAngleFilterTabs';
+import { ThreadItem } from './components/StoryThreadPills';
+import StoryThreadFilterTabs, { resolveActiveThreadId } from './components/StoryThreadFilterTabs';
 import ArticleTimelineSparkline, { TimelineArticle } from './components/ArticleTimelineSparkline';
-import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHistogram';
-import { createAngleColorMap, DEFAULT_ANGLE_COLOR } from './utils/angleColors';
+import StoryThreadHistogram, { HistogramArticle } from './components/StoryThreadHistogram';
+import { createThreadColorMap, DEFAULT_THREAD_COLOR } from './utils/threadColors';
 import {
   parseDate,
   formatRelativeTime,
@@ -81,38 +81,40 @@ export default function ClusterDetailPage() {
 
   const cluster = result.data?.cluster;
   const story = cluster?.story;
-  const isMultiAngleStory = Boolean(story && story.clusters && story.clusters.length > 1);
-  const headline = isMultiAngleStory && story ? story.title : cluster?.headline;
-  const summary = isMultiAngleStory && story?.overview ? story.overview : cluster?.summary;
+  const isMultiThreadStory = Boolean(story && story.clusters && story.clusters.length > 1);
+  const headline = isMultiThreadStory && story ? story.title : cluster?.headline;
+  const summary = isMultiThreadStory && story?.overview ? story.overview : cluster?.summary;
 
-  const [expandedAngleIds, setExpandedAngleIds] = useState<Set<string>>(new Set());
+  const [expandedThreadIds, setExpandedThreadIds] = useState<Set<string>>(new Set());
   const [searchParams, setSearchParams] = useSearchParams();
-  const angleParam = searchParams.get('angle');
+  const threadParam = searchParams.get('thread') || searchParams.get('angle');
 
   const validClusterIds =
-    isMultiAngleStory && story?.clusters ? story.clusters.map((c: any) => c.id) : [];
-  const selectedAngleId = isMultiAngleStory
-    ? resolveActiveAngleId(validClusterIds, angleParam)
+    isMultiThreadStory && story?.clusters ? story.clusters.map((c: any) => c.id) : [];
+  const selectedThreadId = isMultiThreadStory
+    ? resolveActiveThreadId(validClusterIds, threadParam)
     : null;
 
-  const toggleAngleExpansion = (angleId: string) => {
-    setExpandedAngleIds((prev) => {
+  const toggleThreadExpansion = (threadId: string) => {
+    setExpandedThreadIds((prev) => {
       const next = new Set(prev);
-      if (next.has(angleId)) {
-        next.delete(angleId);
+      if (next.has(threadId)) {
+        next.delete(threadId);
       } else {
-        next.add(angleId);
+        next.add(threadId);
       }
       return next;
     });
   };
 
-  const handleSelectAngle = (angleId: string | null, shouldScroll = false) => {
+  const handleSelectThread = (threadId: string | null, shouldScroll = false) => {
     const nextParams = new URLSearchParams(searchParams);
-    if (!angleId || angleId === selectedAngleId) {
+    if (!threadId || threadId === selectedThreadId) {
+      nextParams.delete('thread');
       nextParams.delete('angle');
     } else {
-      nextParams.set('angle', angleId);
+      nextParams.set('thread', threadId);
+      nextParams.delete('angle');
     }
     setSearchParams(nextParams, { replace: false });
 
@@ -186,14 +188,27 @@ export default function ClusterDetailPage() {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto ring-8 ring-amber-50/60">
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
         </div>
         <div className="space-y-1.5">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Story Temporarily Unavailable</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+            Story Temporarily Unavailable
+          </h2>
           <p className="text-sm text-gray-600 max-w-md mx-auto leading-normal">
-            Unable to load this story due to an ongoing platform incident at our database hosting provider.
+            Unable to load this story due to an ongoing platform incident at our database hosting
+            provider.
           </p>
         </div>
         <div className="pt-2">
@@ -206,7 +221,7 @@ export default function ClusterDetailPage() {
   }
 
   let earliestCreatedAt = cluster.createdAt;
-  if (isMultiAngleStory && story?.clusters) {
+  if (isMultiThreadStory && story?.clusters) {
     story.clusters.forEach((c: any) => {
       if (c.createdAt) {
         const cTime = parseDate(c.createdAt)?.getTime();
@@ -221,12 +236,12 @@ export default function ClusterDetailPage() {
   const status = resolveStoryStatus(story?.status, {
     createdAt: earliestCreatedAt,
     lastUpdatedAt: cluster.lastUpdatedAt,
-    isMultiAngle: isMultiAngleStory,
+    isMultiThread: isMultiThreadStory,
   });
 
-  // 1. Gather all angles
-  const angles: AngleItem[] =
-    isMultiAngleStory && story?.clusters
+  // 1. Gather all threads
+  const threads: ThreadItem[] =
+    isMultiThreadStory && story?.clusters
       ? story.clusters.map((c: any) => ({
           id: c.id,
           name: c.storyAngle || c.headline || 'Thread',
@@ -234,20 +249,20 @@ export default function ClusterDetailPage() {
         }))
       : [];
 
-  const colorMap = createAngleColorMap(angles);
+  const colorMap = createThreadColorMap(threads);
 
   // 2. Gather all articles across the story
   const allArticles: (TimelineArticle & HistogramArticle & { fullArticle: any })[] = [];
-  const articlesByAngleId = new Map<string, any[]>();
+  const articlesByThreadId = new Map<string, any[]>();
 
-  if (isMultiAngleStory && story?.clusters) {
+  if (isMultiThreadStory && story?.clusters) {
     story.clusters.forEach((c: any) => {
-      const angleId = c.id;
-      const angleName = c.storyAngle || c.headline || undefined;
-      const angleArticles = c.articles || [];
-      articlesByAngleId.set(angleId, angleArticles);
+      const threadId = c.id;
+      const threadName = c.storyAngle || c.headline || undefined;
+      const threadArticles = c.articles || [];
+      articlesByThreadId.set(threadId, threadArticles);
 
-      angleArticles.forEach((a: any) => {
+      threadArticles.forEach((a: any) => {
         allArticles.push({
           id: a.id,
           title: a.title,
@@ -255,8 +270,8 @@ export default function ClusterDetailPage() {
           source: a.source,
           url: a.url,
           sourceRel: a.sourceRel,
-          angleId,
-          angleName,
+          threadId,
+          threadName,
           fullArticle: a,
         });
       });
@@ -270,8 +285,8 @@ export default function ClusterDetailPage() {
         source: a.source,
         url: a.url,
         sourceRel: a.sourceRel,
-        angleId: cluster.id,
-        angleName: cluster.storyAngle || undefined,
+        threadId: cluster.id,
+        threadName: cluster.storyAngle || undefined,
         fullArticle: a,
       });
     });
@@ -357,15 +372,15 @@ export default function ClusterDetailPage() {
 
       {/* Main Headline */}
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 my-2 leading-tight">
-        {isMultiAngleStory && story ? story.title : cluster.headline}
+        {isMultiThreadStory && story ? story.title : cluster.headline}
       </h1>
 
       {/* Main Summary */}
       <p className="text-gray-700 my-4 text-base leading-relaxed">
-        {isMultiAngleStory && story?.overview ? story.overview : cluster.summary}
+        {isMultiThreadStory && story?.overview ? story.overview : cluster.summary}
       </p>
 
-      {/* Timeline Sparkline (Feature 5) */}
+      {/* Timeline Sparkline */}
       <div className="my-5 pt-3 border-t border-gray-100">
         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
           Chronological Coverage
@@ -378,21 +393,21 @@ export default function ClusterDetailPage() {
         />
       </div>
 
-      {/* Histogram on cluster details view (Feature 4) */}
+      {/* Histogram on cluster details view */}
       <div className="my-6">
-        <StoryAngleHistogram articles={allArticles} angles={angles} colorMap={colorMap} />
+        <StoryThreadHistogram articles={allArticles} threads={threads} colorMap={colorMap} />
       </div>
 
-      {/* Articles grouped by Angle (Feature 3) */}
+      {/* Articles grouped by Thread */}
       <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-6">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-lg font-bold text-gray-900">
-            {isMultiAngleStory ? 'Articles by Thread' : 'Articles Coverage'}
+            {isMultiThreadStory ? 'Articles by Thread' : 'Articles Coverage'}
           </h3>
-          {selectedAngleId && (
+          {selectedThreadId && (
             <button
               type="button"
-              onClick={() => handleSelectAngle(null, false)}
+              onClick={() => handleSelectThread(null, false)}
               className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
             >
               Show all threads ✕
@@ -400,55 +415,55 @@ export default function ClusterDetailPage() {
           )}
         </div>
 
-        {isMultiAngleStory && (
-          <StoryAngleFilterTabs
-            angles={angles}
+        {isMultiThreadStory && (
+          <StoryThreadFilterTabs
+            threads={threads}
             colorMap={colorMap}
-            selectedAngleId={selectedAngleId}
+            selectedThreadId={selectedThreadId}
             totalArticlesCount={allArticles.length}
-            onSelectAngle={(angleId) => handleSelectAngle(angleId, false)}
+            onSelectThread={(threadId) => handleSelectThread(threadId, false)}
           />
         )}
 
-        {isMultiAngleStory && story?.clusters ? (
+        {isMultiThreadStory && story?.clusters ? (
           <div className="space-y-4 sm:space-y-8">
-            {(selectedAngleId
-              ? story.clusters.filter((c: any) => c.id === selectedAngleId)
+            {(selectedThreadId
+              ? story.clusters.filter((c: any) => c.id === selectedThreadId)
               : story.clusters
             ).map((c: any) => {
-              const angleName = c.storyAngle || c.headline || 'Thread';
-              const angleStyle =
-                colorMap.get(c.id) || colorMap.get(angleName) || DEFAULT_ANGLE_COLOR;
-              const angleArticles = sortArticlesNewestFirst(c.articles || []);
-              const isExpanded = expandedAngleIds.has(c.id);
-              const hasMoreArticles = angleArticles.length > 10;
+              const threadName = c.storyAngle || c.headline || 'Thread';
+              const threadStyle =
+                colorMap.get(c.id) || colorMap.get(threadName) || DEFAULT_THREAD_COLOR;
+              const threadArticles = sortArticlesNewestFirst(c.articles || []);
+              const isExpanded = expandedThreadIds.has(c.id);
+              const hasMoreArticles = threadArticles.length > 10;
               const visibleArticles =
-                hasMoreArticles && !isExpanded ? angleArticles.slice(0, 10) : angleArticles;
+                hasMoreArticles && !isExpanded ? threadArticles.slice(0, 10) : threadArticles;
 
               return (
                 <div
                   key={c.id}
                   className="border border-gray-200 border-l-4 rounded-r-lg rounded-l-xs p-3.5 sm:p-5 bg-gray-50/50"
-                  style={{ borderLeftColor: angleStyle.border }}
+                  style={{ borderLeftColor: threadStyle.border }}
                 >
-                  {/* Angle Header */}
+                  {/* Thread Header */}
                   <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                     <div className="flex items-center gap-2">
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: angleStyle.border }}
+                        style={{ backgroundColor: threadStyle.border }}
                         aria-hidden="true"
                       />
                       <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                        {angleName}
+                        {threadName}
                       </h4>
                     </div>
                     <span className="text-xs text-gray-500 font-medium">
-                      {angleArticles.length} {angleArticles.length === 1 ? 'article' : 'articles'}
+                      {threadArticles.length} {threadArticles.length === 1 ? 'article' : 'articles'}
                     </span>
                   </div>
 
-                  {/* Angle Headline & Summary */}
+                  {/* Thread Headline & Summary */}
                   {c.headline && (
                     <h5 className="text-base font-bold text-gray-900 mt-2 mb-1">{c.headline}</h5>
                   )}
@@ -456,7 +471,7 @@ export default function ClusterDetailPage() {
                     <p className="text-sm text-gray-600 mb-4 leading-relaxed">{c.summary}</p>
                   )}
 
-                  {/* Angle Articles List */}
+                  {/* Thread Articles List */}
                   <ul className="space-y-2 sm:space-y-2.5 mt-3">
                     {visibleArticles.map((article: any) => (
                       <li key={article.id}>
@@ -503,7 +518,7 @@ export default function ClusterDetailPage() {
                     <div className="mt-3 pt-1 text-center">
                       <button
                         type="button"
-                        onClick={() => toggleAngleExpansion(c.id)}
+                        onClick={() => toggleThreadExpansion(c.id)}
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
                       >
                         {isExpanded ? (
@@ -513,7 +528,7 @@ export default function ClusterDetailPage() {
                           </>
                         ) : (
                           <>
-                            <span>Show {angleArticles.length - 10} more articles</span>
+                            <span>Show {threadArticles.length - 10} more articles</span>
                             <span aria-hidden="true">↓</span>
                           </>
                         )}

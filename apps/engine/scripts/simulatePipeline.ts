@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { buildNeighborhoods } from '../core/pipeline/organizeStoryAngles';
-import type { ClusterWithEmbedding } from '../core/pipeline/organizeStoryAngles';
+import { buildNeighborhoods } from '../core/pipeline/storyThreads/storyNeighborhoods';
+import type { ClusterWithEmbedding } from '../core/pipeline/storyThreads/storyNeighborhoods';
 
 interface SnapshotData {
   activeClusters: ClusterWithEmbedding[];
@@ -76,7 +76,7 @@ export function runSimulation(): Record<string, SimulationResult> {
     const allHaveAngle = n.every((c) => Boolean(c.storyAngle));
     const matchedStory = targetStoryId ? stories.find((s) => s.id === targetStoryId) : null;
     const totalStoryClusters = targetStoryId
-      ? activeStoryClusterCounts.get(targetStoryId) ?? n.length
+      ? (activeStoryClusterCounts.get(targetStoryId) ?? n.length)
       : 0;
 
     let isSettled = false;
@@ -127,12 +127,14 @@ export function runSimulation(): Record<string, SimulationResult> {
     const allHaveAngle = n.every((c) => Boolean(c.storyAngle));
     const matchedStory = targetStoryId ? stories.find((s) => s.id === targetStoryId) : null;
     const totalStoryClusters = targetStoryId
-      ? activeStoryClusterCounts.get(targetStoryId) ?? n.length
+      ? (activeStoryClusterCounts.get(targetStoryId) ?? n.length)
       : 0;
 
     let isSettled = false;
     if (sameStory && allHaveAngle && matchedStory && totalStoryClusters <= n.length) {
-      const storyUpdatedMs = matchedStory.updatedAt ? new Date(matchedStory.updatedAt).getTime() : 0;
+      const storyUpdatedMs = matchedStory.updatedAt
+        ? new Date(matchedStory.updatedAt).getTime()
+        : 0;
       // 60-second tolerance for transaction timestamp differences
       const hasNewClusterSinceUpdate = n.some(
         (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
@@ -184,12 +186,14 @@ export function runSimulation(): Record<string, SimulationResult> {
     const allHaveAngle = n.every((c) => Boolean(c.storyAngle));
     const matchedStory = targetStoryId ? stories.find((s) => s.id === targetStoryId) : null;
     const totalStoryClusters = targetStoryId
-      ? activeStoryClusterCounts.get(targetStoryId) ?? n.length
+      ? (activeStoryClusterCounts.get(targetStoryId) ?? n.length)
       : 0;
 
     let isSettled = false;
     if (sameStory && allHaveAngle && matchedStory && totalStoryClusters <= n.length) {
-      const storyUpdatedMs = matchedStory.updatedAt ? new Date(matchedStory.updatedAt).getTime() : 0;
+      const storyUpdatedMs = matchedStory.updatedAt
+        ? new Date(matchedStory.updatedAt).getTime()
+        : 0;
       const hasNewClusterSinceUpdate = n.some(
         (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
       );

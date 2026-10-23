@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AngleColorStyle, DEFAULT_ANGLE_COLOR } from '../utils/angleColors';
+import { ThreadColorStyle, DEFAULT_THREAD_COLOR } from '../utils/threadColors';
 import { parseDate, formatRelativeTime } from '../utils/dateUtils';
 import SourceFavicon from './SourceFavicon';
 
@@ -14,15 +14,15 @@ export interface TimelineArticle {
     name?: string | null;
     faviconUrl?: string | null;
   } | null;
-  angleId?: string | null;
-  angleName?: string | null;
+  threadId?: string | null;
+  threadName?: string | null;
 }
 
 export interface TimelineMarker {
   id: string;
   pct: number;
   color: string;
-  angleStyle: AngleColorStyle;
+  threadStyle: ThreadColorStyle;
   time: number;
   article: TimelineArticle;
 }
@@ -41,7 +41,7 @@ export interface SparklineLayout {
 
 export interface ArticleTimelineSparklineProps {
   articles?: TimelineArticle[];
-  colorMap?: Map<string, AngleColorStyle>;
+  colorMap?: Map<string, ThreadColorStyle>;
   fallbackFirstSeen?: number | string | null;
   fallbackLastUpdated?: number | string | null;
   className?: string;
@@ -50,13 +50,13 @@ export interface ArticleTimelineSparklineProps {
 /**
  * Computes timeline markers along a clean, flat single horizontal rail.
  * - Every article has its own individual dot on the rail.
- * - Every dot strictly displays its angle's palette color.
+ * - Every dot strictly displays its thread's palette color.
  * - First seen is anchored at 0%, last updated is anchored at 100%.
  */
 export function buildTimelineMarkers(
   articles: TimelineArticle[] = [],
   options?: {
-    colorMap?: Map<string, AngleColorStyle>;
+    colorMap?: Map<string, ThreadColorStyle>;
     fallbackFirstSeen?: number | string | null;
     fallbackLastUpdated?: number | string | null;
   }
@@ -111,16 +111,16 @@ export function buildTimelineMarkers(
         ? 100
         : Math.max(0, Math.min(100, rawPct));
 
-    const angleStyle =
-      (article.angleId && colorMap?.get(article.angleId)) ||
-      (article.angleName && colorMap?.get(article.angleName)) ||
-      DEFAULT_ANGLE_COLOR;
+    const threadStyle =
+      (article.threadId && colorMap?.get(article.threadId)) ||
+      (article.threadName && colorMap?.get(article.threadName)) ||
+      DEFAULT_THREAD_COLOR;
 
     return {
       id: article.id,
       pct,
-      color: angleStyle.color,
-      angleStyle,
+      color: threadStyle.color,
+      threadStyle,
       time: article.time,
       article,
     };
@@ -260,18 +260,18 @@ export default function ArticleTimelineSparkline({
             <span>{formatRelativeTime(hoveredMarker.time)}</span>
           </div>
 
-          {/* Angle Tag Pill */}
-          {hoveredMarker.article.angleName && (
+          {/* Thread Tag Pill */}
+          {hoveredMarker.article.threadName && (
             <div className="mb-1.5">
               <span
                 className="inline-block px-1.5 py-0.5 rounded-xs text-[9px] font-semibold border uppercase tracking-wider"
                 style={{
-                  backgroundColor: hoveredMarker.angleStyle.bg,
-                  borderColor: hoveredMarker.angleStyle.border,
-                  color: hoveredMarker.angleStyle.text,
+                  backgroundColor: hoveredMarker.threadStyle.bg,
+                  borderColor: hoveredMarker.threadStyle.border,
+                  color: hoveredMarker.threadStyle.text,
                 }}
               >
-                {hoveredMarker.article.angleName}
+                {hoveredMarker.article.threadName}
               </span>
             </div>
           )}

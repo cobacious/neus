@@ -45,11 +45,11 @@ describe('RSS Feed Generator', () => {
     expect(xml).toContain('Synthesised from 14 independent articles.');
   });
 
-  it('groups multi-angle story into single RSS entry with all perspectives listed', () => {
+  it('groups multi-thread story into single RSS entry with all perspectives listed', () => {
     const fixedDate = new Date('2026-10-16T12:00:00Z');
     const clusters: ClusterFeedItem[] = [
       {
-        id: 'angle-1',
+        id: 'cluster-1',
         headline: 'Tiger Incident Enclosure Reopens to Visitors',
         slug: 'tiger-incident-reopening',
         summary: 'Park management reopened the enclosure following the fatal event.',
@@ -64,7 +64,7 @@ describe('RSS Feed Generator', () => {
           overview: 'A fatal tiger encounter led to park closures and council investigations.',
           clusters: [
             {
-              id: 'angle-1',
+              id: 'cluster-1',
               headline: 'Tiger Incident Enclosure Reopens to Visitors',
               slug: 'tiger-incident-reopening',
               summary: 'Park management reopened the enclosure following the fatal event.',
@@ -74,7 +74,7 @@ describe('RSS Feed Generator', () => {
               lastUpdatedAt: new Date('2026-10-16T10:30:00Z').getTime(),
             },
             {
-              id: 'angle-2',
+              id: 'cluster-2',
               headline: 'Family Issues Tribute to William Chapman',
               slug: 'william-chapman-tribute',
               summary: 'Relatives remembered the former actor and noted his mental health struggles.',
@@ -88,7 +88,7 @@ describe('RSS Feed Generator', () => {
       },
       // Second cluster in the feed belongs to the same story
       {
-        id: 'angle-2',
+        id: 'cluster-2',
         headline: 'Family Issues Tribute to William Chapman',
         slug: 'william-chapman-tribute',
         summary: 'Relatives remembered the former actor and noted his mental health struggles.',

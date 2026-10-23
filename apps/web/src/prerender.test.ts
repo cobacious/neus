@@ -8,7 +8,7 @@ describe('Prerender Handler', () => {
     global.fetch = originalFetch;
   });
 
-  it('buildSemanticHtml generates clean semantic markup for multi-angle stories', () => {
+  it('buildSemanticHtml generates clean semantic markup for multi-thread stories', () => {
     const html = buildSemanticHtml(
       'Yorkshire Wildlife Park Incident',
       'Overview of the incident and subsequent inquiries.',

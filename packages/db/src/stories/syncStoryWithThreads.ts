@@ -1,6 +1,12 @@
 import { prisma } from '../client';
 import { generateSlug } from '../clusters/generateSlug';
 
+export type StoryThreadInput = {
+  clusterId: string;
+  thread: string;
+};
+
+// Backward compatibility alias
 export type StoryAngleInput = {
   clusterId: string;
   angle: string;
@@ -12,15 +18,20 @@ export type StoryInput = {
   status?: string;
   overview?: string;
   embedding?: number[] | null;
-  angles: StoryAngleInput[];
+  threads?: StoryThreadInput[];
+  angles?: StoryAngleInput[];
 };
 
-export async function syncStoryWithAngles(input: StoryInput) {
-  if (!input.angles || input.angles.length === 0) {
+export async function syncStoryWithThreads(input: StoryInput) {
+  const normalizedThreads: StoryThreadInput[] =
+    input.threads ||
+    (input.angles ? input.angles.map((a) => ({ clusterId: a.clusterId, thread: a.angle })) : []);
+
+  if (!normalizedThreads || normalizedThreads.length === 0) {
     return null;
   }
 
-  const clusterIds = input.angles.map((a) => a.clusterId);
+  const clusterIds = normalizedThreads.map((t) => t.clusterId);
 
   // 1. Check if an explicit story ID was provided or if any clusters already belong to an existing Story
   let targetStoryId: string | null | undefined = input.existingStoryId;
@@ -68,18 +79,18 @@ export async function syncStoryWithAngles(input: StoryInput) {
     });
   }
 
-  // 2. Assign each cluster to this story and tag its angle
-  for (const item of input.angles) {
+  // 2. Assign each cluster to this story and tag its thread (stored in cluster.storyAngle)
+  for (const item of normalizedThreads) {
     await prisma.cluster.update({
       where: { id: item.clusterId },
       data: {
         storyId: story.id,
-        storyAngle: item.angle,
+        storyAngle: item.thread,
       },
     });
   }
 
-  // 3. Detach any clusters previously assigned to this story that are not in the new angles
+  // 3. Detach any clusters previously assigned to this story that are not in the new threads
   await prisma.cluster.updateMany({
     where: {
       storyId: story.id,
@@ -93,3 +104,6 @@ export async function syncStoryWithAngles(input: StoryInput) {
 
   return story;
 }
+
+// Backward compatibility alias
+export const syncStoryWithAngles = syncStoryWithThreads;

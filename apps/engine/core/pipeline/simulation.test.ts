@@ -16,9 +16,9 @@ const describeWithFixture = hasFixture ? describe : describe.skip;
 describeWithFixture('Pipeline Offline Simulation (Real Production Topology)', () => {
   let mockDb: any;
   let mockFetch: any;
-  let organizeStoryAngles: typeof import('./organizeStoryAngles').organizeStoryAngles;
-  let isSettledNeighborhood: typeof import('./organizeStoryAngles').isSettledNeighborhood;
-  let buildNeighborhoods: typeof import('./organizeStoryAngles').buildNeighborhoods;
+  let organizeStoryThreads: typeof import('./organizeStoryThreads').organizeStoryThreads;
+  let isSettledNeighborhood: typeof import('./storyThreads/storyNeighborhoods').isSettledNeighborhood;
+  let buildNeighborhoods: typeof import('./storyThreads/storyNeighborhoods').buildNeighborhoods;
 
   let snapshot: {
     activeClusters: any[];
@@ -35,6 +35,7 @@ describeWithFixture('Pipeline Offline Simulation (Real Production Topology)', ()
     mockDb = {
       getActiveClustersForStories: jest.fn().mockImplementation(async () => snapshot.activeClusters),
       getStoriesForMatching: jest.fn().mockImplementation(async () => snapshot.stories),
+      syncStoryWithThreads: jest.fn().mockImplementation(async () => ({ id: 'mock-synced-story' })),
       syncStoryWithAngles: jest.fn().mockImplementation(async () => ({ id: 'mock-synced-story' })),
       mergeClusters: jest.fn().mockResolvedValue(undefined as any),
       markDormantStories: jest.fn().mockResolvedValue(0 as any),
@@ -68,10 +69,12 @@ describeWithFixture('Pipeline Offline Simulation (Real Production Topology)', ()
     global.fetch = mockFetch as any;
 
     ({
-      organizeStoryAngles,
+      organizeStoryThreads,
+    } = await import('./organizeStoryThreads'));
+    ({
       isSettledNeighborhood,
       buildNeighborhoods,
-    } = await import('./organizeStoryAngles'));
+    } = await import('./storyThreads/storyNeighborhoods'));
   });
 
   beforeEach(() => {
@@ -85,7 +88,7 @@ describeWithFixture('Pipeline Offline Simulation (Real Production Topology)', ()
 
   it('correctly identifies settled stories and skips redundant LLM calls', async () => {
     const startTime = Date.now();
-    await organizeStoryAngles();
+    await organizeStoryThreads();
     const durationMs = Date.now() - startTime;
 
     // The simulation with mocked AI must execute very fast (< 3 seconds)
