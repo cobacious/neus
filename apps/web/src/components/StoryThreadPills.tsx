@@ -1,14 +1,17 @@
 import React from 'react';
 import { AngleColorStyle, createAngleColorMap } from '../utils/angleColors';
 
-export interface AngleItem {
+export interface ThreadItem {
   id: string;
   name?: string | null;
   articleCount?: number;
 }
 
-export interface StoryAnglePillsProps {
-  angles: AngleItem[];
+export type AngleItem = ThreadItem;
+
+export interface StoryThreadPillsProps {
+  threads?: ThreadItem[];
+  angles?: ThreadItem[];
   colorMap?: Map<string, AngleColorStyle>;
   size?: 'sm' | 'md';
   className?: string;
@@ -16,38 +19,37 @@ export interface StoryAnglePillsProps {
   onSelectAngle?: (angleId: string) => void;
 }
 
-export default function StoryAnglePills({
+export type StoryAnglePillsProps = StoryThreadPillsProps;
+
+export default function StoryThreadPills({
+  threads,
   angles,
   colorMap,
   size = 'sm',
   className = '',
   activeAngleId,
   onSelectAngle,
-}: StoryAnglePillsProps) {
-  if (!angles || angles.length === 0) return null;
+}: StoryThreadPillsProps) {
+  const items = threads || angles || [];
+  if (items.length === 0) return null;
 
   // Use provided map or generate one deterministically
   const activeMap =
-    colorMap ||
-    createAngleColorMap(
-      angles.map((a) => ({ id: a.id, name: a.name || a.id }))
-    );
+    colorMap || createAngleColorMap(items.map((a) => ({ id: a.id, name: a.name || a.id })));
 
-  const sizeClasses =
-    size === 'md'
-      ? 'px-3 py-1 text-xs'
-      : 'px-2.5 py-0.5 text-[11px]';
+  const sizeClasses = size === 'md' ? 'px-3 py-1 text-xs' : 'px-2.5 py-0.5 text-[11px]';
 
   const isInteractive = typeof onSelectAngle === 'function';
 
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      {angles.map((angle) => {
-        const style = activeMap.get(angle.id) || activeMap.get(angle.name || '') || {
-          bg: '#EEF3F5',
-          border: '#4F6D7A',
-          text: '#223842',
-        };
+      {items.map((angle) => {
+        const style = activeMap.get(angle.id) ||
+          activeMap.get(angle.name || '') || {
+            bg: '#EEF3F5',
+            border: '#4F6D7A',
+            text: '#223842',
+          };
         const label = angle.name || 'Thread';
         const isActive = isInteractive && activeAngleId === angle.id;
 
@@ -80,9 +82,7 @@ export default function StoryAnglePills({
           >
             {label}
             {typeof angle.articleCount === 'number' && angle.articleCount > 0 && (
-              <span className="ml-1 opacity-70 text-[10px]">
-                ({angle.articleCount})
-              </span>
+              <span className="ml-1 opacity-70 text-[10px]">({angle.articleCount})</span>
             )}
           </Component>
         );
@@ -90,3 +90,5 @@ export default function StoryAnglePills({
     </div>
   );
 }
+
+export const StoryAnglePills = StoryThreadPills;

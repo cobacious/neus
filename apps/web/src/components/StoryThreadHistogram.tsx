@@ -16,12 +16,15 @@ export interface HistogramArticle {
   angleName?: string | null;
 }
 
-interface StoryAngleHistogramProps {
+export interface StoryThreadHistogramProps {
   articles: HistogramArticle[];
+  threads?: Array<{ id: string; name?: string | null }>;
   angles?: Array<{ id: string; name?: string | null }>;
   colorMap?: Map<string, AngleColorStyle>;
   className?: string;
 }
+
+export type StoryAngleHistogramProps = StoryThreadHistogramProps;
 
 export interface BinSegment {
   angleId: string;
@@ -203,12 +206,13 @@ export function buildHistogramBins(
   return { bins: createdBins, maxBinTotal: max, validArticles };
 }
 
-export default function StoryAngleHistogram({
+export default function StoryThreadHistogram({
   articles = [],
+  threads,
   angles = [],
   colorMap,
   className = '',
-}: StoryAngleHistogramProps) {
+}: StoryThreadHistogramProps) {
   const [hoveredBinIndex, setHoveredBinIndex] = useState<number | null>(null);
 
   const { bins, maxBinTotal, validArticles } = useMemo(() => {
@@ -390,62 +394,61 @@ export default function StoryAngleHistogram({
         </svg>
 
         {/* Hover Popover Tooltip */}
-        {hoveredBin && (() => {
-          const hoverPct =
-            hoveredBinIndex !== null
-              ? ((paddingLeft + (hoveredBinIndex + 0.5) * slotWidth) / svgWidth) * 100
-              : 50;
+        {hoveredBin &&
+          (() => {
+            const hoverPct =
+              hoveredBinIndex !== null
+                ? ((paddingLeft + (hoveredBinIndex + 0.5) * slotWidth) / svgWidth) * 100
+                : 50;
 
-          return (
-            <div
-              className={`absolute bottom-full mb-2 z-30 pointer-events-none bg-gray-900 text-white rounded-lg p-3 text-xs shadow-xl min-w-[190px] max-w-[calc(100vw-32px)] transition-all duration-150 border border-gray-800 ${
-                hoverPct < 20
-                  ? 'left-0 translate-x-0'
-                  : hoverPct > 80
-                  ? 'left-full -translate-x-full'
-                  : '-translate-x-1/2'
-              }`}
-              style={
-                hoverPct >= 20 && hoverPct <= 80
-                  ? { left: `${hoverPct}%` }
-                  : undefined
-              }
-            >
-              <div className="font-semibold text-gray-200 border-b border-gray-700 pb-1 mb-1.5 flex justify-between gap-4">
-                <span>{hoveredBin.rangeLabel || hoveredBin.label}</span>
-                <span className="text-gray-400 font-normal whitespace-nowrap">
-                  {hoveredBin.total} {hoveredBin.total === 1 ? 'article' : 'articles'}
-                </span>
-              </div>
-              {hoveredBin.segments.length > 0 ? (
-                <div className="space-y-1">
-                  {hoveredBin.segments.map((seg) => (
-                    <div
-                      key={seg.angleId}
-                      className="flex items-center justify-between gap-3 text-[11px]"
-                    >
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: seg.color }}
-                        />
-                        <span className="truncate text-gray-300">{seg.angleName}</span>
+            return (
+              <div
+                className={`absolute bottom-full mb-2 z-30 pointer-events-none bg-gray-900 text-white rounded-lg p-3 text-xs shadow-xl min-w-[190px] max-w-[calc(100vw-32px)] transition-all duration-150 border border-gray-800 ${
+                  hoverPct < 20
+                    ? 'left-0 translate-x-0'
+                    : hoverPct > 80
+                      ? 'left-full -translate-x-full'
+                      : '-translate-x-1/2'
+                }`}
+                style={hoverPct >= 20 && hoverPct <= 80 ? { left: `${hoverPct}%` } : undefined}
+              >
+                <div className="font-semibold text-gray-200 border-b border-gray-700 pb-1 mb-1.5 flex justify-between gap-4">
+                  <span>{hoveredBin.rangeLabel || hoveredBin.label}</span>
+                  <span className="text-gray-400 font-normal whitespace-nowrap">
+                    {hoveredBin.total} {hoveredBin.total === 1 ? 'article' : 'articles'}
+                  </span>
+                </div>
+                {hoveredBin.segments.length > 0 ? (
+                  <div className="space-y-1">
+                    {hoveredBin.segments.map((seg) => (
+                      <div
+                        key={seg.angleId}
+                        className="flex items-center justify-between gap-3 text-[11px]"
+                      >
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: seg.color }}
+                          />
+                          <span className="truncate text-gray-300">{seg.angleName}</span>
+                        </div>
+                        <span className="font-semibold text-gray-100 flex-shrink-0">
+                          {seg.count}
+                        </span>
                       </div>
-                      <span className="font-semibold text-gray-100 flex-shrink-0">
-                        {seg.count}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-gray-400 text-[11px] italic py-0.5">
-                  No articles in this window
-                </div>
-              )}
-            </div>
-          );
-        })()}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-gray-400 text-[11px] italic py-0.5">
+                    No articles in this window
+                  </div>
+                )}
+              </div>
+            );
+          })()}
       </div>
     </div>
   );
 }
+
+export const StoryAngleHistogram = StoryThreadHistogram;

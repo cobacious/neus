@@ -1,7 +1,7 @@
-import { buildHistogramBins, HistogramArticle } from './StoryAngleHistogram';
+import { buildHistogramBins, HistogramArticle } from './StoryThreadHistogram';
 import { AngleColorStyle } from '../utils/angleColors';
 
-describe('StoryAngleHistogram buildHistogramBins', () => {
+describe('StoryThreadHistogram buildHistogramBins', () => {
   it('returns empty bins and maxBinTotal 0 when articles are empty', () => {
     const result = buildHistogramBins([]);
     expect(result.bins).toHaveLength(0);
@@ -51,8 +51,16 @@ describe('StoryAngleHistogram buildHistogramBins', () => {
     const baseTime = new Date('2026-10-09T12:00:00.000Z').getTime();
     const articles: HistogramArticle[] = [
       { id: '1', title: 'Initial Flash', publishedAt: new Date(baseTime).toISOString() },
-      { id: '2', title: 'Follow-up', publishedAt: new Date(baseTime + 20 * 60 * 1000).toISOString() },
-      { id: '3', title: 'Confirmation', publishedAt: new Date(baseTime + 45 * 60 * 1000).toISOString() },
+      {
+        id: '2',
+        title: 'Follow-up',
+        publishedAt: new Date(baseTime + 20 * 60 * 1000).toISOString(),
+      },
+      {
+        id: '3',
+        title: 'Confirmation',
+        publishedAt: new Date(baseTime + 45 * 60 * 1000).toISOString(),
+      },
     ];
 
     const result = buildHistogramBins(articles);
@@ -65,8 +73,16 @@ describe('StoryAngleHistogram buildHistogramBins', () => {
   it('uses 1-hour or 2-hour buckets for 12-24h stories', () => {
     const baseTime = new Date('2026-10-09T00:00:00.000Z').getTime();
     const articles: HistogramArticle[] = [
-      { id: '1', title: 'Morning', publishedAt: new Date(baseTime + 8 * 3600 * 1000).toISOString() },
-      { id: '2', title: 'Evening', publishedAt: new Date(baseTime + 20 * 3600 * 1000).toISOString() },
+      {
+        id: '1',
+        title: 'Morning',
+        publishedAt: new Date(baseTime + 8 * 3600 * 1000).toISOString(),
+      },
+      {
+        id: '2',
+        title: 'Evening',
+        publishedAt: new Date(baseTime + 20 * 3600 * 1000).toISOString(),
+      },
     ];
 
     const result = buildHistogramBins(articles);
@@ -80,8 +96,16 @@ describe('StoryAngleHistogram buildHistogramBins', () => {
     const baseTime = new Date('2026-10-01T10:00:00.000Z').getTime();
     const articles: HistogramArticle[] = [
       { id: '1', title: 'Day 1', publishedAt: new Date(baseTime).toISOString() },
-      { id: '2', title: 'Day 3', publishedAt: new Date(baseTime + 2 * 24 * 3600 * 1000).toISOString() },
-      { id: '3', title: 'Day 5', publishedAt: new Date(baseTime + 4 * 24 * 3600 * 1000).toISOString() },
+      {
+        id: '2',
+        title: 'Day 3',
+        publishedAt: new Date(baseTime + 2 * 24 * 3600 * 1000).toISOString(),
+      },
+      {
+        id: '3',
+        title: 'Day 5',
+        publishedAt: new Date(baseTime + 4 * 24 * 3600 * 1000).toISOString(),
+      },
     ];
 
     const result = buildHistogramBins(articles);
@@ -91,14 +115,54 @@ describe('StoryAngleHistogram buildHistogramBins', () => {
 
   it('separates angles into distinct segments within bins', () => {
     const colorMap = new Map<string, AngleColorStyle>([
-      ['angle-1', { id: 'angle-1', name: 'Takeover Bid', color: '#4F6D7A', bg: '', border: '', text: '', dotColor: '' }],
-      ['angle-2', { id: 'angle-2', name: 'Financial Fallout', color: '#DD6E42', bg: '', border: '', text: '', dotColor: '' }],
+      [
+        'angle-1',
+        {
+          id: 'angle-1',
+          name: 'Takeover Bid',
+          color: '#4F6D7A',
+          bg: '',
+          border: '',
+          text: '',
+          dotColor: '',
+        },
+      ],
+      [
+        'angle-2',
+        {
+          id: 'angle-2',
+          name: 'Financial Fallout',
+          color: '#DD6E42',
+          bg: '',
+          border: '',
+          text: '',
+          dotColor: '',
+        },
+      ],
     ]);
 
     const articles: HistogramArticle[] = [
-      { id: '1', title: 'Bid A', publishedAt: '2026-10-09T08:05:00.000Z', angleId: 'angle-1', angleName: 'Takeover Bid' },
-      { id: '2', title: 'Finance B', publishedAt: '2026-10-09T08:10:00.000Z', angleId: 'angle-2', angleName: 'Financial Fallout' },
-      { id: '3', title: 'Bid C', publishedAt: '2026-10-09T08:12:00.000Z', angleId: 'angle-1', angleName: 'Takeover Bid' },
+      {
+        id: '1',
+        title: 'Bid A',
+        publishedAt: '2026-10-09T08:05:00.000Z',
+        angleId: 'angle-1',
+        angleName: 'Takeover Bid',
+      },
+      {
+        id: '2',
+        title: 'Finance B',
+        publishedAt: '2026-10-09T08:10:00.000Z',
+        angleId: 'angle-2',
+        angleName: 'Financial Fallout',
+      },
+      {
+        id: '3',
+        title: 'Bid C',
+        publishedAt: '2026-10-09T08:12:00.000Z',
+        angleId: 'angle-1',
+        angleName: 'Takeover Bid',
+      },
     ];
 
     const result = buildHistogramBins(articles, colorMap);

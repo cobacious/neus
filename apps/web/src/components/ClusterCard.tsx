@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './StatusBadge';
-import StoryAnglePills, { AngleItem } from './StoryAnglePills';
+import StoryThreadPills, { ThreadItem } from './StoryThreadPills';
 import ArticleTimelineSparkline, { TimelineArticle } from './ArticleTimelineSparkline';
 import { createAngleColorMap } from '../utils/angleColors';
 import { parseDate } from '../utils/dateUtils';
@@ -81,13 +81,14 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   });
 
   // Extract angles
-  const angles: AngleItem[] = isMultiAngleStory && story?.clusters
-    ? story.clusters.map((c) => ({
-        id: c.id,
-        name: c.storyAngle || c.headline || 'Thread',
-        articleCount: c.articles ? c.articles.length : undefined,
-      }))
-    : [];
+  const angles: AngleItem[] =
+    isMultiAngleStory && story?.clusters
+      ? story.clusters.map((c) => ({
+          id: c.id,
+          name: c.storyAngle || c.headline || 'Thread',
+          articleCount: c.articles ? c.articles.length : undefined,
+        }))
+      : [];
 
   const colorMap = createAngleColorMap(angles);
 
@@ -141,7 +142,9 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
     <Link
       to={`/${cluster.slug || cluster.id}`}
       className="relative block bg-white border border-gray-200 shadow-xs hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
-      style={statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined}
+      style={
+        statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined
+      }
     >
       {/* Straddling Top-Border Status Badge */}
       {status && (
@@ -163,7 +166,7 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
       {/* Representation of angles on multi-angle stories */}
       {angles.length > 1 && (
         <div className="mb-3">
-          <StoryAnglePills angles={angles} colorMap={colorMap} size="sm" />
+          <StoryThreadPills angles={angles} colorMap={colorMap} size="sm" />
         </div>
       )}
 
@@ -184,7 +187,9 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
             {visibleSources.map((source) => (
               <SourceFavicon key={source.id} source={source} showPaywallBadge />
             ))}
-            {extraSources > 0 && <span className="text-xs text-gray-500 font-medium">+{extraSources}</span>}
+            {extraSources > 0 && (
+              <span className="text-xs text-gray-500 font-medium">+{extraSources}</span>
+            )}
           </div>
         )}
         <span className="text-xs text-gray-500 font-medium shrink-0">

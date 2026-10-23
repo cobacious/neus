@@ -1,8 +1,9 @@
-import { AngleItem } from './StoryAnglePills';
+import { ThreadItem, AngleItem } from './StoryThreadPills';
 import { AngleColorStyle, DEFAULT_ANGLE_COLOR } from '../utils/angleColors';
 
-export interface StoryAngleFilterTabsProps {
-  angles: AngleItem[];
+export interface StoryThreadFilterTabsProps {
+  threads?: ThreadItem[];
+  angles?: AngleItem[];
   colorMap?: Map<string, AngleColorStyle>;
   selectedAngleId: string | null;
   totalArticlesCount?: number;
@@ -10,27 +11,33 @@ export interface StoryAngleFilterTabsProps {
   className?: string;
 }
 
+export type StoryAngleFilterTabsProps = StoryThreadFilterTabsProps;
+
 /**
- * Resolves the active angle ID against valid cluster IDs.
+ * Resolves the active thread ID against valid cluster IDs.
  * Returns null if the param is missing or not present in the valid IDs.
  */
-export function resolveActiveAngleId(
-  validAngleIds: Iterable<string>,
-  angleParam: string | null | undefined
+export function resolveActiveThreadId(
+  validThreadIds: Iterable<string>,
+  threadParam: string | null | undefined
 ): string | null {
-  if (!angleParam) return null;
-  const set = validAngleIds instanceof Set ? validAngleIds : new Set(validAngleIds);
-  return set.has(angleParam) ? angleParam : null;
+  if (!threadParam) return null;
+  const set = validThreadIds instanceof Set ? validThreadIds : new Set(validThreadIds);
+  return set.has(threadParam) ? threadParam : null;
 }
 
-export default function StoryAngleFilterTabs({
+export const resolveActiveAngleId = resolveActiveThreadId;
+
+export default function StoryThreadFilterTabs({
+  threads,
   angles,
   colorMap,
   selectedAngleId,
   onSelectAngle,
   className = '',
-}: StoryAngleFilterTabsProps) {
-  if (!angles || angles.length === 0) return null;
+}: StoryThreadFilterTabsProps) {
+  const items = threads || angles || [];
+  if (items.length === 0) return null;
 
   return (
     <div className={`relative mb-6 ${className}`}>
@@ -39,9 +46,11 @@ export default function StoryAngleFilterTabs({
         role="tablist"
         aria-label="Story thread filter pills"
       >
-        {angles.map((angle) => {
+        {items.map((angle) => {
           const style =
-            colorMap?.get(angle.id) || (angle.name ? colorMap?.get(angle.name) : undefined) || DEFAULT_ANGLE_COLOR;
+            colorMap?.get(angle.id) ||
+            (angle.name ? colorMap?.get(angle.name) : undefined) ||
+            DEFAULT_ANGLE_COLOR;
           const isActive = selectedAngleId === angle.id;
 
           return (
@@ -74,9 +83,7 @@ export default function StoryAngleFilterTabs({
               <span>{angle.name}</span>
               {typeof angle.articleCount === 'number' && (
                 <span
-                  className={`text-[11px] font-normal ${
-                    isActive ? 'opacity-80' : 'text-gray-400'
-                  }`}
+                  className={`text-[11px] font-normal ${isActive ? 'opacity-80' : 'text-gray-400'}`}
                 >
                   ({angle.articleCount})
                 </span>
@@ -93,3 +100,5 @@ export default function StoryAngleFilterTabs({
     </div>
   );
 }
+
+export const StoryAngleFilterTabs = StoryThreadFilterTabs;

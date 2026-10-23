@@ -1,6 +1,6 @@
-import { resolveActiveAngleId } from './StoryAngleFilterTabs';
+import { resolveActiveThreadId, resolveActiveAngleId } from './StoryThreadFilterTabs';
 
-describe('StoryAngleFilterTabs resolveActiveAngleId', () => {
+describe('StoryThreadFilterTabs resolveActiveThreadId', () => {
   const validClusterIds = ['cluster-1', 'cluster-2', 'cluster-3'];
 
   it('returns null when angleParam is missing or empty', () => {

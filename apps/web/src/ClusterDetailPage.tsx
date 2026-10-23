@@ -3,10 +3,10 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
 import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './components/StatusBadge';
-import { AngleItem } from './components/StoryAnglePills';
-import StoryAngleFilterTabs, { resolveActiveAngleId } from './components/StoryAngleFilterTabs';
+import { ThreadItem } from './components/StoryThreadPills';
+import StoryThreadFilterTabs, { resolveActiveThreadId } from './components/StoryThreadFilterTabs';
 import ArticleTimelineSparkline, { TimelineArticle } from './components/ArticleTimelineSparkline';
-import StoryAngleHistogram, { HistogramArticle } from './components/StoryAngleHistogram';
+import StoryThreadHistogram, { HistogramArticle } from './components/StoryThreadHistogram';
 import { createAngleColorMap, DEFAULT_ANGLE_COLOR } from './utils/angleColors';
 import {
   parseDate,
@@ -92,7 +92,7 @@ export default function ClusterDetailPage() {
   const validClusterIds =
     isMultiAngleStory && story?.clusters ? story.clusters.map((c: any) => c.id) : [];
   const selectedAngleId = isMultiAngleStory
-    ? resolveActiveAngleId(validClusterIds, angleParam)
+    ? resolveActiveThreadId(validClusterIds, angleParam)
     : null;
 
   const toggleAngleExpansion = (angleId: string) => {
@@ -186,14 +186,27 @@ export default function ClusterDetailPage() {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto ring-8 ring-amber-50/60">
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
         </div>
         <div className="space-y-1.5">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Story Temporarily Unavailable</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+            Story Temporarily Unavailable
+          </h2>
           <p className="text-sm text-gray-600 max-w-md mx-auto leading-normal">
-            Unable to load this story due to an ongoing platform incident at our database hosting provider.
+            Unable to load this story due to an ongoing platform incident at our database hosting
+            provider.
           </p>
         </div>
         <div className="pt-2">
@@ -380,7 +393,7 @@ export default function ClusterDetailPage() {
 
       {/* Histogram on cluster details view (Feature 4) */}
       <div className="my-6">
-        <StoryAngleHistogram articles={allArticles} angles={angles} colorMap={colorMap} />
+        <StoryThreadHistogram articles={allArticles} angles={angles} colorMap={colorMap} />
       </div>
 
       {/* Articles grouped by Angle (Feature 3) */}
@@ -401,7 +414,7 @@ export default function ClusterDetailPage() {
         </div>
 
         {isMultiAngleStory && (
-          <StoryAngleFilterTabs
+          <StoryThreadFilterTabs
             angles={angles}
             colorMap={colorMap}
             selectedAngleId={selectedAngleId}
