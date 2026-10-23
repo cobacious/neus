@@ -18,12 +18,12 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 import { generateStructuredJson } from '../../lib/aiClient';
-import { isTypeSafeActive, classifyArticleAnglesBatchWithJev } from '../../lib/typesafeClient';
-
-export type NeighborhoodMerge = {
-  targetClusterId: string;
-  sourceClusterIds: string[];
-};
+import {
+  classifyArticleAnglesBatch,
+  detectDuplicateClusters,
+  CandidateClusterForMerge,
+  ClusterMergeDecision,
+} from '../../lib/typesafeClient';
 
 export type NeighborhoodStory = {
   existingStoryId?: string | null;
@@ -37,7 +37,6 @@ export type NeighborhoodStory = {
 };
 
 export type NeighborhoodEvaluation = {
-  merges: NeighborhoodMerge[];
   stories?: NeighborhoodStory[];
   story?: NeighborhoodStory | null;
 };
@@ -312,23 +311,20 @@ async function evaluateNeighborhood(
   const prompt = `
 You are an expert news editor and taxonomist.
 
-Here is a candidate group of closely related news clusters identified by vector similarity:
+Here is a candidate group of distinct news clusters identified by vector similarity:
 ${JSON.stringify(clusters, null, 2)}
 
 TASK:
 Analyze these clusters and determine:
-1. MERGES (Duplicate Coverage): Are any of these clusters redundant duplicates covering the EXACT SAME event, announcement, or angle without distinct new developments? (e.g. duplicate wire coverage of the same press release or incident).
-   - If yes, specify which should be merged into which. The "targetClusterId" must be the more detailed cluster (or the one with more articles).
-   - "sourceClusterIds" are the duplicate clusters that will be absorbed into target and deleted.
-2. STORIES (Multi-angle saga): After accounting for any merges, do 2 or more distinct remaining clusters represent DIFFERENT ANGLES, chronological developments, or sub-stories of the SAME overarching news saga?
-   - If yes, provide for each story:
-     - "existingStoryId": If this saga matches or develops an EXISTING STORY listed in the CANDIDATE STORIES below, specify its id. Otherwise null.
-     - "storyTitle": An objective, neutral overarching news headline synthesizing what happened across the saga.
-     - "status": One of "breaking" (first 12-24h of newly emerging breaking news where details are still arriving) or "developing" (multi-angle saga actively expanding in scope with related spin-offs/fallout).
-     - "overview": A neutral 2-sentence macro-summary synthesizing the whole saga across all its angles.
-     - "angles": Array of member clusters with:
-       - "clusterId": The cluster id (must NOT be a merged source cluster)
-       - "angle": A 2-5 word description of this cluster's specific angle/development (e.g. "Hospital Awakening", "Warden Resignation", "Legal Inquiry").
+Do 2 or more distinct clusters represent DIFFERENT ANGLES, chronological developments, or sub-stories of the SAME overarching news saga?
+- If yes, provide for each story:
+  - "existingStoryId": If this saga matches or develops an EXISTING STORY listed in the CANDIDATE STORIES below, specify its id. Otherwise null.
+  - "storyTitle": An objective, neutral overarching news headline synthesizing what happened across the saga.
+  - "status": One of "breaking" (first 12-24h of newly emerging breaking news where details are still arriving) or "developing" (multi-angle saga actively expanding in scope with related spin-offs/fallout).
+  - "overview": A neutral 2-sentence macro-summary synthesizing the whole saga across all its angles.
+  - "angles": Array of member clusters with:
+    - "clusterId": The cluster id
+    - "angle": A 2-5 word description of this cluster's specific angle/development (e.g. "Hospital Awakening", "Warden Resignation", "Legal Inquiry").
 
 EDITORIAL TAXONOMY GUIDELINES:
 A multi-angle "Story" is an overarching news topic that brings together 2 or more distinct angles, chronological chapters, or key facets of:
@@ -357,12 +353,6 @@ ${
 }
 Return JSON with this exact schema:
 {
-  "merges": [
-    {
-      "targetClusterId": string,
-      "sourceClusterIds": string[]
-    }
-  ],
   "stories": [
     {
       "existingStoryId": string | null,
@@ -387,17 +377,6 @@ Return JSON with this exact schema:
     schema: {
       type: 'OBJECT',
       properties: {
-        merges: {
-          type: 'ARRAY',
-          items: {
-            type: 'OBJECT',
-            properties: {
-              targetClusterId: { type: 'STRING' },
-              sourceClusterIds: { type: 'ARRAY', items: { type: 'STRING' } },
-            },
-            required: ['targetClusterId', 'sourceClusterIds'],
-          },
-        },
         stories: {
           type: 'ARRAY',
           items: {
@@ -423,9 +402,13 @@ Return JSON with this exact schema:
           },
         },
       },
-      required: ['merges', 'stories'],
+      required: ['stories'],
     },
   });
+}
+
+export interface ClassifyArticleAnglesDependencies {
+  classifyBatch?: typeof classifyArticleAnglesBatch;
 }
 
 export async function classifyArticleAngles(
@@ -447,7 +430,8 @@ export async function classifyArticleAngles(
   options?: {
     isExistingStory?: boolean;
     newClusterIds?: Set<string>;
-  }
+  },
+  deps: ClassifyArticleAnglesDependencies = {}
 ): Promise<Array<{ articleId: string; targetClusterId: string }>> {
   if (angles.length < 2 || articles.length === 0) return [];
 
@@ -507,13 +491,13 @@ export async function classifyArticleAngles(
 
     // Incremental optimization: if this is an existing story and the article is already
     // in an established cluster (not a new incoming cluster), keep its current assignment
-    // rather than paying for an LLM re-classification.
+    // rather than paying for a re-classification.
     if (isExistingStory && !isFromNewCluster && angles.some((a) => a.clusterId === article.currentClusterId)) {
       resolvedAssignments.push({ articleId: article.articleId, targetClusterId: article.currentClusterId });
       continue;
     }
 
-    // Ambiguous, unassigned or new cluster article without high confidence: defer to LLM
+    // Ambiguous, unassigned or new cluster article without high confidence: defer to System One
     ambiguousArticles.push({
       articleId: article.articleId,
       currentClusterId: article.currentClusterId,
@@ -525,114 +509,65 @@ export async function classifyArticleAngles(
 
   if (ambiguousArticles.length === 0) {
     logger.info(
-      `[${PipelineStep.Organize}] All ${articles.length} article(s) for "${storyTitle}" resolved via vector similarity (0 LLM calls)`
+      `[${PipelineStep.Organize}] All ${articles.length} article(s) for "${storyTitle}" resolved via vector similarity (0 API calls)`
     );
     return resolvedAssignments;
   }
 
   if (resolvedAssignments.length > 0) {
     logger.info(
-      `[${PipelineStep.Organize}] ${resolvedAssignments.length}/${articles.length} article(s) resolved via vector similarity; classifying remaining ${ambiguousArticles.length} article(s) with LLM...`
+      `[${PipelineStep.Organize}] ${resolvedAssignments.length}/${articles.length} article(s) resolved via vector similarity; classifying remaining ${ambiguousArticles.length} article(s) with System One...`
     );
   }
 
-  const llmAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+  const classifyBatch = deps.classifyBatch ?? classifyArticleAnglesBatch;
+  logger.info(
+    `[${PipelineStep.Organize}] Classifying ${ambiguousArticles.length} ambiguous article(s) for "${storyTitle}" with System One (parallel)...`
+  );
 
-  // If TypeSafe Jev is active, evaluate ambiguous articles using System One Choice primitives
-  if (isTypeSafeActive()) {
-    logger.info(
-      `[${PipelineStep.Organize}] Classifying ${ambiguousArticles.length} ambiguous article(s) for "${storyTitle}" with TypeSafe Jev (parallel)...`
-    );
+  const batchResults = await classifyBatch({
+    articles: ambiguousArticles.map((a) => ({
+      id: a.articleId,
+      title: a.title,
+      snippet: a.snippet,
+      content: a.content,
+    })),
+    angles: angles.map((a) => ({
+      clusterId: a.clusterId,
+      angle: a.angle,
+      headline: a.headline,
+    })),
+    storyTitle,
+    step: PipelineStep.Organize,
+  });
 
-    const jevResults = await classifyArticleAnglesBatchWithJev({
-      articles: ambiguousArticles.map((a) => ({
-        id: a.articleId,
-        title: a.title,
-        snippet: a.snippet,
-        content: a.content,
-      })),
-      angles: angles.map((a) => ({
-        clusterId: a.clusterId,
-        angle: a.angle,
-        headline: a.headline,
-      })),
-      storyTitle,
-      step: PipelineStep.Organize,
-    });
-
-    for (const res of jevResults) {
-      if (res.targetClusterId) {
-        llmAssignments.push({
-          articleId: res.articleId,
-          targetClusterId: res.targetClusterId,
-        });
-      }
-    }
-
-    return [...resolvedAssignments, ...llmAssignments];
-  }
-
-  const BATCH_SIZE = 25;
-
-  for (let i = 0; i < ambiguousArticles.length; i += BATCH_SIZE) {
-    const batch = ambiguousArticles.slice(i, i + BATCH_SIZE);
-    const batchIndex = Math.floor(i / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(ambiguousArticles.length / BATCH_SIZE);
-
-    logger.info(
-      `[${PipelineStep.Organize}] Classifying batch ${batchIndex}/${totalBatches} (${batch.length} articles) for "${storyTitle}"...`
-    );
-
-    const prompt = `You are an objective news editor organizing a multi-angle story.
-Story: "${storyTitle}"
-
-Defined Angles in this Story:
-${angles.map((a) => `- ID: "${a.clusterId}" | Angle: "${a.angle}"${a.headline ? ` | Headline: "${a.headline}"` : ''}`).join('\n')}
-
-Articles to assign:
-${batch.map((a, idx) => `${idx + 1}. ID: "${a.articleId}" | Title: "${a.title}"`).join('\n')}
-
-TASK:
-For each article, determine which angle ID it most accurately represents based on its headline and core event.
-Assign every article to the single best-matching angle cluster ID.
-
-Return JSON with key "assignments": Array<{ articleId: string, targetClusterId: string }>`;
-
-    const parsed = await generateStructuredJson<{
-      assignments: Array<{ articleId: string; targetClusterId: string }>;
-    }>({
-      prompt,
-      systemInstruction:
-        'You are an objective news editor. Assign articles to their most accurate angle. Return strict JSON only.',
-      step: PipelineStep.Organize,
-      schema: {
-        type: 'OBJECT',
-        properties: {
-          assignments: {
-            type: 'ARRAY',
-            items: {
-              type: 'OBJECT',
-              properties: {
-                articleId: { type: 'STRING' },
-                targetClusterId: { type: 'STRING' },
-              },
-              required: ['articleId', 'targetClusterId'],
-            },
-          },
-        },
-        required: ['assignments'],
-      },
-    });
-
-    if (Array.isArray(parsed.assignments)) {
-      llmAssignments.push(...parsed.assignments);
+  const classifiedAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+  for (const res of batchResults) {
+    if (res.targetClusterId) {
+      classifiedAssignments.push({
+        articleId: res.articleId,
+        targetClusterId: res.targetClusterId,
+      });
     }
   }
 
-  return [...resolvedAssignments, ...llmAssignments];
+  return [...resolvedAssignments, ...classifiedAssignments];
 }
 
-export async function organizeStoryAngles() {
+export interface OrganizeStoryAnglesDependencies {
+  detectDuplicateClusters?: typeof detectDuplicateClusters;
+  classifyArticleAngles?: typeof classifyArticleAngles;
+  evaluateNeighborhood?: typeof evaluateNeighborhood;
+}
+
+export async function organizeStoryAngles(
+  options: { timeBudgetMs?: number } = {},
+  deps: OrganizeStoryAnglesDependencies = {}
+) {
+  const detectDuplicatesFn = deps.detectDuplicateClusters ?? detectDuplicateClusters;
+  const classifyAnglesFn = deps.classifyArticleAngles ?? classifyArticleAngles;
+  const evaluateNeighborhoodFn = deps.evaluateNeighborhood ?? evaluateNeighborhood;
+
   logPipelineStep(PipelineStep.Organize, 'Organizing clusters into story angles & merging duplicates...');
 
   const activeClusters = await getActiveClustersForStories(30);
@@ -766,9 +701,55 @@ export async function organizeStoryAngles() {
     }
     totalEvaluated++;
 
-    const candidateStories = findCandidateStoriesForNeighborhood(neighborhood, existingStories);
+    const neighborhoodClusterIds = new Set(neighborhood.map((c) => c.id));
+    const mergedSourceIds = new Set<string>();
 
-    const clustersForPrompt = neighborhood.map((c) => ({
+    // 1. Evaluate candidate duplicate clusters in the neighborhood
+    const candidatesForMerge: CandidateClusterForMerge[] = neighborhood.map((c) => ({
+      id: c.id,
+      headline: c.headline,
+      summary: c.summary,
+      storyId: c.storyId,
+      articleCount: c._count?.articleAssignments ?? 0,
+      createdAt: c.createdAt,
+      embedding: (Array.isArray(c.embedding) ? c.embedding : null) as number[] | null,
+    }));
+
+    const merges = await detectDuplicatesFn(candidatesForMerge, {
+      minCosineSimilarity: 0.78,
+      minDuplicateProbability: 0.85,
+      step: PipelineStep.Organize,
+    });
+
+    for (const m of merges) {
+      const validSources = m.sourceClusterIds.filter(
+        (s) =>
+          s !== m.targetClusterId &&
+          neighborhoodClusterIds.has(s) &&
+          !mergedSourceIds.has(s)
+      );
+
+      if (validSources.length > 0 && neighborhoodClusterIds.has(m.targetClusterId)) {
+        await mergeClusters(m.targetClusterId, validSources);
+        validSources.forEach((id) => mergedSourceIds.add(id));
+        totalMerged += validSources.length;
+        logger.info(
+          `[${PipelineStep.Organize}] Merged ${validSources.length} duplicate cluster(s) into ${m.targetClusterId}`
+        );
+      }
+    }
+
+    const survivingNeighborhood = neighborhood.filter((c) => !mergedSourceIds.has(c.id));
+    if (survivingNeighborhood.length < 2) {
+      logger.info(
+        `[${PipelineStep.Organize}] Only ${survivingNeighborhood.length} cluster(s) remain in neighborhood after merging duplicates. Skipping story umbrella evaluation.`
+      );
+      continue;
+    }
+
+    const candidateStories = findCandidateStoriesForNeighborhood(survivingNeighborhood, existingStories);
+
+    const clustersForPrompt = survivingNeighborhood.map((c) => ({
       id: c.id,
       headline: c.headline,
       summary: c.summary,
@@ -778,36 +759,12 @@ export async function organizeStoryAngles() {
 
     let evalResult: NeighborhoodEvaluation;
     try {
-      evalResult = await evaluateNeighborhood(clustersForPrompt, candidateStories);
+      evalResult = await evaluateNeighborhoodFn(clustersForPrompt, candidateStories);
     } catch (err: any) {
       logger.error(
         `[${PipelineStep.Organize}] Failed evaluating neighborhood ${i + 1}/${orderedNeighborhoods.length}: ${err.message || err}`
       );
       continue;
-    }
-
-    const neighborhoodClusterIds = new Set(neighborhood.map((c) => c.id));
-    const mergedSourceIds = new Set<string>();
-
-    // 1. Process merges
-    for (const m of evalResult.merges || []) {
-      if (m.targetClusterId && Array.isArray(m.sourceClusterIds)) {
-        const validSources = m.sourceClusterIds.filter(
-          (s) =>
-            s !== m.targetClusterId &&
-            neighborhoodClusterIds.has(s) &&
-            !mergedSourceIds.has(s)
-        );
-
-        if (validSources.length > 0 && neighborhoodClusterIds.has(m.targetClusterId)) {
-          await mergeClusters(m.targetClusterId, validSources);
-          validSources.forEach((id) => mergedSourceIds.add(id));
-          totalMerged += validSources.length;
-          logger.info(
-            `[${PipelineStep.Organize}] Merged ${validSources.length} duplicate cluster(s) into ${m.targetClusterId}`
-          );
-        }
-      }
     }
 
     // 2. Process story grouping & reactivation
@@ -896,7 +853,7 @@ export async function organizeStoryAngles() {
                   .map((c) => c.id)
               );
 
-              const assignments = await classifyArticleAngles(
+              const assignments = await classifyAnglesFn(
                 storyItem.storyTitle,
                 anglesWithHeadlines,
                 storyArticles,

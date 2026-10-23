@@ -1,5 +1,6 @@
 import { logger, PipelineStep } from './pipelineLogger';
 import { recordAiUsage } from './aiUsage';
+import { cosineSimilarity } from '../core/pipeline/utils';
 
 const TYPESAFE_API_BASE_URL =
   process.env.TYPESAFE_API_BASE_URL || 'https://api.typesafe.ai';
@@ -214,7 +215,7 @@ export interface ArticleAngleResult {
  * Classifies an article into one of several candidate story angles, or returns null if
  * it fits none of the angles or confidence is low.
  */
-export async function classifyArticleAngleWithJev(params: {
+export async function classifyArticleAngle(params: {
   article: ArticleInputForAngle;
   angles: ArticleAngleCandidate[];
   storyTitle?: string;
@@ -289,7 +290,7 @@ export async function classifyArticleAngleWithJev(params: {
 /**
  * Classifies multiple ambiguous articles against candidate angles in parallel batches.
  */
-export async function classifyArticleAnglesBatchWithJev(params: {
+export async function classifyArticleAnglesBatch(params: {
   articles: ArticleInputForAngle[];
   angles: ArticleAngleCandidate[];
   storyTitle?: string;
@@ -306,6 +307,11 @@ export async function classifyArticleAnglesBatchWithJev(params: {
     step = PipelineStep.Organize,
   } = params;
 
+  if (!isTypeSafeActive()) {
+    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping article angle classification.`);
+    return [];
+  }
+
   const results: Array<{
     articleId: string;
     targetClusterId: string | null;
@@ -317,7 +323,7 @@ export async function classifyArticleAnglesBatchWithJev(params: {
     const chunk = articles.slice(i, i + concurrency);
     const chunkPromises = chunk.map(async (art) => {
       try {
-        const res = await classifyArticleAngleWithJev({
+        const res = await classifyArticleAngle({
           article: art,
           angles,
           storyTitle,
@@ -332,7 +338,7 @@ export async function classifyArticleAnglesBatchWithJev(params: {
         };
       } catch (err: any) {
         logger.warn(
-          `[${step}] Jev angle classification failed for article "${art.id}": ${err.message}`
+          `[${step}] System One angle classification failed for article "${art.id}": ${err.message}`
         );
         return {
           articleId: art.id,
@@ -353,7 +359,7 @@ export async function classifyArticleAnglesBatchWithJev(params: {
 /**
  * Verifies if two clusters describe the exact same real-world event.
  */
-export async function verifyDuplicateClustersWithJev(params: {
+export async function verifyDuplicateClusters(params: {
   clusterA: { title: string; summary?: string | null };
   clusterB: { title: string; summary?: string | null };
   step?: PipelineStep;
@@ -399,4 +405,147 @@ export async function verifyDuplicateClustersWithJev(params: {
     isDuplicate: answer.noul >= 0.85,
     probability: answer.noul,
   };
+}
+
+export interface CandidateClusterForMerge {
+  id: string;
+  headline?: string | null;
+  summary?: string | null;
+  storyId?: string | null;
+  articleCount: number;
+  createdAt: Date | string;
+  embedding?: number[] | null;
+}
+
+export interface ClusterMergeDecision {
+  targetClusterId: string;
+  sourceClusterIds: string[];
+}
+
+/**
+ * Detects duplicate clusters within a candidate neighborhood using pairwise cosine similarity
+ * and System One Noul verification.
+ */
+export async function detectDuplicateClusters(
+  clusters: CandidateClusterForMerge[],
+  options?: {
+    minCosineSimilarity?: number;
+    minDuplicateProbability?: number;
+    step?: PipelineStep;
+  }
+): Promise<ClusterMergeDecision[]> {
+  const minCosine = options?.minCosineSimilarity ?? 0.78;
+  const minProb = options?.minDuplicateProbability ?? 0.85;
+  const step = options?.step ?? PipelineStep.Organize;
+
+  if (!isTypeSafeActive()) {
+    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping duplicate cluster detection.`);
+    return [];
+  }
+
+  if (clusters.length < 2) return [];
+
+  // 1. Identify candidate duplicate pairs with cosine similarity >= minCosine
+  const candidatePairs: Array<[CandidateClusterForMerge, CandidateClusterForMerge, number]> = [];
+  for (let i = 0; i < clusters.length; i++) {
+    const c1 = clusters[i];
+    const emb1 = Array.isArray(c1.embedding) && c1.embedding.length > 0 ? c1.embedding : null;
+    if (!emb1) continue;
+
+    for (let j = i + 1; j < clusters.length; j++) {
+      const c2 = clusters[j];
+      const emb2 = Array.isArray(c2.embedding) && c2.embedding.length > 0 ? c2.embedding : null;
+      if (!emb2) continue;
+
+      const sim = cosineSimilarity(emb1, emb2);
+      if (sim >= minCosine) {
+        candidatePairs.push([c1, c2, sim]);
+      }
+    }
+  }
+
+  if (candidatePairs.length === 0) return [];
+
+  logger.info(
+    `[${step}] Evaluating ${candidatePairs.length} candidate duplicate pair(s) with System One (cosine >= ${minCosine})...`
+  );
+
+  // 2. Evaluate candidate pairs with System One Noul in parallel
+  const pairVerifications = await Promise.all(
+    candidatePairs.map(async ([c1, c2, sim]) => {
+      try {
+        const res = await verifyDuplicateClusters({
+          clusterA: { title: c1.headline || '', summary: c1.summary },
+          clusterB: { title: c2.headline || '', summary: c2.summary },
+          step,
+        });
+        return { c1, c2, sim, isDuplicate: res.probability >= minProb, probability: res.probability };
+      } catch (err: any) {
+        logger.warn(
+          `[${step}] Duplicate verification failed for clusters ${c1.id} & ${c2.id}: ${err.message}`
+        );
+        return { c1, c2, sim, isDuplicate: false, probability: 0 };
+      }
+    })
+  );
+
+  // 3. Formulate merge decisions
+  // An absorbed source cluster cannot be a target or a source for another merge in the same pass
+  const mergedSources = new Set<string>();
+  const mergesByTarget = new Map<string, Set<string>>();
+
+  for (const item of pairVerifications) {
+    if (!item.isDuplicate) continue;
+    const { c1, c2, probability } = item;
+
+    if (mergedSources.has(c1.id) || mergedSources.has(c2.id)) continue;
+
+    // Determine target vs source:
+    // 1. Prefer cluster with existing storyId
+    // 2. Prefer cluster with more articles
+    // 3. Prefer older cluster
+    let target = c1;
+    let source = c2;
+
+    if (!c1.storyId && c2.storyId) {
+      target = c2;
+      source = c1;
+    } else if (c1.storyId && !c2.storyId) {
+      target = c1;
+      source = c2;
+    } else if (c2.articleCount > c1.articleCount) {
+      target = c2;
+      source = c1;
+    } else if (c1.articleCount > c2.articleCount) {
+      target = c1;
+      source = c2;
+    } else {
+      const time1 = new Date(c1.createdAt).getTime();
+      const time2 = new Date(c2.createdAt).getTime();
+      if (time2 < time1) {
+        target = c2;
+        source = c1;
+      }
+    }
+
+    logger.info(
+      `[${step}] System One identified duplicate clusters: absorbing "${source.headline || source.id}" into "${target.headline || target.id}" (probability=${probability.toFixed(2)})`
+    );
+
+    mergedSources.add(source.id);
+    if (!mergesByTarget.has(target.id)) {
+      mergesByTarget.set(target.id, new Set());
+    }
+    mergesByTarget.get(target.id)!.add(source.id);
+  }
+
+  const decisions: ClusterMergeDecision[] = [];
+  for (const [targetId, sourceSet] of mergesByTarget.entries()) {
+    decisions.push({
+      targetClusterId: targetId,
+      sourceClusterIds: Array.from(sourceSet),
+    });
+  }
+
+  return decisions;
 }

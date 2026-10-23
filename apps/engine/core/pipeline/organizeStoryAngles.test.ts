@@ -99,6 +99,7 @@ describe('findCandidateStoriesForNeighborhood', () => {
 describe('organizeStoryAngles', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    delete process.env.TYPESAFE_API_KEY;
     (mockDb.getStoriesForMatching as jest.Mock).mockResolvedValue([]);
     (mockDb.markDormantStories as jest.Mock).mockResolvedValue(0);
     (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([]);
@@ -154,9 +155,6 @@ describe('organizeStoryAngles', () => {
             parts: [
               {
                 text: JSON.stringify({
-                  merges: [
-                    { targetClusterId: 'c1', sourceClusterIds: ['c2'] },
-                  ],
                   story: {
                     existingStoryId: 'dormant-story-1',
                     storyTitle: 'Christa Pike Execution Attempt and Aftermath',
@@ -164,7 +162,6 @@ describe('organizeStoryAngles', () => {
                     overview: 'Macro overview of the event.',
                     angles: [
                       { clusterId: 'c1', angle: 'Botched Execution Attempt' },
-                      { clusterId: 'c2', angle: 'Duplicate' },
                       { clusterId: 'c3', angle: 'Hospital Awakening' },
                     ],
                   },
@@ -185,7 +182,12 @@ describe('organizeStoryAngles', () => {
     (mockDb.mergeClusters as jest.Mock).mockResolvedValue(2);
     (mockDb.syncStoryWithAngles as jest.Mock).mockResolvedValue({ id: 'dormant-story-1' });
 
-    await organizeStoryAngles();
+    await organizeStoryAngles(
+      {},
+      {
+        detectDuplicateClusters: async () => [{ targetClusterId: 'c1', sourceClusterIds: ['c2'] }],
+      }
+    );
 
     // 1. mergeClusters called with target c1 and source [c2]
     expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
@@ -207,47 +209,61 @@ describe('organizeStoryAngles', () => {
     expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
   });
 
-  it('handles duplicate merges with null story', async () => {
+  it('handles duplicate merges and skips story when only 1 cluster remains', async () => {
     (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
       { id: 'c1', headline: 'Norfolk GP attack', summary: 'S1', embedding: [1, 0], createdAt: new Date() },
       { id: 'c2', headline: 'Norfolk surgery stabbing', summary: 'S2', embedding: [1, 0], createdAt: new Date() },
     ]);
 
-    const mockLlmResponse = {
-      candidates: [
-        {
-          content: {
-            parts: [
-              {
-                text: JSON.stringify({
-                  merges: [
-                    { targetClusterId: 'c1', sourceClusterIds: ['c2'] },
-                  ],
-                  story: null,
-                }),
-              },
-            ],
-          },
-        },
-      ],
-    };
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockLlmResponse,
-    });
-
     (mockDb.mergeClusters as jest.Mock).mockResolvedValue(1);
 
-    await organizeStoryAngles();
+    await organizeStoryAngles(
+      {},
+      {
+        detectDuplicateClusters: async () => [{ targetClusterId: 'c1', sourceClusterIds: ['c2'] }],
+      }
+    );
 
     expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
     expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
   });
 
-  it('realigns misclassified articles across story angles when LLM returns updated assignments', async () => {
+  it('merges duplicate clusters via detector and skips story evaluation when only 1 cluster remains', async () => {
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      {
+        id: 'c1',
+        headline: 'Fatal tiger incident at Doncaster park',
+        summary: 'S1',
+        embedding: [0.95, 0.05],
+        createdAt: new Date(),
+        _count: { articleAssignments: 4 },
+      },
+      {
+        id: 'c2',
+        headline: 'Keeper dies in tiger enclosure attack',
+        summary: 'S2',
+        embedding: [0.94, 0.06],
+        createdAt: new Date(),
+        _count: { articleAssignments: 2 },
+      },
+    ]);
+
+    const mockDetectDuplicates = jest.fn().mockResolvedValue([
+      { targetClusterId: 'c1', sourceClusterIds: ['c2'] },
+    ]);
+
+    await organizeStoryAngles({}, { detectDuplicateClusters: mockDetectDuplicates as any });
+
+    // c2 should be merged into c1
+    expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
+
+    // Since only 1 cluster remains, story sync should not be called
+    expect(mockDb.syncStoryWithAngles).not.toHaveBeenCalled();
+  });
+
+  it('realigns misclassified articles across story angles when updated assignments occur', async () => {
     (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
       { id: 'c1', headline: 'Corrections Chief Resigns', summary: 'Resignation', embedding: [1, 0], createdAt: new Date() },
       { id: 'c2', headline: 'Inmate Hospitalized', summary: 'Recovery in ICU', embedding: [1, 0], createdAt: new Date() },
@@ -260,7 +276,6 @@ describe('organizeStoryAngles', () => {
             parts: [
               {
                 text: JSON.stringify({
-                  merges: [],
                   story: {
                     storyTitle: 'Christa Pike Aftermath',
                     status: 'developing',
@@ -278,36 +293,11 @@ describe('organizeStoryAngles', () => {
       ],
     };
 
-    const mockRealignmentResponse = {
-      candidates: [
-        {
-          content: {
-            parts: [
-              {
-                text: JSON.stringify({
-                  assignments: [
-                    { articleId: 'art-1', targetClusterId: 'c1' },
-                    { articleId: 'art-2', targetClusterId: 'c2' }, // misclassified article moved from c1 to c2
-                  ],
-                }),
-              },
-            ],
-          },
-        },
-      ],
-    };
-
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockEvaluationResponse,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockRealignmentResponse,
-      });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockEvaluationResponse,
+    });
 
     (mockDb.syncStoryWithAngles as jest.Mock).mockResolvedValue({ id: 'story-1' });
     (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([
@@ -319,7 +309,15 @@ describe('organizeStoryAngles', () => {
       affectedClusters: ['c1', 'c2'],
     });
 
-    await organizeStoryAngles();
+    await organizeStoryAngles(
+      {},
+      {
+        classifyArticleAngles: async () => [
+          { articleId: 'art-1', targetClusterId: 'c1' },
+          { articleId: 'art-2', targetClusterId: 'c2' },
+        ],
+      }
+    );
 
     expect(mockDb.getStoryArticlesForRealignment).toHaveBeenCalledWith(['c1', 'c2']);
     expect(mockDb.realignStoryArticles).toHaveBeenCalledWith([
@@ -588,6 +586,7 @@ describe('isSettledNeighborhood', () => {
 describe('classifyArticleAngles', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    delete process.env.TYPESAFE_API_KEY;
   });
 
   const angles = [
@@ -610,43 +609,32 @@ describe('classifyArticleAngles', () => {
     ]);
   });
 
-  it('defers ambiguous articles to LLM while resolving confident ones locally', async () => {
+  it('defers ambiguous articles to batch classifier while resolving confident ones locally', async () => {
     const articles = [
       { articleId: 'a1', currentClusterId: 'c1', title: 'Court hearing day one', embedding: [0.99, 0.05, 0] }, // clear match for c1
       { articleId: 'a2', currentClusterId: 'c1', title: 'Ambiguous reaction piece', embedding: [0.6, 0.58, 0] }, // ambiguous margin < 0.04
     ];
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify({
-                    assignments: [{ articleId: 'a2', targetClusterId: 'c2' }],
-                  }),
-                },
-              ],
-            },
-          },
-        ],
-      }),
-    });
+    const mockClassifyBatch = jest.fn().mockResolvedValue([
+      { articleId: 'a2', targetClusterId: 'c2', confidence: 0.9, choice: 'angle_c2' },
+    ]);
 
-    const assignments = await classifyArticleAngles('Major Political Trial', angles, articles);
+    const assignments = await classifyArticleAngles(
+      'Major Political Trial',
+      angles,
+      articles,
+      undefined,
+      { classifyBatch: mockClassifyBatch as any }
+    );
 
-    // LLM should only have been called once for the single ambiguous article a2
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockClassifyBatch).toHaveBeenCalledTimes(1);
     expect(assignments).toEqual([
       { articleId: 'a1', targetClusterId: 'c1' },
       { articleId: 'a2', targetClusterId: 'c2' },
     ]);
   });
 
-  it('preserves established articles in existing stories without LLM calls', async () => {
+  it('preserves established articles in existing stories without API calls', async () => {
     const articles = [
       { articleId: 'a-old', currentClusterId: 'c1', title: 'Historic piece', embedding: null },
       { articleId: 'a-new', currentClusterId: 'c-incoming', title: 'New development', embedding: [0.05, 0.98, 0] },
@@ -662,7 +650,7 @@ describe('classifyArticleAngles', () => {
       newClusterIds: new Set(['c-incoming']),
     });
 
-    // No LLM call needed: a-old is preserved incrementally; a-new is resolved via vector similarity
+    // No API call needed: a-old is preserved incrementally; a-new is resolved via vector similarity
     expect(mockFetch).not.toHaveBeenCalled();
     expect(assignments).toEqual([
       { articleId: 'a-old', targetClusterId: 'c1' },
@@ -670,49 +658,26 @@ describe('classifyArticleAngles', () => {
     ]);
   });
 
-  it('uses TypeSafe Jev when TYPESAFE_API_KEY is active and respects none_of_the_above', async () => {
-    process.env.TYPESAFE_API_KEY = 'test_typesafe_key';
-
+  it('respects none_of_the_above and leaves unrelated articles untouched', async () => {
     const testArticles = [
       { articleId: 'a-matching', currentClusterId: 'c1', title: 'Police investigate trial', embedding: null },
       { articleId: 'a-unrelated', currentClusterId: 'c1', title: 'Unrelated bank interest rates', embedding: null },
     ];
 
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          model: 'jev-1.14.0',
-          answers: {
-            angle: {
-              type: 'choice',
-              choice: 'angle_c2',
-              confidence: 0.95,
-              probabilities: { angle_c1: 0.05, angle_c2: 0.95, none_of_the_above: 0.0 },
-            },
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          model: 'jev-1.14.0',
-          answers: {
-            angle: {
-              type: 'choice',
-              choice: 'none_of_the_above',
-              confidence: 0.99,
-              probabilities: { angle_c1: 0.01, angle_c2: 0.0, none_of_the_above: 0.99 },
-            },
-          },
-        }),
-      });
+    const mockClassifyBatch = jest.fn().mockResolvedValue([
+      { articleId: 'a-matching', targetClusterId: 'c2', confidence: 0.95, choice: 'angle_c2' },
+      { articleId: 'a-unrelated', targetClusterId: null, confidence: 0.99, choice: 'none_of_the_above' },
+    ]);
 
-    const assignments = await classifyArticleAngles('Major Political Trial', angles, testArticles);
+    const assignments = await classifyArticleAngles(
+      'Major Political Trial',
+      angles,
+      testArticles,
+      undefined,
+      { classifyBatch: mockClassifyBatch as any }
+    );
 
-    // Only a-matching should be reassigned to c2; a-unrelated should not be reassigned
+    // Only a-matching should be reassigned to c2; a-unrelated should not be in the reassignment list
     expect(assignments).toEqual([
       { articleId: 'a-matching', targetClusterId: 'c2' },
     ]);

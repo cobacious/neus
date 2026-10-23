@@ -1,9 +1,10 @@
 import { jest } from '@jest/globals';
 import {
   callSystemOne,
-  classifyArticleAngleWithJev,
-  classifyArticleAnglesBatchWithJev,
-  verifyDuplicateClustersWithJev,
+  classifyArticleAngle,
+  classifyArticleAnglesBatch,
+  verifyDuplicateClusters,
+  detectDuplicateClusters,
   isTypeSafeActive,
 } from './typesafeClient';
 import { getAiUsageTotals, resetAiUsage } from './aiUsage';
@@ -103,7 +104,7 @@ describe('typesafeClient', () => {
     });
   });
 
-  describe('classifyArticleAngleWithJev', () => {
+  describe('classifyArticleAngle', () => {
     it('assigns article to matching angle cluster ID', async () => {
       process.env.TYPESAFE_API_KEY = 'mock_key';
 
@@ -124,7 +125,7 @@ describe('typesafeClient', () => {
       });
       global.fetch = mockFetch;
 
-      const result = await classifyArticleAngleWithJev({
+      const result = await classifyArticleAngle({
         article: {
           id: 'art_1',
           title: 'Police declare major incident after fatal tiger attack',
@@ -170,7 +171,7 @@ describe('typesafeClient', () => {
       });
       global.fetch = mockFetch;
 
-      const result = await classifyArticleAngleWithJev({
+      const result = await classifyArticleAngle({
         article: {
           id: 'art_2',
           title: 'Unrelated court trial begins in Leeds for burglary',
@@ -207,7 +208,7 @@ describe('typesafeClient', () => {
       });
       global.fetch = mockFetch;
 
-      const result = await classifyArticleAngleWithJev({
+      const result = await classifyArticleAngle({
         article: {
           id: 'art_3',
           title: 'General comments on animal captivity',
@@ -224,7 +225,7 @@ describe('typesafeClient', () => {
     });
   });
 
-  describe('classifyArticleAnglesBatchWithJev', () => {
+  describe('classifyArticleAnglesBatch', () => {
     it('processes batch of articles concurrently', async () => {
       process.env.TYPESAFE_API_KEY = 'mock_key';
 
@@ -262,7 +263,7 @@ describe('typesafeClient', () => {
         });
       global.fetch = mockFetch;
 
-      const results = await classifyArticleAnglesBatchWithJev({
+      const results = await classifyArticleAnglesBatch({
         articles: [
           { id: 'art_1', title: 'Article 1 matching angle' },
           { id: 'art_2', title: 'Article 2 not matching' },
@@ -285,7 +286,7 @@ describe('typesafeClient', () => {
     });
   });
 
-  describe('verifyDuplicateClustersWithJev', () => {
+  describe('verifyDuplicateClusters', () => {
     it('identifies duplicate clusters when noul probability >= 0.85', async () => {
       process.env.TYPESAFE_API_KEY = 'mock_key';
 
@@ -304,7 +305,7 @@ describe('typesafeClient', () => {
       });
       global.fetch = mockFetch;
 
-      const result = await verifyDuplicateClustersWithJev({
+      const result = await verifyDuplicateClusters({
         clusterA: {
           title: 'Keeper dies in tiger enclosure incident at Doncaster park',
         },
@@ -335,7 +336,7 @@ describe('typesafeClient', () => {
       });
       global.fetch = mockFetch;
 
-      const result = await verifyDuplicateClustersWithJev({
+      const result = await verifyDuplicateClusters({
         clusterA: {
           title: 'Keeper dies in tiger enclosure incident',
         },
@@ -346,6 +347,82 @@ describe('typesafeClient', () => {
 
       expect(result.isDuplicate).toBe(false);
       expect(result.probability).toBe(0.12);
+    });
+  });
+
+  describe('detectDuplicateClusters', () => {
+    it('returns empty array when fewer than 2 clusters are provided', async () => {
+      const result = await detectDuplicateClusters([]);
+      expect(result).toEqual([]);
+    });
+
+    it('skips pairs below cosine threshold', async () => {
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch;
+
+      const clusters = [
+        {
+          id: 'c1',
+          headline: 'Cluster 1',
+          articleCount: 3,
+          createdAt: new Date(),
+          embedding: [1, 0, 0],
+        },
+        {
+          id: 'c2',
+          headline: 'Cluster 2',
+          articleCount: 2,
+          createdAt: new Date(),
+          embedding: [0, 1, 0], // Orthogonal -> cosine 0 < 0.78
+        },
+      ];
+
+      const merges = await detectDuplicateClusters(clusters);
+      expect(merges).toEqual([]);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('identifies and returns merge decision when cosine >= threshold and Jev probability >= 0.85', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            is_same_event: {
+              type: 'noul',
+              noul: 0.92,
+            },
+          },
+        }),
+      });
+      global.fetch = mockFetch;
+
+      const clusters = [
+        {
+          id: 'c1-target',
+          headline: 'Fatal tiger incident at Doncaster wildlife park',
+          articleCount: 5,
+          createdAt: new Date('2026-10-20T10:00:00Z'),
+          embedding: [0.95, 0.05, 0],
+        },
+        {
+          id: 'c2-source',
+          headline: 'Keeper dies in tiger enclosure attack',
+          articleCount: 2,
+          createdAt: new Date('2026-10-20T10:15:00Z'),
+          embedding: [0.94, 0.06, 0], // High cosine similarity
+        },
+      ];
+
+      const merges = await detectDuplicateClusters(clusters);
+      expect(merges).toHaveLength(1);
+      expect(merges[0]).toEqual({
+        targetClusterId: 'c1-target',
+        sourceClusterIds: ['c2-source'],
+      });
     });
   });
 });
