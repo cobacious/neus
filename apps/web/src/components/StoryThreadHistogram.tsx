@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AngleColorStyle, DEFAULT_ANGLE_COLOR } from '../utils/angleColors';
+import { ThreadColorStyle, DEFAULT_THREAD_COLOR } from '../utils/threadColors';
 import { parseDate } from '../utils/dateUtils';
 
 export interface HistogramArticle {
@@ -12,23 +12,20 @@ export interface HistogramArticle {
     name?: string | null;
     faviconUrl?: string | null;
   } | null;
-  angleId?: string | null;
-  angleName?: string | null;
+  threadId?: string | null;
+  threadName?: string | null;
 }
 
 export interface StoryThreadHistogramProps {
   articles: HistogramArticle[];
   threads?: Array<{ id: string; name?: string | null }>;
-  angles?: Array<{ id: string; name?: string | null }>;
-  colorMap?: Map<string, AngleColorStyle>;
+  colorMap?: Map<string, ThreadColorStyle>;
   className?: string;
 }
 
-export type StoryAngleHistogramProps = StoryThreadHistogramProps;
-
 export interface BinSegment {
-  angleId: string;
-  angleName: string;
+  threadId: string;
+  threadName: string;
   color: string;
   count: number;
   sources: string[];
@@ -53,11 +50,11 @@ export interface HistogramBinsResult {
  * Computes adaptive time bins for article publication histogram.
  * - Granular 15m/30m/1h/2h bucketing for rapid breaking news instead of coarse 6h buckets.
  * - Clean day transitions without redundant weekday repeats on same-day bins.
- * - Stacked segment breakdown by story angle.
+ * - Stacked segment breakdown by story thread.
  */
 export function buildHistogramBins(
   articles: HistogramArticle[] = [],
-  colorMap?: Map<string, AngleColorStyle>
+  colorMap?: Map<string, ThreadColorStyle>
 ): HistogramBinsResult {
   // 1. Filter valid articles and sort chronologically
   const validArticles = articles
@@ -177,18 +174,18 @@ export function buildHistogramBins(
     const bin = createdBins[bIdx];
     bin.total += 1;
 
-    const aId = article.angleId || article.angleName || 'default';
-    const aName = article.angleName || 'Articles';
+    const tId = article.threadId || article.threadName || 'default';
+    const tName = article.threadName || 'Articles';
     const style =
-      (article.angleId && colorMap?.get(article.angleId)) ||
-      (article.angleName && colorMap?.get(article.angleName)) ||
-      DEFAULT_ANGLE_COLOR;
+      (tId && colorMap?.get(tId)) ||
+      (tName && colorMap?.get(tName)) ||
+      DEFAULT_THREAD_COLOR;
 
-    let seg = bin.segments.find((s) => s.angleId === aId);
+    let seg = bin.segments.find((s) => s.threadId === tId);
     if (!seg) {
       seg = {
-        angleId: aId,
-        angleName: aName,
+        threadId: tId,
+        threadName: tName,
         color: style.color,
         count: 0,
         sources: [],
@@ -208,8 +205,7 @@ export function buildHistogramBins(
 
 export default function StoryThreadHistogram({
   articles = [],
-  threads,
-  angles = [],
+  threads = [],
   colorMap,
   className = '',
 }: StoryThreadHistogramProps) {
@@ -258,25 +254,27 @@ export default function StoryThreadHistogram({
         </span>
       </div>
 
-      {/* Angle Legend */}
-      {angles.length > 1 && (
+      {/* Thread Legend */}
+      {threads.length > 1 && (
         <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
-          {angles.map((angle) => {
+          {threads.map((thread) => {
             const style =
-              colorMap?.get(angle.id) ||
-              (angle.name && colorMap?.get(angle.name)) ||
-              DEFAULT_ANGLE_COLOR;
+              colorMap?.get(thread.id) ||
+              (thread.name && colorMap?.get(thread.name)) ||
+              DEFAULT_THREAD_COLOR;
             const count = validArticles.filter(
-              (a) => a.angleId === angle.id || a.angleName === angle.name
+              (a) =>
+                a.threadId === thread.id ||
+                a.threadName === thread.name
             ).length;
 
             return (
-              <div key={angle.id} className="flex items-center gap-1.5 text-gray-700">
+              <div key={thread.id} className="flex items-center gap-1.5 text-gray-700">
                 <span
                   className="w-2.5 h-2.5 rounded-xs flex-shrink-0"
                   style={{ backgroundColor: style.color }}
                 />
-                <span className="font-medium">{angle.name || 'Thread'}</span>
+                <span className="font-medium">{thread.name || 'Thread'}</span>
                 <span className="text-gray-400">({count})</span>
               </div>
             );
@@ -363,7 +361,7 @@ export default function StoryThreadHistogram({
 
                   return (
                     <rect
-                      key={seg.angleId}
+                      key={seg.threadId}
                       x={x}
                       y={segY}
                       width={barWidth}
@@ -422,7 +420,7 @@ export default function StoryThreadHistogram({
                   <div className="space-y-1">
                     {hoveredBin.segments.map((seg) => (
                       <div
-                        key={seg.angleId}
+                        key={seg.threadId}
                         className="flex items-center justify-between gap-3 text-[11px]"
                       >
                         <div className="flex items-center gap-1.5 truncate">
@@ -430,7 +428,7 @@ export default function StoryThreadHistogram({
                             className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{ backgroundColor: seg.color }}
                           />
-                          <span className="truncate text-gray-300">{seg.angleName}</span>
+                          <span className="truncate text-gray-300">{seg.threadName}</span>
                         </div>
                         <span className="font-semibold text-gray-100 flex-shrink-0">
                           {seg.count}
@@ -450,5 +448,3 @@ export default function StoryThreadHistogram({
     </div>
   );
 }
-
-export const StoryAngleHistogram = StoryThreadHistogram;

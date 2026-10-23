@@ -3,7 +3,7 @@
  *
  * Sourced from Coolors, this 6-color editorial palette establishes
  * Neus's visual identity across charts, badges, timeline sparklines,
- * story angles, and UI accents:
+ * story threads and UI accents:
  *
  * 1. Blue Slate:  #4F6D7A
  * 2. Burnt Peach: #DD6E42

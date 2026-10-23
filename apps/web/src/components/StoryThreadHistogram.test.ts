@@ -1,5 +1,5 @@
 import { buildHistogramBins, HistogramArticle } from './StoryThreadHistogram';
-import { AngleColorStyle } from '../utils/angleColors';
+import { ThreadColorStyle } from '../utils/threadColors';
 
 describe('StoryThreadHistogram buildHistogramBins', () => {
   it('returns empty bins and maxBinTotal 0 when articles are empty', () => {
@@ -21,7 +21,6 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
   });
 
   it('allocates articles into multiple granular 30-minute bins for a ~2-hour breaking story (like Everton)', () => {
-    // Timestamps matching the real Everton story: 07:43, 08:23, 09:26, 09:49 UTC
     const articles: HistogramArticle[] = [
       { id: '1', title: 'Guardian', publishedAt: '2026-10-09T07:43:02.000Z' },
       { id: '2', title: 'BBC', publishedAt: '2026-10-09T08:23:50.000Z' },
@@ -30,19 +29,15 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
     ];
 
     const result = buildHistogramBins(articles);
-    // Story span is ~2.1 hours, so it must use 30-minute buckets, yielding multiple bins!
     expect(result.bins.length).toBeGreaterThan(1);
     expect(result.bins.length).toBeLessThanOrEqual(6);
 
-    // Ensure articles are distributed across multiple bins rather than stacked into one
     const nonZeroBins = result.bins.filter((b) => b.total > 0);
     expect(nonZeroBins.length).toBeGreaterThanOrEqual(3);
 
-    // Total article count across all bins matches input
     const totalCount = result.bins.reduce((sum, b) => sum + b.total, 0);
     expect(totalCount).toBe(4);
 
-    // Range labels are provided for tooltips
     expect(result.bins[0].rangeLabel).toBeDefined();
     expect(result.bins[0].rangeLabel).toContain('–');
   });
@@ -65,7 +60,6 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
 
     const result = buildHistogramBins(articles);
     expect(result.bins.length).toBeGreaterThan(1);
-    // Each bin spans 15 minutes (900,000 ms)
     const binDuration = result.bins[0].endTime - result.bins[0].startTime;
     expect(binDuration).toBe(15 * 60 * 1000);
   });
@@ -87,7 +81,6 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
 
     const result = buildHistogramBins(articles);
     const binDuration = result.bins[0].endTime - result.bins[0].startTime;
-    // 12h span -> 1h or 2h buckets
     expect([3600 * 1000, 2 * 3600 * 1000]).toContain(binDuration);
     expect(result.bins.length).toBeGreaterThan(1);
   });
@@ -113,12 +106,12 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
     expect(binDuration).toBe(24 * 3600 * 1000);
   });
 
-  it('separates angles into distinct segments within bins', () => {
-    const colorMap = new Map<string, AngleColorStyle>([
+  it('separates threads into distinct segments within bins', () => {
+    const colorMap = new Map<string, ThreadColorStyle>([
       [
-        'angle-1',
+        'thread-1',
         {
-          id: 'angle-1',
+          id: 'thread-1',
           name: 'Takeover Bid',
           color: '#4F6D7A',
           bg: '',
@@ -128,9 +121,9 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
         },
       ],
       [
-        'angle-2',
+        'thread-2',
         {
-          id: 'angle-2',
+          id: 'thread-2',
           name: 'Financial Fallout',
           color: '#DD6E42',
           bg: '',
@@ -146,33 +139,32 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
         id: '1',
         title: 'Bid A',
         publishedAt: '2026-10-09T08:05:00.000Z',
-        angleId: 'angle-1',
-        angleName: 'Takeover Bid',
+        threadId: 'thread-1',
+        threadName: 'Takeover Bid',
       },
       {
         id: '2',
         title: 'Finance B',
         publishedAt: '2026-10-09T08:10:00.000Z',
-        angleId: 'angle-2',
-        angleName: 'Financial Fallout',
+        threadId: 'thread-2',
+        threadName: 'Financial Fallout',
       },
       {
         id: '3',
         title: 'Bid C',
         publishedAt: '2026-10-09T08:12:00.000Z',
-        angleId: 'angle-1',
-        angleName: 'Takeover Bid',
+        threadId: 'thread-1',
+        threadName: 'Takeover Bid',
       },
     ];
 
     const result = buildHistogramBins(articles, colorMap);
-    // All in the same 15m bin (08:00 - 08:15)
     const activeBin = result.bins.find((b) => b.total === 3);
     expect(activeBin).toBeDefined();
     expect(activeBin?.segments).toHaveLength(2);
 
-    const seg1 = activeBin?.segments.find((s) => s.angleId === 'angle-1');
-    const seg2 = activeBin?.segments.find((s) => s.angleId === 'angle-2');
+    const seg1 = activeBin?.segments.find((s) => s.threadId === 'thread-1');
+    const seg2 = activeBin?.segments.find((s) => s.threadId === 'thread-2');
 
     expect(seg1?.count).toBe(2);
     expect(seg1?.color).toBe('#4F6D7A');
@@ -189,10 +181,8 @@ describe('StoryThreadHistogram buildHistogramBins', () => {
     const result = buildHistogramBins(articles);
     expect(result.bins.length).toBeGreaterThan(1);
 
-    // First bin has day prefix (e.g., 'Fri 08:00' or local timezone day)
     expect(result.bins[0].label).toMatch(/[A-Za-z]{3}\s\d{2}:\d{2}/);
 
-    // Subsequent bins on the same day only show compact time (e.g. '08:30', '09:00')
     if (result.bins.length > 1) {
       expect(result.bins[1].label).toMatch(/^\d{2}:\d{2}$/);
     }
