@@ -6,47 +6,10 @@ jest.unstable_mockModule('../../../lib/aiClient', () => ({
   generateStructuredJson: mockGenerateStructuredJson,
 }));
 
-let evaluateStoryNeighborhood: typeof import('./evaluateStoryNeighborhood').evaluateStoryNeighborhood;
-let synthesizeStoryCopy: typeof import('./evaluateStoryNeighborhood').synthesizeStoryCopy;
+let synthesizeStoryCopy: typeof import('./synthesizeStoryCopy').synthesizeStoryCopy;
 
 beforeAll(async () => {
-  ({ evaluateStoryNeighborhood, synthesizeStoryCopy } = await import('./evaluateStoryNeighborhood'));
-});
-
-describe('evaluateStoryNeighborhood', () => {
-  beforeEach(() => {
-    jest.resetAllMocks();
-  });
-
-  it('calls generateStructuredJson with clusters and candidate stories', async () => {
-    const mockResult = {
-      merges: [{ targetClusterId: 'c1', sourceClusterIds: ['c2'] }],
-      stories: [
-        {
-          storyTitle: 'Test Story',
-          status: 'developing' as const,
-          overview: 'Overview of test story.',
-          threads: [{ clusterId: 'c1', thread: 'Core Angle' }],
-        },
-      ],
-    };
-
-    (mockGenerateStructuredJson as jest.Mock).mockResolvedValue(mockResult);
-
-    const clusters = [
-      { id: 'c1', headline: 'Incident Occurs', summary: 'Summary 1', date: '2026-10-23' },
-      { id: 'c2', headline: 'Incident Details', summary: 'Summary 2', date: '2026-10-23' },
-    ];
-
-    const candidateStories = [
-      { id: 'story-1', title: 'Prior Story', status: 'developing', overview: 'Prior overview' },
-    ];
-
-    const result = await evaluateStoryNeighborhood(clusters, candidateStories);
-
-    expect(mockGenerateStructuredJson).toHaveBeenCalledTimes(1);
-    expect(result).toEqual(mockResult);
-  });
+  ({ synthesizeStoryCopy } = await import('./synthesizeStoryCopy'));
 });
 
 describe('synthesizeStoryCopy', () => {
@@ -99,10 +62,10 @@ describe('synthesizeStoryCopy', () => {
     const mockApiResponse = {
       storyTitle: 'Conservative Party Conference 2026 Opens in Birmingham',
       status: 'developing' as const,
-      overview: 'Tory leadership addresses conference on tax reform.',
+      overview: 'Tory members gather for annual conference in Birmingham amid tax debates.',
       threads: [
-        { clusterId: 'c1', thread: 'Opening Address' },
-        { clusterId: 'c2', thread: 'Tax Policy' },
+        { clusterId: 'c1', thread: 'Conference Opening' },
+        { clusterId: 'c2', thread: 'Tax Policy Debate' },
       ],
     };
 
@@ -110,9 +73,11 @@ describe('synthesizeStoryCopy', () => {
 
     const result = await synthesizeStoryCopy(clusters, existingStory);
 
-    expect(result.storyTitle).toBe('Conservative Party Conference 2026 Opens in Birmingham');
+    expect(result).toEqual(mockApiResponse);
+    expect(mockGenerateStructuredJson).toHaveBeenCalledTimes(1);
+
     const callArgs = (mockGenerateStructuredJson as jest.Mock).mock.calls[0][0] as { prompt: string };
-    expect(callArgs.prompt).toContain('PRE-EXISTING STORY IN DATABASE:');
+    expect(callArgs.prompt).toContain('PRE-EXISTING STORY IN DATABASE');
     expect(callArgs.prompt).toContain('Conservative Party Conference 2026');
   });
 });

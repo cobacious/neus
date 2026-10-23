@@ -24,16 +24,13 @@ import {
   isSettledNeighborhood,
 } from './storyThreads/storyNeighborhoods';
 import {
-  evaluateStoryNeighborhood,
   synthesizeStoryCopy,
   StoryCopyResult,
-  NeighborhoodEvaluation,
-} from './storyThreads/evaluateStoryNeighborhood';
+} from './storyThreads/synthesizeStoryCopy';
 import { classifyArticleThreads } from './storyThreads/classifyArticleThreads';
 import {
   detectDuplicateClusters,
   detectStorySagas,
-  isTypeSafeActive,
   CandidateClusterForMerge,
 } from '../../lib/typesafeClient';
 
@@ -41,7 +38,6 @@ export interface OrganizeStoryThreadsDependencies {
   detectDuplicateClusters?: typeof detectDuplicateClusters;
   detectStorySagas?: typeof detectStorySagas;
   synthesizeStoryCopy?: typeof synthesizeStoryCopy;
-  evaluateNeighborhood?: typeof evaluateStoryNeighborhood;
   classifyArticleThreads?: typeof classifyArticleThreads;
 }
 
@@ -52,7 +48,6 @@ export async function organizeStoryThreads(
   const detectDuplicatesFn = deps.detectDuplicateClusters ?? detectDuplicateClusters;
   const detectSagasFn = deps.detectStorySagas ?? detectStorySagas;
   const synthesizeCopyFn = deps.synthesizeStoryCopy ?? synthesizeStoryCopy;
-  const evaluateNeighborhoodFn = deps.evaluateNeighborhood ?? evaluateStoryNeighborhood;
   const classifyThreadsFn = deps.classifyArticleThreads ?? classifyArticleThreads;
 
   logPipelineStep(
@@ -186,21 +181,17 @@ export async function organizeStoryThreads(
     const neighborhoodClusterIds = new Set(neighborhood.map((c) => c.id));
     const mergedSourceIds = new Set<string>();
     const assignedClusterIds = new Set<string>();
-    const useTypeSafe = Boolean(
-      deps.detectDuplicateClusters || deps.detectStorySagas || isTypeSafeActive()
-    );
 
-    if (useTypeSafe) {
-      // 1. Evaluate candidate duplicate clusters in the neighborhood via TypeSafe Jev (Noul)
-      const candidatesForMerge: CandidateClusterForMerge[] = neighborhood.map((c) => ({
-        id: c.id,
-        headline: c.headline ?? null,
-        summary: c.summary ?? null,
-        storyId: c.storyId,
-        articleCount: c._count?.articleAssignments ?? 0,
-        createdAt: c.createdAt,
-        embedding: (Array.isArray(c.embedding) ? c.embedding : null) as number[] | null,
-      }));
+    // 1. Evaluate candidate duplicate clusters in the neighborhood via TypeSafe Jev (Noul)
+    const candidatesForMerge: CandidateClusterForMerge[] = neighborhood.map((c) => ({
+      id: c.id,
+      headline: c.headline ?? null,
+      summary: c.summary ?? null,
+      storyId: c.storyId,
+      articleCount: c._count?.articleAssignments ?? 0,
+      createdAt: c.createdAt,
+      embedding: (Array.isArray(c.embedding) ? c.embedding : null) as number[] | null,
+    }));
 
       const merges = await detectDuplicatesFn(candidatesForMerge, {
         minCosineSimilarity: 0.78,
@@ -395,170 +386,6 @@ export async function organizeStoryThreads(
           }
         }
       }
-    } else {
-      // Fallback: Gemini structured JSON neighborhood evaluation
-      const candidateStories = findCandidateStoriesForNeighborhood(neighborhood, existingStories);
-
-      const clustersForPrompt = neighborhood.map((c) => ({
-        id: c.id,
-        headline: c.headline ?? null,
-        summary: c.summary ?? null,
-        date: new Date(c.createdAt).toISOString().split('T')[0],
-        articleCount: c._count?.articleAssignments ?? 0,
-      }));
-
-      let evalResult: NeighborhoodEvaluation;
-      try {
-        evalResult = await evaluateNeighborhoodFn(clustersForPrompt, candidateStories);
-      } catch (err: any) {
-        logger.error(
-          `[${PipelineStep.Organize}] Failed evaluating neighborhood ${i + 1}/${orderedNeighborhoods.length}: ${err.message || err}`
-        );
-        continue;
-      }
-
-      // 1. Process merges
-      for (const m of evalResult.merges || []) {
-        if (m.targetClusterId && Array.isArray(m.sourceClusterIds)) {
-          const validSources = m.sourceClusterIds.filter(
-            (s) =>
-              s !== m.targetClusterId &&
-              neighborhoodClusterIds.has(s) &&
-              !mergedSourceIds.has(s)
-          );
-
-          if (validSources.length > 0 && neighborhoodClusterIds.has(m.targetClusterId)) {
-            await mergeClusters(m.targetClusterId, validSources);
-            validSources.forEach((id) => mergedSourceIds.add(id));
-            totalMerged += validSources.length;
-            logger.info(
-              `[${PipelineStep.Organize}] Merged ${validSources.length} duplicate cluster(s) into ${m.targetClusterId}`
-            );
-          }
-        }
-      }
-
-      // 2. Process story grouping & reactivation
-      const storiesToSync =
-        evalResult.stories ||
-        (evalResult.story ? [evalResult.story] : []);
-
-      for (const storyItem of storiesToSync) {
-        const storyThreads = storyItem.threads || (storyItem as any).angles;
-        if (Array.isArray(storyThreads)) {
-          const survivingThreads = storyThreads.filter(
-            (t) => !mergedSourceIds.has(t.clusterId) && neighborhoodClusterIds.has(t.clusterId)
-          );
-
-          if (survivingThreads.length >= 2) {
-            survivingThreads.forEach((t) => assignedClusterIds.add(t.clusterId));
-            const survivingClusters = neighborhood.filter((c) =>
-              survivingThreads.some((t) => t.clusterId === c.id)
-            );
-            const storyEmbedding = computeCentroidEmbedding(survivingClusters);
-
-            const targetStoryId =
-              storyItem.existingStoryId ||
-              survivingClusters.find((c) => c.storyId)?.storyId;
-
-            await syncStoryWithThreads({
-              existingStoryId: targetStoryId || undefined,
-              storyTitle: storyItem.storyTitle,
-              status: storyItem.status || 'developing',
-              overview: storyItem.overview,
-              embedding: storyEmbedding,
-              threads: survivingThreads.map((t) => ({
-                clusterId: t.clusterId,
-                thread: t.thread || (t as any).angle,
-              })),
-            });
-            totalStoriesSynced++;
-            logger.info(
-              `[${PipelineStep.Organize}] Grouped ${survivingThreads.length} threads under story: "${storyItem.storyTitle}"${
-                targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
-              }`
-            );
-
-            // Realign articles across story threads to correct misclassifications
-            try {
-              const threadClusterIds = survivingThreads.map((t) => t.clusterId);
-              const storyArticles = await getStoryArticlesForRealignment(threadClusterIds);
-
-              const targetStory = targetStoryId
-                ? existingStories.find((s) => s.id === targetStoryId)
-                : null;
-              const existingStoryClusterCount = targetStory?._count?.clusters;
-              const hasThreadCountChange =
-                existingStoryClusterCount !== undefined &&
-                existingStoryClusterCount !== survivingThreads.length;
-              const storyUpdatedMs = targetStory?.updatedAt
-                ? new Date(targetStory.updatedAt).getTime()
-                : 0;
-              const hasNewClusterSinceUpdate = survivingClusters.some(
-                (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
-              );
-
-              if (
-                storyArticles.length > 0 &&
-                (!targetStoryId || hasThreadCountChange || hasNewClusterSinceUpdate)
-              ) {
-                const threadsWithHeadlines = survivingThreads.map((t) => {
-                  const cluster = survivingClusters.find((c) => c.id === t.clusterId);
-                  return {
-                    clusterId: t.clusterId,
-                    thread: t.thread || (t as any).angle,
-                    headline: cluster?.headline ?? null,
-                    embedding: (Array.isArray(cluster?.embedding) ? cluster.embedding : null) as number[] | null,
-                  };
-                });
-
-                const newClusterIds = new Set(
-                  survivingClusters
-                    .filter(
-                      (c) =>
-                        new Date(c.createdAt).getTime() > storyUpdatedMs + 60000 ||
-                        c.storyId !== targetStoryId
-                    )
-                    .map((c) => c.id)
-                );
-
-                const assignments = await classifyThreadsFn(
-                  storyItem.storyTitle,
-                  threadsWithHeadlines,
-                  storyArticles,
-                  {
-                    isExistingStory: Boolean(targetStoryId),
-                    newClusterIds,
-                  }
-                );
-
-                const validClusterIdSet = new Set(threadClusterIds);
-                const validReassignments = assignments.filter(
-                  (r) =>
-                    validClusterIdSet.has(r.targetClusterId) &&
-                    storyArticles.some(
-                      (a) => a.articleId === r.articleId && a.currentClusterId !== r.targetClusterId
-                    )
-                );
-
-                if (validReassignments.length > 0) {
-                  const { updatedCount } = await realignStoryArticles(validReassignments);
-                  if (updatedCount > 0) {
-                    logger.info(
-                      `[${PipelineStep.Organize}] Realigned ${updatedCount} article(s) across threads for story "${storyItem.storyTitle}"`
-                    );
-                  }
-                }
-              }
-            } catch (realignErr: any) {
-              logger.warn(
-                `[${PipelineStep.Organize}] Article realignment skipped for "${storyItem.storyTitle}": ${realignErr.message || realignErr}`
-              );
-            }
-          }
-        }
-      }
-    }
 
     // 3. Dissociate any clusters in this neighborhood that had a storyId but were NOT assigned to any story
     const unassignedNeighborhoodClusters = neighborhood.filter(

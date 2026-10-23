@@ -8,7 +8,6 @@ import {
   verifySagaRelationship,
   verifyStoryMembership,
   detectStorySagas,
-  isTypeSafeActive,
 } from './typesafeClient';
 import { getAiUsageTotals, resetAiUsage } from './aiUsage';
 
@@ -17,24 +16,12 @@ const originalEnv = process.env;
 describe('typesafeClient', () => {
   beforeEach(() => {
     jest.resetModules();
-    process.env = { ...originalEnv };
+    process.env = { ...originalEnv, TYPESAFE_API_KEY: 'mock_key' };
     resetAiUsage();
   });
 
   afterAll(() => {
     process.env = originalEnv;
-  });
-
-  describe('isTypeSafeActive', () => {
-    it('returns true when TYPESAFE_API_KEY is present', () => {
-      process.env.TYPESAFE_API_KEY = 'mock_key';
-      expect(isTypeSafeActive()).toBe(true);
-    });
-
-    it('returns false when TYPESAFE_API_KEY is absent', () => {
-      delete process.env.TYPESAFE_API_KEY;
-      expect(isTypeSafeActive()).toBe(false);
-    });
   });
 
   describe('callSystemOne', () => {
@@ -520,13 +507,14 @@ describe('typesafeClient', () => {
       expect(result).toEqual([]);
     });
 
-    it('returns empty array when TYPESAFE_API_KEY is not configured', async () => {
+    it('throws error when TYPESAFE_API_KEY is not configured', async () => {
       delete process.env.TYPESAFE_API_KEY;
-      const result = await detectStorySagas([
-        { id: 'c1', createdAt: new Date() },
-        { id: 'c2', createdAt: new Date() },
-      ]);
-      expect(result).toEqual([]);
+      await expect(
+        detectStorySagas([
+          { id: 'c1', createdAt: new Date() },
+          { id: 'c2', createdAt: new Date() },
+        ])
+      ).rejects.toThrow('TYPESAFE_API_KEY is not configured');
     });
 
     it('identifies new story sagas using pairwise relationships and connected components', async () => {

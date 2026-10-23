@@ -72,13 +72,6 @@ export interface SystemOneCallOptions {
 }
 
 /**
- * Checks if a TypeSafe API key is available in the current environment.
- */
-export function isTypeSafeActive(): boolean {
-  return Boolean(process.env.TYPESAFE_API_KEY);
-}
-
-/**
  * Default System One model.
  */
 export function resolveTypeSafeModel(): string {
@@ -323,9 +316,8 @@ export async function classifyArticleThreadsBatch(params: {
   } = params;
   const candidateThreads = params.threads || params.angles || [];
 
-  if (!isTypeSafeActive()) {
-    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping article thread classification.`);
-    return [];
+  if (!process.env.TYPESAFE_API_KEY) {
+    throw new Error('TYPESAFE_API_KEY is not configured');
   }
 
   const results: Array<{
@@ -458,12 +450,11 @@ export async function detectDuplicateClusters(
   const minProb = options?.minDuplicateProbability ?? 0.85;
   const step = options?.step ?? PipelineStep.Organize;
 
-  if (!isTypeSafeActive()) {
-    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping duplicate cluster detection.`);
-    return [];
-  }
-
   if (clusters.length < 2) return [];
+
+  if (!process.env.TYPESAFE_API_KEY) {
+    throw new Error('TYPESAFE_API_KEY is not configured');
+  }
 
   // 1. Identify candidate duplicate pairs with cosine similarity >= minCosine
   const candidatePairs: Array<[CandidateClusterForMerge, CandidateClusterForMerge, number]> = [];
@@ -699,12 +690,11 @@ export async function detectStorySagas(
   const minProb = options?.minSagaProbability ?? 0.85;
   const step = options?.step ?? PipelineStep.Organize;
 
-  if (!isTypeSafeActive()) {
-    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping story saga detection.`);
-    return [];
-  }
-
   if (clusters.length < 2) return [];
+
+  if (!process.env.TYPESAFE_API_KEY) {
+    throw new Error('TYPESAFE_API_KEY is not configured');
+  }
 
   // 1. If candidate stories exist, verify membership for clusters
   const matchedStoryClusters = new Map<string, Set<string>>();

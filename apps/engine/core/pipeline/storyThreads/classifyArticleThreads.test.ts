@@ -1,11 +1,5 @@
 import { jest } from '@jest/globals';
 
-const mockGenerateStructuredJson = jest.fn();
-
-jest.unstable_mockModule('../../../lib/aiClient', () => ({
-  generateStructuredJson: mockGenerateStructuredJson,
-}));
-
 let classifyArticleThreads: typeof import('./classifyArticleThreads').classifyArticleThreads;
 
 beforeAll(async () => {
@@ -42,7 +36,6 @@ describe('classifyArticleThreads', () => {
 
     const res = await classifyArticleThreads('Saga Title', threads, articles);
 
-    expect(mockGenerateStructuredJson).not.toHaveBeenCalled();
     expect(res).toEqual([
       { articleId: 'a1', targetClusterId: 'c1' },
       { articleId: 'a2', targetClusterId: 'c2' },
@@ -66,11 +59,10 @@ describe('classifyArticleThreads', () => {
       { isExistingStory: true, newClusterIds: new Set() }
     );
 
-    expect(mockGenerateStructuredJson).not.toHaveBeenCalled();
     expect(res).toEqual([{ articleId: 'a1', targetClusterId: 'c1' }]);
   });
 
-  it('falls back to LLM for ambiguous articles', async () => {
+  it('evaluates ambiguous articles via TypeSafe Jev and gates assignments by confidence', async () => {
     const threads = [
       { clusterId: 'c1', thread: 'Hospital Care', embedding: [1, 0, 0] },
       { clusterId: 'c2', thread: 'Court Case', embedding: [0, 1, 0] },
@@ -80,13 +72,19 @@ describe('classifyArticleThreads', () => {
       { articleId: 'a_ambiguous', currentClusterId: 'c_other', title: 'Unclear Article' },
     ];
 
-    (mockGenerateStructuredJson as jest.Mock).mockResolvedValue({
-      assignments: [{ articleId: 'a_ambiguous', targetClusterId: 'c1' }],
-    });
+    const mockClassifyBatch = jest.fn().mockResolvedValue([
+      { articleId: 'a_ambiguous', targetClusterId: 'c1', confidence: 0.88, choice: 'thread_c1' },
+    ]);
 
-    const res = await classifyArticleThreads('Saga Title', threads, articles);
+    const res = await classifyArticleThreads(
+      'Saga Title',
+      threads,
+      articles,
+      undefined,
+      { classifyBatch: mockClassifyBatch as any }
+    );
 
-    expect(mockGenerateStructuredJson).toHaveBeenCalledTimes(1);
+    expect(mockClassifyBatch).toHaveBeenCalledTimes(1);
     expect(res).toEqual([{ articleId: 'a_ambiguous', targetClusterId: 'c1' }]);
   });
 
@@ -115,7 +113,6 @@ describe('classifyArticleThreads', () => {
     );
 
     expect(mockClassifyBatch).toHaveBeenCalledTimes(1);
-    expect(mockGenerateStructuredJson).not.toHaveBeenCalled();
     // Only a-matching should be reassigned to c2; a-unrelated should not be reassigned
     expect(assignments).toEqual([
       { articleId: 'a-matching', targetClusterId: 'c2' },

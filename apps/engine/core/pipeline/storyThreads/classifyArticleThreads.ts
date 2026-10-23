@@ -1,10 +1,6 @@
 import { cosineSimilarity } from '../utils';
 import { logger, PipelineStep } from '../../../lib/pipelineLogger';
-import { generateStructuredJson } from '../../../lib/aiClient';
-import {
-  isTypeSafeActive,
-  classifyArticleThreadsBatch,
-} from '../../../lib/typesafeClient';
+import { classifyArticleThreadsBatch } from '../../../lib/typesafeClient';
 
 export type StoryThreadWithHeadline = {
   clusterId: string;
@@ -144,95 +140,32 @@ export async function classifyArticleThreads(
   const llmAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
   const classifyBatchFn = deps.classifyBatch ?? classifyArticleThreadsBatch;
 
-  // If TypeSafe Jev is active or injected, evaluate ambiguous articles via System One Choice
-  if (deps.classifyBatch || isTypeSafeActive()) {
-    logger.info(
-      `[${PipelineStep.Organize}] Classifying ${ambiguousArticles.length} ambiguous article(s) for "${storyTitle}" with TypeSafe Jev (parallel)...`
-    );
+  logger.info(
+    `[${PipelineStep.Organize}] Classifying ${ambiguousArticles.length} ambiguous article(s) for "${storyTitle}" with TypeSafe Jev (parallel)...`
+  );
 
-    const jevResults = await classifyBatchFn({
-      articles: ambiguousArticles.map((a) => ({
-        id: a.articleId,
-        title: a.title,
-        snippet: a.snippet,
-        content: a.content,
-      })),
-      threads: threads.map((t) => ({
-        clusterId: t.clusterId,
-        thread: t.thread,
-        headline: t.headline,
-      })),
-      storyTitle,
-      step: PipelineStep.Organize,
-    });
+  const jevResults = await classifyBatchFn({
+    articles: ambiguousArticles.map((a) => ({
+      id: a.articleId,
+      title: a.title,
+      snippet: a.snippet,
+      content: a.content,
+    })),
+    threads: threads.map((t) => ({
+      clusterId: t.clusterId,
+      thread: t.thread,
+      headline: t.headline,
+    })),
+    storyTitle,
+    step: PipelineStep.Organize,
+  });
 
-    for (const res of jevResults) {
-      if (res.targetClusterId) {
-        llmAssignments.push({
-          articleId: res.articleId,
-          targetClusterId: res.targetClusterId,
-        });
-      }
-    }
-
-    return [...resolvedAssignments, ...llmAssignments];
-  }
-
-  // Fallback: Gemini structured JSON classification
-  const BATCH_SIZE = 25;
-
-  for (let i = 0; i < ambiguousArticles.length; i += BATCH_SIZE) {
-    const batch = ambiguousArticles.slice(i, i + BATCH_SIZE);
-    const batchIndex = Math.floor(i / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(ambiguousArticles.length / BATCH_SIZE);
-
-    logger.info(
-      `[${PipelineStep.Organize}] Classifying batch ${batchIndex}/${totalBatches} (${batch.length} articles) for "${storyTitle}" with Gemini...`
-    );
-
-    const prompt = `You are an objective news editor organizing a multi-thread story.
-Story: "${storyTitle}"
-
-Defined Threads in this Story:
-${threads.map((t) => `- ID: "${t.clusterId}" | Thread: "${t.thread}"${t.headline ? ` | Headline: "${t.headline}"` : ''}`).join('\n')}
-
-Articles to assign:
-${batch.map((a, idx) => `${idx + 1}. ID: "${a.articleId}" | Title: "${a.title}"`).join('\n')}
-
-TASK:
-For each article, determine which thread ID it most accurately represents based on its headline and core event.
-Assign every article to the single best-matching thread cluster ID.
-
-Return JSON with key "assignments": Array<{ articleId: string, targetClusterId: string }>`;
-
-    const parsed = await generateStructuredJson<{
-      assignments: Array<{ articleId: string; targetClusterId: string }>;
-    }>({
-      prompt,
-      systemInstruction:
-        'You are an objective news editor. Assign articles to their most accurate thread. Return strict JSON only.',
-      step: PipelineStep.Organize,
-      schema: {
-        type: 'OBJECT',
-        properties: {
-          assignments: {
-            type: 'ARRAY',
-            items: {
-              type: 'OBJECT',
-              properties: {
-                articleId: { type: 'STRING' },
-                targetClusterId: { type: 'STRING' },
-              },
-              required: ['articleId', 'targetClusterId'],
-            },
-          },
-        },
-        required: ['assignments'],
-      },
-    });
-
-    if (parsed && Array.isArray(parsed.assignments)) {
-      llmAssignments.push(...parsed.assignments);
+  for (const res of jevResults) {
+    if (res.targetClusterId) {
+      llmAssignments.push({
+        articleId: res.articleId,
+        targetClusterId: res.targetClusterId,
+      });
     }
   }
 
