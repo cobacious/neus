@@ -549,3 +549,256 @@ export async function detectDuplicateClusters(
 
   return decisions;
 }
+
+export interface CandidateStoryContext {
+  id: string;
+  title: string;
+  overview?: string | null;
+}
+
+export interface StorySagaDecision {
+  existingStoryId: string | null;
+  clusterIds: string[];
+}
+
+/**
+ * Verifies if two distinct clusters report on different angles, developments or consequences
+ * of the exact same overarching news saga.
+ */
+export async function verifySagaRelationship(params: {
+  clusterA: { title: string; summary?: string | null };
+  clusterB: { title: string; summary?: string | null };
+  step?: PipelineStep;
+}): Promise<{ isSameSaga: boolean; probability: number }> {
+  const { clusterA, clusterB, step = PipelineStep.Organize } = params;
+
+  const state = {
+    storyA: {
+      headline: clusterA.title,
+      summary: clusterA.summary || undefined,
+    },
+    storyB: {
+      headline: clusterB.title,
+      summary: clusterB.summary || undefined,
+    },
+  };
+
+  const response = await callSystemOne(
+    {
+      state,
+      questions: {
+        is_same_saga: {
+          type: 'noul',
+          instructions:
+            'Do these two news reports cover different angles, developments or consequences of the exact same overarching news saga?',
+          criteria: {
+            true: 'Both reports cover different facets, developments or chronological consequences of the exact same overarching news saga (e.g. an incident and hospital aftermath, or an opening speech and policy debate at a summit).',
+            false:
+              'The reports cover separate or independent events, even if they share broad keywords, locations or related thematic beats.',
+          },
+        },
+      },
+    },
+    { step }
+  );
+
+  const answer = response.answers['is_same_saga'] as NoulAnswer;
+  if (!answer || answer.type !== 'noul') {
+    throw new Error('TypeSafe response did not contain expected noul answer');
+  }
+
+  return {
+    isSameSaga: answer.noul >= 0.85,
+    probability: answer.noul,
+  };
+}
+
+/**
+ * Verifies if a cluster belongs to an existing news story saga.
+ */
+export async function verifyStoryMembership(params: {
+  cluster: { title: string; summary?: string | null };
+  story: { title: string; overview?: string | null };
+  step?: PipelineStep;
+}): Promise<{ isMember: boolean; probability: number }> {
+  const { cluster, story, step = PipelineStep.Organize } = params;
+
+  const state = {
+    storyUmbrella: {
+      title: story.title,
+      overview: story.overview || undefined,
+    },
+    cluster: {
+      headline: cluster.title,
+      summary: cluster.summary || undefined,
+    },
+  };
+
+  const response = await callSystemOne(
+    {
+      state,
+      questions: {
+        is_member: {
+          type: 'noul',
+          instructions:
+            'Does this news report represent a specific angle, development or consequence belonging to the existing news saga?',
+          criteria: {
+            true: 'This report directly belongs under the overarching news saga described by the story title and overview.',
+            false:
+              'This report covers a separate occurrence or unrelated topic that does not belong under this specific story umbrella.',
+          },
+        },
+      },
+    },
+    { step }
+  );
+
+  const answer = response.answers['is_member'] as NoulAnswer;
+  if (!answer || answer.type !== 'noul') {
+    throw new Error('TypeSafe response did not contain expected noul answer');
+  }
+
+  return {
+    isMember: answer.noul >= 0.85,
+    probability: answer.noul,
+  };
+}
+
+/**
+ * Evaluates candidate clusters within a neighborhood to identify confirmed multi-angle stories
+ * using System One Noul judgments.
+ */
+export async function detectStorySagas(
+  clusters: CandidateClusterForMerge[],
+  candidateStories: CandidateStoryContext[] = [],
+  options?: {
+    minSagaProbability?: number;
+    step?: PipelineStep;
+  }
+): Promise<StorySagaDecision[]> {
+  const minProb = options?.minSagaProbability ?? 0.85;
+  const step = options?.step ?? PipelineStep.Organize;
+
+  if (!isTypeSafeActive()) {
+    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping story saga detection.`);
+    return [];
+  }
+
+  if (clusters.length < 2) return [];
+
+  // 1. If candidate stories exist, verify membership for clusters
+  const matchedStoryClusters = new Map<string, Set<string>>();
+  const unassignedClusters: CandidateClusterForMerge[] = [];
+
+  for (const c of clusters) {
+    let matchedId: string | null = null;
+
+    if (c.storyId && candidateStories.some((s) => s.id === c.storyId)) {
+      matchedId = c.storyId;
+    } else if (candidateStories.length > 0) {
+      for (const s of candidateStories) {
+        try {
+          const res = await verifyStoryMembership({
+            cluster: { title: c.headline || '', summary: c.summary },
+            story: { title: s.title, overview: s.overview },
+            step,
+          });
+          if (res.probability >= minProb) {
+            matchedId = s.id;
+            break;
+          }
+        } catch (err: any) {
+          logger.warn(`[${step}] Story membership verification failed for cluster ${c.id}: ${err.message}`);
+        }
+      }
+    }
+
+    if (matchedId) {
+      if (!matchedStoryClusters.has(matchedId)) {
+        matchedStoryClusters.set(matchedId, new Set());
+      }
+      matchedStoryClusters.get(matchedId)!.add(c.id);
+    } else {
+      unassignedClusters.push(c);
+    }
+  }
+
+  const decisions: StorySagaDecision[] = [];
+
+  // Collect confirmed existing stories with >= 2 member clusters in this neighborhood
+  for (const [storyId, clusterIdSet] of matchedStoryClusters.entries()) {
+    if (clusterIdSet.size >= 2) {
+      decisions.push({
+        existingStoryId: storyId,
+        clusterIds: Array.from(clusterIdSet),
+      });
+    }
+  }
+
+  // 2. For unassigned clusters, evaluate pairwise saga relationships to discover new stories
+  if (unassignedClusters.length >= 2) {
+    const candidatePairs: Array<[CandidateClusterForMerge, CandidateClusterForMerge]> = [];
+    for (let i = 0; i < unassignedClusters.length; i++) {
+      for (let j = i + 1; j < unassignedClusters.length; j++) {
+        candidatePairs.push([unassignedClusters[i], unassignedClusters[j]]);
+      }
+    }
+
+    const pairVerifications = await Promise.all(
+      candidatePairs.map(async ([c1, c2]) => {
+        try {
+          const res = await verifySagaRelationship({
+            clusterA: { title: c1.headline || '', summary: c1.summary },
+            clusterB: { title: c2.headline || '', summary: c2.summary },
+            step,
+          });
+          return { c1, c2, isSameSaga: res.probability >= minProb };
+        } catch (err: any) {
+          logger.warn(`[${step}] Saga relationship check failed for clusters ${c1.id} & ${c2.id}: ${err.message}`);
+          return { c1, c2, isSameSaga: false };
+        }
+      })
+    );
+
+    // Build connected components for new sagas
+    const adjacency = new Map<string, Set<string>>();
+    for (const c of unassignedClusters) {
+      adjacency.set(c.id, new Set());
+    }
+    for (const item of pairVerifications) {
+      if (item.isSameSaga) {
+        adjacency.get(item.c1.id)!.add(item.c2.id);
+        adjacency.get(item.c2.id)!.add(item.c1.id);
+      }
+    }
+
+    const visited = new Set<string>();
+    for (const c of unassignedClusters) {
+      if (visited.has(c.id)) continue;
+
+      const component: string[] = [];
+      const queue = [c.id];
+      visited.add(c.id);
+
+      while (queue.length > 0) {
+        const curr = queue.shift()!;
+        component.push(curr);
+        for (const neighbor of adjacency.get(curr) || []) {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            queue.push(neighbor);
+          }
+        }
+      }
+
+      if (component.length >= 2) {
+        decisions.push({
+          existingStoryId: null,
+          clusterIds: component,
+        });
+      }
+    }
+  }
+
+  return decisions;
+}

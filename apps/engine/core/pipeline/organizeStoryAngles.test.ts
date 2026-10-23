@@ -24,6 +24,7 @@ let computeCentroidEmbedding: typeof import('./organizeStoryAngles').computeCent
 let findCandidateStoriesForNeighborhood: typeof import('./organizeStoryAngles').findCandidateStoriesForNeighborhood;
 let isSettledNeighborhood: typeof import('./organizeStoryAngles').isSettledNeighborhood;
 let classifyArticleAngles: typeof import('./organizeStoryAngles').classifyArticleAngles;
+let synthesizeStoryCopy: typeof import('./organizeStoryAngles').synthesizeStoryCopy;
 
 beforeAll(async () => {
   process.env.GEMINI_API_KEY = 'mock-gemini-key';
@@ -35,6 +36,7 @@ beforeAll(async () => {
     findCandidateStoriesForNeighborhood,
     isSettledNeighborhood,
     classifyArticleAngles,
+    synthesizeStoryCopy,
   } = await import('./organizeStoryAngles'));
 });
 
@@ -155,16 +157,13 @@ describe('organizeStoryAngles', () => {
             parts: [
               {
                 text: JSON.stringify({
-                  story: {
-                    existingStoryId: 'dormant-story-1',
-                    storyTitle: 'Christa Pike Execution Attempt and Aftermath',
-                    status: 'developing',
-                    overview: 'Macro overview of the event.',
-                    angles: [
-                      { clusterId: 'c1', angle: 'Botched Execution Attempt' },
-                      { clusterId: 'c3', angle: 'Hospital Awakening' },
-                    ],
-                  },
+                  storyTitle: 'Christa Pike Execution Attempt and Aftermath',
+                  status: 'developing',
+                  overview: 'Macro overview of the event.',
+                  angles: [
+                    { clusterId: 'c1', angle: 'Botched Execution Attempt' },
+                    { clusterId: 'c3', angle: 'Hospital Awakening' },
+                  ],
                 }),
               },
             ],
@@ -186,6 +185,12 @@ describe('organizeStoryAngles', () => {
       {},
       {
         detectDuplicateClusters: async () => [{ targetClusterId: 'c1', sourceClusterIds: ['c2'] }],
+        detectStorySagas: async () => [
+          {
+            existingStoryId: 'dormant-story-1',
+            clusterIds: ['c1', 'c3'],
+          },
+        ],
       }
     );
 
@@ -276,15 +281,13 @@ describe('organizeStoryAngles', () => {
             parts: [
               {
                 text: JSON.stringify({
-                  story: {
-                    storyTitle: 'Christa Pike Aftermath',
-                    status: 'developing',
-                    overview: 'Botched execution saga',
-                    angles: [
-                      { clusterId: 'c1', angle: 'Chief Resignation' },
-                      { clusterId: 'c2', angle: 'Hospital Recovery' },
-                    ],
-                  },
+                  storyTitle: 'Christa Pike Aftermath',
+                  status: 'developing',
+                  overview: 'Botched execution saga',
+                  angles: [
+                    { clusterId: 'c1', angle: 'Chief Resignation' },
+                    { clusterId: 'c2', angle: 'Hospital Recovery' },
+                  ],
                 }),
               },
             ],
@@ -312,6 +315,12 @@ describe('organizeStoryAngles', () => {
     await organizeStoryAngles(
       {},
       {
+        detectStorySagas: async () => [
+          {
+            existingStoryId: null,
+            clusterIds: ['c1', 'c2'],
+          },
+        ],
         classifyArticleAngles: async () => [
           { articleId: 'art-1', targetClusterId: 'c1' },
           { articleId: 'art-2', targetClusterId: 'c2' },
@@ -417,11 +426,39 @@ describe('organizeStoryAngles', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: JSON.stringify({ merges: [], story: null }) }] } }],
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    storyTitle: 'Test Story',
+                    status: 'developing',
+                    overview: 'Test overview',
+                    angles: [
+                      { clusterId: 'c1', angle: 'Angle 1' },
+                      { clusterId: 'c2', angle: 'Angle 2' },
+                    ],
+                  }),
+                },
+              ],
+            },
+          },
+        ],
       }),
     });
 
-    await organizeStoryAngles();
+    await organizeStoryAngles(
+      {},
+      {
+        detectStorySagas: async (clusters) => [
+          {
+            existingStoryId: null,
+            clusterIds: clusters.map((c) => c.id),
+          },
+        ],
+      }
+    );
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const firstBody = (mockFetch.mock.calls[0] as [string, any])[1].body as string;
@@ -683,4 +720,100 @@ describe('classifyArticleAngles', () => {
     ]);
   });
 });
+
+describe('synthesizeStoryCopy', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('generates structured story copy from confirmed clusters without judging taxonomy', async () => {
+    const clusters = [
+      { id: 'c1', headline: 'Botched execution attempt', summary: 'S1', date: '2026-10-20', articleCount: 3 },
+      { id: 'c2', headline: 'Inmate wakes up in hospital', summary: 'S2', date: '2026-10-21', articleCount: 2 },
+    ];
+
+    const mockApiResponse = {
+      storyTitle: 'Christa Pike Survives Execution Attempt in Hospital ICU',
+      status: 'developing',
+      overview: 'Pike remains in critical condition following an execution attempt. Officials have launched an investigation.',
+      angles: [
+        { clusterId: 'c1', angle: 'Execution Attempt' },
+        { clusterId: 'c2', angle: 'Hospital Revival' },
+      ],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify(mockApiResponse) }],
+            },
+          },
+        ],
+      }),
+    });
+
+    const result = await synthesizeStoryCopy(clusters);
+
+    expect(result).toEqual(mockApiResponse);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    const callBody = JSON.parse((mockFetch.mock.calls[0] as [string, any])[1].body);
+    const userPrompt = callBody.contents[0].parts[0].text;
+    expect(userPrompt).toContain('You are an expert news copywriter and editor.');
+    expect(userPrompt).toContain('confirmed as distinct member angles');
+    expect(userPrompt).not.toContain('Do 2 or more distinct clusters represent DIFFERENT ANGLES');
+  });
+
+  it('includes pre-existing story context when updating an existing story umbrella', async () => {
+    const clusters = [
+      { id: 'c1', headline: 'Party conference opens', summary: 'Day 1', date: '2026-10-20' },
+      { id: 'c2', headline: 'Tax policy announcement', summary: 'Speech', date: '2026-10-21' },
+    ];
+
+    const existingStory = {
+      id: 'existing-story-id',
+      title: 'Conservative Party Conference 2026',
+      overview: 'Tory members gather for annual conference in Birmingham.',
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    storyTitle: 'Conservative Party Conference 2026 Opens in Birmingham',
+                    status: 'developing',
+                    overview: 'Tory leadership addresses conference on tax reform.',
+                    angles: [
+                      { clusterId: 'c1', angle: 'Opening Address' },
+                      { clusterId: 'c2', angle: 'Tax Policy' },
+                    ],
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+
+    const result = await synthesizeStoryCopy(clusters, existingStory);
+
+    expect(result.storyTitle).toBe('Conservative Party Conference 2026 Opens in Birmingham');
+    const callBody = JSON.parse((mockFetch.mock.calls[0] as [string, any])[1].body);
+    const userPrompt = callBody.contents[0].parts[0].text;
+    expect(userPrompt).toContain('PRE-EXISTING STORY IN DATABASE:');
+    expect(userPrompt).toContain('Conservative Party Conference 2026');
+  });
+});
+
 

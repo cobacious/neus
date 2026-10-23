@@ -21,12 +21,13 @@ import { generateStructuredJson } from '../../lib/aiClient';
 import {
   classifyArticleAnglesBatch,
   detectDuplicateClusters,
+  detectStorySagas,
   CandidateClusterForMerge,
   ClusterMergeDecision,
+  StorySagaDecision,
 } from '../../lib/typesafeClient';
 
-export type NeighborhoodStory = {
-  existingStoryId?: string | null;
+export interface StoryCopyResult {
   storyTitle: string;
   status: 'breaking' | 'developing';
   overview: string;
@@ -34,12 +35,7 @@ export type NeighborhoodStory = {
     clusterId: string;
     angle: string;
   }>;
-};
-
-export type NeighborhoodEvaluation = {
-  stories?: NeighborhoodStory[];
-  story?: NeighborhoodStory | null;
-};
+}
 
 export type CandidateStory = {
   id: string;
@@ -304,105 +300,70 @@ export function findCandidateStoriesForNeighborhood(
   return Array.from(candidateMap.values());
 }
 
-async function evaluateNeighborhood(
+export async function synthesizeStoryCopy(
   clusters: Array<{ id: string; headline: string | null; summary: string | null; date: string; articleCount?: number }>,
-  candidateStories?: CandidateStory[]
-): Promise<NeighborhoodEvaluation> {
+  existingStory?: CandidateStory | null
+): Promise<StoryCopyResult> {
   const prompt = `
-You are an expert news editor and taxonomist.
+You are an expert news copywriter and editor.
 
-Here is a candidate group of distinct news clusters identified by vector similarity:
+The following ${clusters.length} news clusters have been confirmed as distinct member angles of the exact same overarching news story:
 ${JSON.stringify(clusters, null, 2)}
-
+${
+  existingStory
+    ? `\nPRE-EXISTING STORY IN DATABASE:\nTitle: "${existingStory.title}"\nOverview: "${existingStory.overview || ''}"\n`
+    : ''
+}
 TASK:
-Analyze these clusters and determine:
-Do 2 or more distinct clusters represent DIFFERENT ANGLES, chronological developments, or sub-stories of the SAME overarching news saga?
-- If yes, provide for each story:
-  - "existingStoryId": If this saga matches or develops an EXISTING STORY listed in the CANDIDATE STORIES below, specify its id. Otherwise null.
-  - "storyTitle": An objective, neutral overarching news headline synthesizing what happened across the saga.
-  - "status": One of "breaking" (first 12-24h of newly emerging breaking news where details are still arriving) or "developing" (multi-angle saga actively expanding in scope with related spin-offs/fallout).
-  - "overview": A neutral 2-sentence macro-summary synthesizing the whole saga across all its angles.
-  - "angles": Array of member clusters with:
-    - "clusterId": The cluster id
-    - "angle": A 2-5 word description of this cluster's specific angle/development (e.g. "Hospital Awakening", "Warden Resignation", "Legal Inquiry").
-
-EDITORIAL TAXONOMY GUIDELINES:
-A multi-angle "Story" is an overarching news topic that brings together 2 or more distinct angles, chronological chapters, or key facets of:
-1. Narrative Sagas & Investigations: Unfolding events with direct consequences (e.g. an incident occurs -> hospital/investigative updates -> institutional fallout/resignation -> legal/judicial proceedings).
-2. Major Scheduled Macro-Events: Significant calendar events with multiple major speeches, announcements, or debates (e.g. party conferences, bilateral summits, legislative budget sessions, tournaments).
+Write the editorial presentation for this story:
+1. "storyTitle": An objective, neutral overarching news headline synthesizing what happened across the story (must have an active verb describing the event or development, not an abstract topic label).
+2. "overview": A neutral 2-sentence macro-summary synthesizing the entire saga across all member angles.
+3. "status": "breaking" (first 12-24h of newly emerging breaking news where details are still arriving) or "developing" (multi-angle saga actively expanding in scope with related spin-offs/fallout).
+4. "angles": For each of the ${clusters.length} clusters, provide a concise 2-5 word description of its specific angle (e.g. "Hospital Awakening", "Warden Resignation", "Legal Inquiry").
 
 CRITICAL TITLING & OVERVIEW RULES:
 - The "storyTitle" MUST read like a real, neutral news headline with an active verb describing the overarching event or development (e.g. "Clashes Erupt Across France Over Student Protests and Rising Living Costs", "Vatican Confirms Pope Leo Diagnosed with Lung Cancer Following Surgery").
 - DO NOT format "storyTitle" as an abstract topic label, Wikipedia category or list of nouns ending in "... and Fallout", "...: Speeches, Debates and Reactions" or "...: Court Proceedings and Witness Testimony". It must read like a real, neutral news headline.
-- NEVER narrow the "storyTitle" to a single minor sub-angle or individual pledge (e.g. DO NOT name a party conference story after one specific tax pledge like "Badenoch Pledges to Scrap Inheritance Tax"; instead write "Conservative Party Opens Annual Conference Amid Debates Over Economic Strategy and Leadership").
-- The "overview" must synthesize the entire overarching saga or event across all member angles.
+- NEVER narrow the "storyTitle" to a single minor sub-angle or individual pledge.
+- The "overview" must synthesize the entire overarching saga across all member angles.
 
-FALSE POSITIVES TO KEEP STANDALONE (Return "stories": []):
-Do NOT group clusters into a story merely because:
-1. They share an entity or figure (e.g., an actor, CEO, or leader) but cover entirely unrelated actions or occurrences with no shared narrative or event thread.
-2. They share a broad thematic beat (e.g., general healthcare news) with no shared event, initiative, or investigation connecting them.
-3. If candidate clusters are unrelated standalone reports, return "stories": [].
-${
-  candidateStories && candidateStories.length > 0
-    ? `\nCANDIDATE STORIES IN DATABASE (active or dormant sagas that may match this neighborhood):\n${JSON.stringify(
-        candidateStories,
-        null,
-        2
-      )}\n`
-    : ''
-}
 Return JSON with this exact schema:
 {
-  "stories": [
+  "storyTitle": string,
+  "status": "breaking" | "developing",
+  "overview": string,
+  "angles": [
     {
-      "existingStoryId": string | null,
-      "storyTitle": string,
-      "status": "breaking" | "developing",
-      "overview": string,
-      "angles": [
-        {
-          "clusterId": string,
-          "angle": string
-        }
-      ]
+      "clusterId": string,
+      "angle": string
     }
   ]
 }
 `;
 
-  return generateStructuredJson<NeighborhoodEvaluation>({
+  return generateStructuredJson<StoryCopyResult>({
     prompt,
-    systemInstruction: 'You are an objective news taxonomist. Return strict JSON only.',
+    systemInstruction: 'You are an objective news copywriter. Return strict JSON only.',
     step: PipelineStep.Organize,
     schema: {
       type: 'OBJECT',
       properties: {
-        stories: {
+        storyTitle: { type: 'STRING' },
+        status: { type: 'STRING', enum: ['breaking', 'developing'] },
+        overview: { type: 'STRING' },
+        angles: {
           type: 'ARRAY',
           items: {
             type: 'OBJECT',
             properties: {
-              existingStoryId: { type: 'STRING', nullable: true },
-              storyTitle: { type: 'STRING' },
-              status: { type: 'STRING', enum: ['breaking', 'developing'] },
-              overview: { type: 'STRING' },
-              angles: {
-                type: 'ARRAY',
-                items: {
-                  type: 'OBJECT',
-                  properties: {
-                    clusterId: { type: 'STRING' },
-                    angle: { type: 'STRING' },
-                  },
-                  required: ['clusterId', 'angle'],
-                },
-              },
+              clusterId: { type: 'STRING' },
+              angle: { type: 'STRING' },
             },
-            required: ['storyTitle', 'status', 'overview', 'angles'],
+            required: ['clusterId', 'angle'],
           },
         },
       },
-      required: ['stories'],
+      required: ['storyTitle', 'status', 'overview', 'angles'],
     },
   });
 }
@@ -556,8 +517,9 @@ export async function classifyArticleAngles(
 
 export interface OrganizeStoryAnglesDependencies {
   detectDuplicateClusters?: typeof detectDuplicateClusters;
+  detectStorySagas?: typeof detectStorySagas;
+  synthesizeStoryCopy?: typeof synthesizeStoryCopy;
   classifyArticleAngles?: typeof classifyArticleAngles;
-  evaluateNeighborhood?: typeof evaluateNeighborhood;
 }
 
 export async function organizeStoryAngles(
@@ -565,8 +527,9 @@ export async function organizeStoryAngles(
   deps: OrganizeStoryAnglesDependencies = {}
 ) {
   const detectDuplicatesFn = deps.detectDuplicateClusters ?? detectDuplicateClusters;
+  const detectSagasFn = deps.detectStorySagas ?? detectStorySagas;
+  const synthesizeCopyFn = deps.synthesizeStoryCopy ?? synthesizeStoryCopy;
   const classifyAnglesFn = deps.classifyArticleAngles ?? classifyArticleAngles;
-  const evaluateNeighborhoodFn = deps.evaluateNeighborhood ?? evaluateNeighborhood;
 
   logPipelineStep(PipelineStep.Organize, 'Organizing clusters into story angles & merging duplicates...');
 
@@ -749,143 +712,162 @@ export async function organizeStoryAngles(
 
     const candidateStories = findCandidateStoriesForNeighborhood(survivingNeighborhood, existingStories);
 
-    const clustersForPrompt = survivingNeighborhood.map((c) => ({
+    // 2. Evaluate story sagas using System One (Noul)
+    const candidatesForSaga: CandidateClusterForMerge[] = survivingNeighborhood.map((c) => ({
       id: c.id,
       headline: c.headline,
       summary: c.summary,
-      date: new Date(c.createdAt).toISOString().split('T')[0],
+      storyId: c.storyId,
       articleCount: c._count?.articleAssignments ?? 0,
+      createdAt: c.createdAt,
+      embedding: (Array.isArray(c.embedding) ? c.embedding : null) as number[] | null,
     }));
 
-    let evalResult: NeighborhoodEvaluation;
-    try {
-      evalResult = await evaluateNeighborhoodFn(clustersForPrompt, candidateStories);
-    } catch (err: any) {
-      logger.error(
-        `[${PipelineStep.Organize}] Failed evaluating neighborhood ${i + 1}/${orderedNeighborhoods.length}: ${err.message || err}`
-      );
-      continue;
-    }
+    const sagaDecisions = await detectSagasFn(candidatesForSaga, candidateStories, {
+      step: PipelineStep.Organize,
+    });
 
-    // 2. Process story grouping & reactivation
-    const storiesToSync =
-      evalResult.stories ||
-      (evalResult.story ? [evalResult.story] : []);
+    if (sagaDecisions.length === 0) {
+      logger.info(
+        `[${PipelineStep.Organize}] System One identified no multi-angle sagas in neighborhood (${survivingNeighborhood.length} clusters remain standalone). Skipping copywriting.`
+      );
+    }
 
     const assignedClusterIds = new Set<string>();
 
-    for (const storyItem of storiesToSync) {
-      if (Array.isArray(storyItem.angles)) {
-        const survivingAngles = storyItem.angles.filter(
-          (a) => !mergedSourceIds.has(a.clusterId) && neighborhoodClusterIds.has(a.clusterId)
+    // 3. For each confirmed saga, invoke Gemini strictly for copywriting
+    for (const saga of sagaDecisions) {
+      const sagaClusters = survivingNeighborhood.filter((c) => saga.clusterIds.includes(c.id));
+      if (sagaClusters.length < 2) continue;
+
+      const existingStory = saga.existingStoryId
+        ? existingStories.find((s) => s.id === saga.existingStoryId)
+        : null;
+
+      const clustersForCopy = sagaClusters.map((c) => ({
+        id: c.id,
+        headline: c.headline,
+        summary: c.summary,
+        date: new Date(c.createdAt).toISOString().split('T')[0],
+        articleCount: c._count?.articleAssignments ?? 0,
+      }));
+
+      let copyResult: StoryCopyResult;
+      try {
+        copyResult = await synthesizeCopyFn(clustersForCopy, existingStory);
+      } catch (err: any) {
+        logger.error(
+          `[${PipelineStep.Organize}] Failed synthesizing story copy: ${err.message || err}`
+        );
+        continue;
+      }
+
+      const survivingAngles = copyResult.angles.filter(
+        (a) => !mergedSourceIds.has(a.clusterId) && neighborhoodClusterIds.has(a.clusterId)
+      );
+
+      if (survivingAngles.length >= 2) {
+        survivingAngles.forEach((a) => assignedClusterIds.add(a.clusterId));
+        const storyEmbedding = computeCentroidEmbedding(sagaClusters);
+
+        const targetStoryId =
+          saga.existingStoryId ||
+          sagaClusters.find((c) => c.storyId)?.storyId;
+
+        await syncStoryWithAngles({
+          existingStoryId: targetStoryId || undefined,
+          storyTitle: copyResult.storyTitle,
+          status: copyResult.status || 'developing',
+          overview: copyResult.overview,
+          embedding: storyEmbedding,
+          angles: survivingAngles,
+        });
+        totalStoriesSynced++;
+        logger.info(
+          `[${PipelineStep.Organize}] Grouped ${survivingAngles.length} angles under story: "${copyResult.storyTitle}"${
+            targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
+          }`
         );
 
-        if (survivingAngles.length >= 2) {
-          survivingAngles.forEach((a) => assignedClusterIds.add(a.clusterId));
-          const survivingClusters = neighborhood.filter((c) =>
-            survivingAngles.some((a) => a.clusterId === c.id)
-          );
-          const storyEmbedding = computeCentroidEmbedding(survivingClusters);
+        // Realign articles across story angles to correct misclassifications
+        try {
+          const angleClusterIds = survivingAngles.map((a) => a.clusterId);
+          const storyArticles = await getStoryArticlesForRealignment(angleClusterIds);
 
-          const targetStoryId =
-            storyItem.existingStoryId ||
-            survivingClusters.find((c) => c.storyId)?.storyId;
-
-          await syncStoryWithAngles({
-            existingStoryId: targetStoryId || undefined,
-            storyTitle: storyItem.storyTitle,
-            status: storyItem.status || 'developing',
-            overview: storyItem.overview,
-            embedding: storyEmbedding,
-            angles: survivingAngles,
-          });
-          totalStoriesSynced++;
-          logger.info(
-            `[${PipelineStep.Organize}] Grouped ${survivingAngles.length} angles under story: "${storyItem.storyTitle}"${
-              targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
-            }`
+          // Only run article classification if:
+          // 1. New story created (!targetStoryId), OR
+          // 2. Angle count/membership changed, OR
+          // 3. A new cluster was added to this story since it was last organized
+          const targetStory = targetStoryId
+            ? existingStories.find((s) => s.id === targetStoryId)
+            : null;
+          const existingStoryClusterCount = targetStory?._count?.clusters;
+          const hasAngleCountChange =
+            existingStoryClusterCount !== undefined &&
+            existingStoryClusterCount !== survivingAngles.length;
+          const storyUpdatedMs = targetStory?.updatedAt
+            ? new Date(targetStory.updatedAt).getTime()
+            : 0;
+          const hasNewClusterSinceUpdate = sagaClusters.some(
+            (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
           );
 
-          // Realign articles across story angles to correct misclassifications
-          try {
-            const angleClusterIds = survivingAngles.map((a) => a.clusterId);
-            const storyArticles = await getStoryArticlesForRealignment(angleClusterIds);
+          if (
+            storyArticles.length > 0 &&
+            (!targetStoryId || hasAngleCountChange || hasNewClusterSinceUpdate)
+          ) {
+            const anglesWithHeadlines = survivingAngles.map((a) => {
+              const cluster = sagaClusters.find((c) => c.id === a.clusterId);
+              return {
+                clusterId: a.clusterId,
+                angle: a.angle,
+                headline: cluster?.headline ?? null,
+                embedding: (Array.isArray(cluster?.embedding) ? cluster.embedding : null) as number[] | null,
+              };
+            });
 
-            // Only run article classification if:
-            // 1. New story created (!targetStoryId), OR
-            // 2. Angle count/membership changed, OR
-            // 3. A new cluster was added to this story since it was last organized
-            const targetStory = targetStoryId
-              ? existingStories.find((s) => s.id === targetStoryId)
-              : null;
-            const existingStoryClusterCount = targetStory?._count?.clusters;
-            const hasAngleCountChange =
-              existingStoryClusterCount !== undefined &&
-              existingStoryClusterCount !== survivingAngles.length;
-            const storyUpdatedMs = targetStory?.updatedAt
-              ? new Date(targetStory.updatedAt).getTime()
-              : 0;
-            const hasNewClusterSinceUpdate = survivingClusters.some(
-              (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
+            const newClusterIds = new Set(
+              sagaClusters
+                .filter(
+                  (c) =>
+                    new Date(c.createdAt).getTime() > storyUpdatedMs + 60000 ||
+                    c.storyId !== targetStoryId
+                )
+                .map((c) => c.id)
             );
 
-            if (
-              storyArticles.length > 0 &&
-              (!targetStoryId || hasAngleCountChange || hasNewClusterSinceUpdate)
-            ) {
-              const anglesWithHeadlines = survivingAngles.map((a) => {
-                const cluster = survivingClusters.find((c) => c.id === a.clusterId);
-                return {
-                  clusterId: a.clusterId,
-                  angle: a.angle,
-                  headline: cluster?.headline ?? null,
-                  embedding: (Array.isArray(cluster?.embedding) ? cluster.embedding : null) as number[] | null,
-                };
-              });
+            const assignments = await classifyAnglesFn(
+              copyResult.storyTitle,
+              anglesWithHeadlines,
+              storyArticles,
+              {
+                isExistingStory: Boolean(targetStoryId),
+                newClusterIds,
+              }
+            );
 
-              const newClusterIds = new Set(
-                survivingClusters
-                  .filter(
-                    (c) =>
-                      new Date(c.createdAt).getTime() > storyUpdatedMs + 60000 ||
-                      c.storyId !== targetStoryId
-                  )
-                  .map((c) => c.id)
-              );
+            const validClusterIdSet = new Set(angleClusterIds);
+            const validReassignments = assignments.filter(
+              (r) =>
+                validClusterIdSet.has(r.targetClusterId) &&
+                storyArticles.some(
+                  (a) => a.articleId === r.articleId && a.currentClusterId !== r.targetClusterId
+                )
+            );
 
-              const assignments = await classifyAnglesFn(
-                storyItem.storyTitle,
-                anglesWithHeadlines,
-                storyArticles,
-                {
-                  isExistingStory: Boolean(targetStoryId),
-                  newClusterIds,
-                }
-              );
-
-              const validClusterIdSet = new Set(angleClusterIds);
-              const validReassignments = assignments.filter(
-                (r) =>
-                  validClusterIdSet.has(r.targetClusterId) &&
-                  storyArticles.some(
-                    (a) => a.articleId === r.articleId && a.currentClusterId !== r.targetClusterId
-                  )
-              );
-
-              if (validReassignments.length > 0) {
-                const { updatedCount } = await realignStoryArticles(validReassignments);
-                if (updatedCount > 0) {
-                  logger.info(
-                    `[${PipelineStep.Organize}] Realigned ${updatedCount} article(s) across angles for story "${storyItem.storyTitle}"`
-                  );
-                }
+            if (validReassignments.length > 0) {
+              const { updatedCount } = await realignStoryArticles(validReassignments);
+              if (updatedCount > 0) {
+                logger.info(
+                  `[${PipelineStep.Organize}] Realigned ${updatedCount} article(s) across angles for story "${copyResult.storyTitle}"`
+                );
               }
             }
-          } catch (realignErr: any) {
-            logger.warn(
-              `[${PipelineStep.Organize}] Article realignment skipped for "${storyItem.storyTitle}": ${realignErr.message || realignErr}`
-            );
           }
+        } catch (realignErr: any) {
+          logger.warn(
+            `[${PipelineStep.Organize}] Article realignment skipped for "${copyResult.storyTitle}": ${realignErr.message || realignErr}`
+          );
         }
       }
     }

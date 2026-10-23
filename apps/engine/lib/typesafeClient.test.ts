@@ -5,6 +5,9 @@ import {
   classifyArticleAnglesBatch,
   verifyDuplicateClusters,
   detectDuplicateClusters,
+  verifySagaRelationship,
+  verifyStoryMembership,
+  detectStorySagas,
   isTypeSafeActive,
 } from './typesafeClient';
 import { getAiUsageTotals, resetAiUsage } from './aiUsage';
@@ -422,6 +425,192 @@ describe('typesafeClient', () => {
       expect(merges[0]).toEqual({
         targetClusterId: 'c1-target',
         sourceClusterIds: ['c2-source'],
+      });
+    });
+  });
+
+  describe('verifySagaRelationship', () => {
+    it('returns isSameSaga true when Jev returns probability >= 0.85', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            is_same_saga: {
+              type: 'noul',
+              noul: 0.94,
+            },
+          },
+        }),
+      });
+      global.fetch = mockFetch;
+
+      const result = await verifySagaRelationship({
+        clusterA: { title: 'Tiger enclosure breach kills keeper', summary: 'Incident at wildlife park' },
+        clusterB: { title: 'Council opens health and safety inquiry into zoo attack', summary: 'Official investigation' },
+      });
+
+      expect(result.isSameSaga).toBe(true);
+      expect(result.probability).toBe(0.94);
+    });
+
+    it('returns isSameSaga false when Jev returns probability < 0.85', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            is_same_saga: {
+              type: 'noul',
+              noul: 0.42,
+            },
+          },
+        }),
+      });
+      global.fetch = mockFetch;
+
+      const result = await verifySagaRelationship({
+        clusterA: { title: 'Tiger enclosure breach kills keeper', summary: 'Incident at wildlife park' },
+        clusterB: { title: 'Chester Zoo announces birth of rare black rhino', summary: 'Zoo breeding success' },
+      });
+
+      expect(result.isSameSaga).toBe(false);
+      expect(result.probability).toBe(0.42);
+    });
+  });
+
+  describe('verifyStoryMembership', () => {
+    it('returns isMember true when Jev returns probability >= 0.85', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            is_member: {
+              type: 'noul',
+              noul: 0.91,
+            },
+          },
+        }),
+      });
+      global.fetch = mockFetch;
+
+      const result = await verifyStoryMembership({
+        cluster: { title: 'Ministers announce new scrutiny panel', summary: 'Follow-up inquiry' },
+        story: { title: 'Yorkshire Wildlife Park Tiger Incident', overview: 'Fatal tiger attack and aftermath' },
+      });
+
+      expect(result.isMember).toBe(true);
+      expect(result.probability).toBe(0.91);
+    });
+  });
+
+  describe('detectStorySagas', () => {
+    it('returns empty array when fewer than 2 clusters are provided', async () => {
+      const result = await detectStorySagas([{ id: 'c1', createdAt: new Date() }]);
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when TYPESAFE_API_KEY is not configured', async () => {
+      delete process.env.TYPESAFE_API_KEY;
+      const result = await detectStorySagas([
+        { id: 'c1', createdAt: new Date() },
+        { id: 'c2', createdAt: new Date() },
+      ]);
+      expect(result).toEqual([]);
+    });
+
+    it('identifies new story sagas using pairwise relationships and connected components', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockImplementation(async (url: any, opts: any) => {
+        const body = JSON.parse(opts.body);
+        const headlineA = body.state.storyA?.headline || '';
+        const headlineB = body.state.storyB?.headline || '';
+
+        // c1 and c2 are related; c3 is unrelated
+        const isRelated =
+          (headlineA.includes('attack') && headlineB.includes('investigation')) ||
+          (headlineA.includes('investigation') && headlineB.includes('attack'));
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            model: 'jev-1.14.0',
+            answers: {
+              is_same_saga: {
+                type: 'noul',
+                noul: isRelated ? 0.95 : 0.2,
+              },
+            },
+          }),
+        };
+      });
+      global.fetch = mockFetch as any;
+
+      const clusters = [
+        { id: 'c1', headline: 'Tiger attack at Doncaster park', createdAt: new Date() },
+        { id: 'c2', headline: 'Council launches investigation into safety protocols', createdAt: new Date() },
+        { id: 'c3', headline: 'Unrelated local traffic update', createdAt: new Date() },
+      ];
+
+      const sagas = await detectStorySagas(clusters);
+
+      expect(sagas).toHaveLength(1);
+      expect(sagas[0]).toEqual({
+        existingStoryId: null,
+        clusterIds: ['c1', 'c2'],
+      });
+    });
+
+    it('matches clusters to existing candidate stories', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockImplementation(async (url: any, opts: any) => {
+        const body = JSON.parse(opts.body);
+        const isMember = (body.state.cluster?.headline || '').includes('Pike');
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            model: 'jev-1.14.0',
+            answers: {
+              is_member: {
+                type: 'noul',
+                noul: isMember ? 0.95 : 0.1,
+              },
+            },
+          }),
+        };
+      });
+      global.fetch = mockFetch as any;
+
+      const clusters = [
+        { id: 'c1', headline: 'Pike survives lethal injection', createdAt: new Date() },
+        { id: 'c2', headline: 'Pike transferred to ICU ward', createdAt: new Date() },
+      ];
+
+      const candidateStories = [
+        { id: 'story-pike', title: 'Christa Pike Execution Saga', overview: 'Lethal injection attempt and fallout' },
+      ];
+
+      const sagas = await detectStorySagas(clusters, candidateStories);
+
+      expect(sagas).toHaveLength(1);
+      expect(sagas[0]).toEqual({
+        existingStoryId: 'story-pike',
+        clusterIds: ['c1', 'c2'],
       });
     });
   });
