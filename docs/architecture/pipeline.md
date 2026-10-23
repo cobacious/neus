@@ -35,14 +35,17 @@ Neus is not a set of isolated scripts; it is an interdependent data ecosystem. M
 
 ```mermaid
 flowchart TD
-    Cron["Cron Schedule<br/>(Every 4 hours)"] --> Ingest["Feed Ingestion<br/>(18 sources)"]
-    Ingest --> Embed["Vector Embeddings<br/>(gemini-embedding-2)"]
+    Pulse["Pulse Sentinel<br/>(Every 20m via apps/api)"] --> Ingest["Continuous Feed Ingestion<br/>(18 sources, Zero AI Cost)"]
+    Ingest --> Trigger{"Tri-Trigger Evaluation<br/>(Surge / Batch / Staleness)"}
+    Trigger -- "Trigger satisfied & cooldown > 2h" --> Actions["GitHub Actions Dispatch<br/>(workflow_dispatch)"]
+    Trigger -- "Under threshold or cooling down" --> Idle["Idle until next pulse"]
+    Actions --> Embed["Vector Embeddings<br/>(gemini-embedding-2)"]
     Embed --> Cluster["Clustering<br/>(Threshold: 0.88)"]
     Cluster --> Summarise["Summaries<br/>(gemini-flash-lite)"]
     Cluster --> Organize["Story Angles<br/>(Graph + Vector + LLM)"]
     Organize --> Score["Score & Ranking<br/>(24h Half-Life Decay)"]
     Score --> Web["Frontend Feed<br/>(apps/web)"]
-    Cluster --> Retention["Retention & Purge<br/>(Neon Free Tier: 1GB)"]
+    Actions --> Retention["Retention & Purge<br/>(Neon Free Tier: 1GB)"]
 ```
 
 | Variable | Current Value | Primary Purpose | Downstream Impact if Modified |
@@ -54,7 +57,7 @@ flowchart TD
 | Unclustered Article Retention | `7 days` | Hard deletion of unclustered solitary articles | **Extending (> 14 days)**: Unclustered articles accumulate (2,500+ rows), approaching Neon's 1 GB free storage limit and slowing vector queries. |
 | Cluster Archive Window | `30 days` | Archives old clusters and prunes heavy text and vectors | Balances historical archive permalinks against database storage ceilings. |
 | Recency Half-Life (`HALF_LIFE_HOURS`) | `24 hours` | Exponential decay rate for feed ranking in [`scoreCluster.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/core/pipeline/scoreCluster.ts) | **Shortening (< 12h)**: Rapid turnover; stories vanish quickly, favoring raw freshness over depth.<br/>**Lengthening (> 48h)**: Stagnant front page; yesterday's major news stays at the top even with no new developments. |
-| Cron Schedule | `Every 4 hours` | External execution cadence via `cron-job.org` | **Hourly**: 6x multiplier on embedding calls, summary checks and Neon compute hours.<br/>**Daily (24h)**: News is stale on arrival; batch sizes cause timeout risks. |
+| Pipeline Cadence | Decoupled Pulse Sentinel (20m ingestion, adaptive synthesis) | External continuous ingestion via `cron-job.org` calling [`apps/api/pulse.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/api/pulse.ts) | Decouples fast zero-cost RSS ingestion from heavy AI synthesis. Triggers full pipeline only on breaking surges ($\ge 3$ sources in 45m), volume threshold ($\ge 85$ unclustered articles) or heartbeat staleness ($\ge 6$h), respecting a 120-minute safety cooldown. |
 
 ---
 
