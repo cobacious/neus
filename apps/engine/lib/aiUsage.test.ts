@@ -100,11 +100,21 @@ describe('aiUsage', () => {
       promptTokens: 5000,
       outputTokens: 200,
     });
+    recordAiUsage({
+      step: 'ORGANIZE',
+      provider: 'typesafe',
+      model: 'jev-latest',
+      operation: 'judge',
+      durationMs: 150,
+      promptTokens: 2000,
+      outputTokens: 0,
+    });
 
     const cost = getTotalAiCostUsd();
     expect(cost.geminiUsd).toBeGreaterThan(0);
     expect(cost.openaiUsd).toBeGreaterThan(0);
-    expect(cost.totalUsd).toBeCloseTo(cost.geminiUsd + cost.openaiUsd, 6);
+    expect(cost.typesafeUsd).toBeGreaterThan(0);
+    expect(cost.totalUsd).toBeCloseTo(cost.geminiUsd + cost.openaiUsd + cost.typesafeUsd, 6);
   });
 
   it('resets between runs', () => {

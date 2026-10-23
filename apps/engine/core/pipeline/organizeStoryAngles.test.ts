@@ -669,5 +669,53 @@ describe('classifyArticleAngles', () => {
       { articleId: 'a-new', targetClusterId: 'c2' },
     ]);
   });
+
+  it('uses TypeSafe Jev when TYPESAFE_API_KEY is active and respects none_of_the_above', async () => {
+    process.env.TYPESAFE_API_KEY = 'test_typesafe_key';
+
+    const testArticles = [
+      { articleId: 'a-matching', currentClusterId: 'c1', title: 'Police investigate trial', embedding: null },
+      { articleId: 'a-unrelated', currentClusterId: 'c1', title: 'Unrelated bank interest rates', embedding: null },
+    ];
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            angle: {
+              type: 'choice',
+              choice: 'angle_c2',
+              confidence: 0.95,
+              probabilities: { angle_c1: 0.05, angle_c2: 0.95, none_of_the_above: 0.0 },
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            angle: {
+              type: 'choice',
+              choice: 'none_of_the_above',
+              confidence: 0.99,
+              probabilities: { angle_c1: 0.01, angle_c2: 0.0, none_of_the_above: 0.99 },
+            },
+          },
+        }),
+      });
+
+    const assignments = await classifyArticleAngles('Major Political Trial', angles, testArticles);
+
+    // Only a-matching should be reassigned to c2; a-unrelated should not be reassigned
+    expect(assignments).toEqual([
+      { articleId: 'a-matching', targetClusterId: 'c2' },
+    ]);
+  });
 });
 

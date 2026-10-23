@@ -18,6 +18,7 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 import { generateStructuredJson } from '../../lib/aiClient';
+import { isTypeSafeActive, classifyArticleAnglesBatchWithJev } from '../../lib/typesafeClient';
 
 export type NeighborhoodMerge = {
   targetClusterId: string;
@@ -439,6 +440,8 @@ export async function classifyArticleAngles(
     articleId: string;
     currentClusterId: string;
     title: string;
+    snippet?: string | null;
+    content?: string | null;
     embedding?: unknown;
   }>,
   options?: {
@@ -453,7 +456,13 @@ export async function classifyArticleAngles(
   );
 
   const resolvedAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
-  const ambiguousArticles: Array<{ articleId: string; currentClusterId: string; title: string }> = [];
+  const ambiguousArticles: Array<{
+    articleId: string;
+    currentClusterId: string;
+    title: string;
+    snippet?: string | null;
+    content?: string | null;
+  }> = [];
 
   const isExistingStory = options?.isExistingStory ?? false;
   const newClusterIds = options?.newClusterIds ?? new Set<string>();
@@ -509,6 +518,8 @@ export async function classifyArticleAngles(
       articleId: article.articleId,
       currentClusterId: article.currentClusterId,
       title: article.title,
+      snippet: article.snippet,
+      content: article.content,
     });
   }
 
@@ -525,8 +536,43 @@ export async function classifyArticleAngles(
     );
   }
 
-  const BATCH_SIZE = 25;
   const llmAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+
+  // If TypeSafe Jev is active, evaluate ambiguous articles using System One Choice primitives
+  if (isTypeSafeActive()) {
+    logger.info(
+      `[${PipelineStep.Organize}] Classifying ${ambiguousArticles.length} ambiguous article(s) for "${storyTitle}" with TypeSafe Jev (parallel)...`
+    );
+
+    const jevResults = await classifyArticleAnglesBatchWithJev({
+      articles: ambiguousArticles.map((a) => ({
+        id: a.articleId,
+        title: a.title,
+        snippet: a.snippet,
+        content: a.content,
+      })),
+      angles: angles.map((a) => ({
+        clusterId: a.clusterId,
+        angle: a.angle,
+        headline: a.headline,
+      })),
+      storyTitle,
+      step: PipelineStep.Organize,
+    });
+
+    for (const res of jevResults) {
+      if (res.targetClusterId) {
+        llmAssignments.push({
+          articleId: res.articleId,
+          targetClusterId: res.targetClusterId,
+        });
+      }
+    }
+
+    return [...resolvedAssignments, ...llmAssignments];
+  }
+
+  const BATCH_SIZE = 25;
 
   for (let i = 0; i < ambiguousArticles.length; i += BATCH_SIZE) {
     const batch = ambiguousArticles.slice(i, i + BATCH_SIZE);
