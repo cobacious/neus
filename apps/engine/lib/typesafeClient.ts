@@ -190,41 +190,50 @@ export async function callSystemOne(
   throw lastError || new Error('TypeSafe API call failed');
 }
 
-export interface ArticleAngleCandidate {
+export interface ArticleThreadCandidate {
   clusterId: string;
-  angle: string;
+  thread?: string;
+  angle?: string;
   headline?: string | null;
   summary?: string | null;
 }
 
-export interface ArticleInputForAngle {
+export type ArticleAngleCandidate = ArticleThreadCandidate;
+
+export interface ArticleInputForThread {
   id: string;
   title: string;
   snippet?: string | null;
   content?: string | null;
 }
 
-export interface ArticleAngleResult {
+export type ArticleInputForAngle = ArticleInputForThread;
+
+export interface ArticleThreadResult {
   targetClusterId: string | null;
   confidence: number;
   choice: string;
   probabilities: Record<string, number>;
 }
 
+export type ArticleAngleResult = ArticleThreadResult;
+
 /**
- * Classifies an article into one of several candidate story angles, or returns null if
- * it fits none of the angles or confidence is low.
+ * Classifies an article into one of several candidate story threads or returns null if
+ * it fits none of the threads or confidence is low.
  */
-export async function classifyArticleAngle(params: {
-  article: ArticleInputForAngle;
-  angles: ArticleAngleCandidate[];
+export async function classifyArticleThread(params: {
+  article: ArticleInputForThread;
+  threads?: ArticleThreadCandidate[];
+  angles?: ArticleAngleCandidate[];
   storyTitle?: string;
   minConfidence?: number;
   step?: PipelineStep;
-}): Promise<ArticleAngleResult> {
-  const { article, angles, storyTitle, minConfidence = 0.45, step = PipelineStep.Organize } = params;
+}): Promise<ArticleThreadResult> {
+  const candidateThreads = params.threads || params.angles || [];
+  const { article, storyTitle, minConfidence = 0.45, step = PipelineStep.Organize } = params;
 
-  if (angles.length === 0) {
+  if (candidateThreads.length === 0) {
     return {
       targetClusterId: null,
       confidence: 1.0,
@@ -233,17 +242,17 @@ export async function classifyArticleAngle(params: {
     };
   }
 
-  // Construct angle options map
+  // Construct thread options map
   const criteria: Record<string, string> = {};
-  for (const a of angles) {
-    const key = `angle_${a.clusterId}`;
-    const descParts: string[] = [`Angle focus: ${a.angle}`];
-    if (a.headline) descParts.push(`Headline: ${a.headline}`);
-    if (a.summary) descParts.push(`Summary: ${a.summary}`);
+  for (const t of candidateThreads) {
+    const key = `thread_${t.clusterId}`;
+    const descParts: string[] = [`Thread focus: ${t.thread || t.angle || 'General Thread'}`];
+    if (t.headline) descParts.push(`Headline: ${t.headline}`);
+    if (t.summary) descParts.push(`Summary: ${t.summary}`);
     criteria[key] = descParts.join(' | ');
   }
   criteria['none_of_the_above'] =
-    'Does not clearly belong to any of these angles; describes a separate event or topic';
+    'Does not clearly belong to any of these threads; describes a separate event or topic';
 
   // Construct state with headline, snippet and leading 2,000 characters of body
   const leadBody = article.content ? article.content.trim().slice(0, 2000) : undefined;
@@ -258,10 +267,10 @@ export async function classifyArticleAngle(params: {
     {
       state,
       questions: {
-        angle: {
+        thread: {
           type: 'choice',
           instructions:
-            'Which specific story angle does this news article belong to? Select none_of_the_above if it describes a different event or topic.',
+            'Which specific story thread does this news article belong to? Select none_of_the_above if it describes a different event or topic.',
           criteria,
         },
       },
@@ -269,14 +278,17 @@ export async function classifyArticleAngle(params: {
     { step }
   );
 
-  const answer = response.answers['angle'] as ChoiceAnswer;
+  const answer = (response.answers['thread'] || response.answers['angle']) as ChoiceAnswer;
   if (!answer || answer.type !== 'choice') {
     throw new Error('TypeSafe response did not contain expected choice answer');
   }
 
   let targetClusterId: string | null = null;
-  if (answer.choice.startsWith('angle_') && answer.confidence >= minConfidence) {
-    targetClusterId = answer.choice.replace('angle_', '');
+  if (
+    (answer.choice.startsWith('thread_') || answer.choice.startsWith('angle_')) &&
+    answer.confidence >= minConfidence
+  ) {
+    targetClusterId = answer.choice.replace(/^thread_|^angle_/, '');
   }
 
   return {
@@ -287,12 +299,16 @@ export async function classifyArticleAngle(params: {
   };
 }
 
+// Backward compatibility alias
+export const classifyArticleAngle = classifyArticleThread;
+
 /**
- * Classifies multiple ambiguous articles against candidate angles in parallel batches.
+ * Classifies multiple ambiguous articles against candidate threads in parallel batches.
  */
-export async function classifyArticleAnglesBatch(params: {
-  articles: ArticleInputForAngle[];
-  angles: ArticleAngleCandidate[];
+export async function classifyArticleThreadsBatch(params: {
+  articles: ArticleInputForThread[];
+  threads?: ArticleThreadCandidate[];
+  angles?: ArticleAngleCandidate[];
   storyTitle?: string;
   concurrency?: number;
   minConfidence?: number;
@@ -300,15 +316,15 @@ export async function classifyArticleAnglesBatch(params: {
 }): Promise<Array<{ articleId: string; targetClusterId: string | null; confidence: number; choice: string }>> {
   const {
     articles,
-    angles,
     storyTitle,
     concurrency = 5,
     minConfidence = 0.45,
     step = PipelineStep.Organize,
   } = params;
+  const candidateThreads = params.threads || params.angles || [];
 
   if (!isTypeSafeActive()) {
-    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping article angle classification.`);
+    logger.warn(`[${step}] TypeSafe API key is not configured. Skipping article thread classification.`);
     return [];
   }
 
@@ -323,9 +339,9 @@ export async function classifyArticleAnglesBatch(params: {
     const chunk = articles.slice(i, i + concurrency);
     const chunkPromises = chunk.map(async (art) => {
       try {
-        const res = await classifyArticleAngle({
+        const res = await classifyArticleThread({
           article: art,
-          angles,
+          threads: candidateThreads,
           storyTitle,
           minConfidence,
           step,
@@ -338,7 +354,7 @@ export async function classifyArticleAnglesBatch(params: {
         };
       } catch (err: any) {
         logger.warn(
-          `[${step}] System One angle classification failed for article "${art.id}": ${err.message}`
+          `[${step}] System One thread classification failed for article "${art.id}": ${err.message}`
         );
         return {
           articleId: art.id,
@@ -355,6 +371,10 @@ export async function classifyArticleAnglesBatch(params: {
 
   return results;
 }
+
+// Backward compatibility aliases
+export const classifyArticleAnglesBatch = classifyArticleThreadsBatch;
+export const classifyArticleAnglesBatchWithJev = classifyArticleThreadsBatch;
 
 /**
  * Verifies if two clusters describe the exact same real-world event.

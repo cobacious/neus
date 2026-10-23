@@ -6,6 +6,7 @@ export type StoryStatus = 'breaking' | 'developing';
 export interface ClusterMeta {
   createdAt?: number | string | null;
   lastUpdatedAt?: number | string | null;
+  isMultiThread?: boolean;
   isMultiAngle?: boolean;
   articles?: Array<{ publishedAt?: number | string | null }>;
 }
@@ -19,8 +20,8 @@ interface StatusBadgeProps {
 /**
  * Resolves the display status for a story or cluster:
  * - 'breaking': Fresh event (< 18h) where details are actively emerging.
- * - 'developing': Exclusively for multi-angle stories that are actively growing in scope.
- * - null: Standard/routine news, single-angle stories past the breaking window, or dormant items.
+ * - 'developing': Exclusively for multi-thread stories that are actively growing in scope.
+ * - null: Standard/routine news, single-thread stories past the breaking window or dormant items.
  */
 export function resolveStoryStatus(
   status?: string | null,
@@ -40,7 +41,7 @@ export function resolveStoryStatus(
 
   const startTime = startDate?.getTime();
   const lastUpdateTime = lastUpdateDate?.getTime();
-  const isMultiAngle = Boolean(clusterMeta?.isMultiAngle);
+  const isMultiThread = Boolean(clusterMeta?.isMultiThread ?? clusterMeta?.isMultiAngle);
 
   const lifespanHours =
     startTime !== undefined ? (referenceNow - startTime) / (1000 * 60 * 60) : undefined;
@@ -63,8 +64,8 @@ export function resolveStoryStatus(
     }
 
     // After breaking phase decays:
-    // If it has grown into a multi-angle story, it transitions to 'developing'
-    if (isMultiAngle) {
+    // If it has grown into a multi-thread story, it transitions to 'developing'
+    if (isMultiThread) {
       return 'developing';
     }
 
@@ -74,8 +75,8 @@ export function resolveStoryStatus(
 
   // 2. Explicit Developing status
   if (norm === 'developing') {
-    // Strictly reserved for multi-angle stories. Single-cluster reports are never developing.
-    if (!isMultiAngle) {
+    // Strictly reserved for multi-thread stories. Single-cluster reports are never developing.
+    if (!isMultiThread) {
       return null;
     }
     return 'developing';
@@ -91,8 +92,8 @@ export function resolveStoryStatus(
     return 'breaking';
   }
 
-  // Multi-angle stories with no explicit status, but active
-  if (isMultiAngle && (hoursSinceLastUpdate === undefined || hoursSinceLastUpdate <= 48)) {
+  // Multi-thread stories with no explicit status, but active
+  if (isMultiThread && (hoursSinceLastUpdate === undefined || hoursSinceLastUpdate <= 48)) {
     return 'developing';
   }
 

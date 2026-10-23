@@ -18,21 +18,22 @@ jest.unstable_mockModule('../client', () => ({
   prisma: mockPrisma,
 }));
 
-let syncStoryWithAngles: typeof import('./syncStoryWithAngles').syncStoryWithAngles;
+let syncStoryWithThreads: typeof import('./syncStoryWithThreads').syncStoryWithThreads;
+let syncStoryWithAngles: typeof import('./syncStoryWithThreads').syncStoryWithAngles;
 
 beforeAll(async () => {
-  ({ syncStoryWithAngles } = await import('./syncStoryWithAngles'));
+  ({ syncStoryWithThreads, syncStoryWithAngles } = await import('./syncStoryWithThreads'));
 });
 
-describe('syncStoryWithAngles', () => {
+describe('syncStoryWithThreads', () => {
   beforeEach(() => {
     jest.resetAllMocks();
   });
 
-  it('returns null if angles array is empty', async () => {
-    const res = await syncStoryWithAngles({
+  it('returns null if threads array is empty', async () => {
+    const res = await syncStoryWithThreads({
       storyTitle: 'Test Story',
-      angles: [],
+      threads: [],
     });
     expect(res).toBeNull();
   });
@@ -54,13 +55,13 @@ describe('syncStoryWithAngles', () => {
 
     (mockPrisma.cluster.update as jest.Mock).mockResolvedValue({} as any);
 
-    const result = await syncStoryWithAngles({
+    const result = await syncStoryWithThreads({
       storyTitle: 'Botched Execution',
       status: 'developing',
       overview: 'An overview',
-      angles: [
-        { clusterId: 'c1', angle: 'The Attempt' },
-        { clusterId: 'c2', angle: 'The Fallout' },
+      threads: [
+        { clusterId: 'c1', thread: 'The Attempt' },
+        { clusterId: 'c2', thread: 'The Fallout' },
       ],
     });
 

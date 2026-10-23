@@ -1,5 +1,5 @@
 import { buildTimelineMarkers } from './ArticleTimelineSparkline';
-import { AngleColorStyle } from '../utils/angleColors';
+import { ThreadColorStyle } from '../utils/threadColors';
 
 describe('ArticleTimelineSparkline buildTimelineMarkers', () => {
   const baseTime = new Date('2026-10-09T10:00:00.000Z').getTime();
@@ -26,20 +26,20 @@ describe('ArticleTimelineSparkline buildTimelineMarkers', () => {
     expect(layout?.lastUpdatedLabel).not.toContain('Invalid');
   });
 
-  it('preserves every article with its individual angle color along the single horizontal rail', () => {
+  it('preserves every article with its individual thread color along the single horizontal rail', () => {
     // 48h timeline
     const span = 48 * 3600 * 1000;
-    const colorMap = new Map<string, AngleColorStyle>([
-      ['angle-1', { id: 'angle-1', name: 'Angle 1', color: '#4F6D7A', bg: '', border: '', text: '', dotColor: '' }],
-      ['angle-2', { id: 'angle-2', name: 'Angle 2', color: '#DD6E42', bg: '', border: '', text: '', dotColor: '' }],
+    const colorMap = new Map<string, ThreadColorStyle>([
+      ['thread-1', { id: 'thread-1', name: 'Thread 1', color: '#4F6D7A', bg: '', border: '', text: '', dotColor: '' }],
+      ['thread-2', { id: 'thread-2', name: 'Thread 2', color: '#DD6E42', bg: '', border: '', text: '', dotColor: '' }],
     ]);
 
     const articles = [
-      { id: '1', title: 'First', publishedAt: baseTime, angleId: 'angle-1' },
-      // Article 2 and 3 are 10 minutes apart in a 48h timeline (~0.3% apart) with DIFFERENT angles
-      { id: '2', title: 'Breaking A', publishedAt: baseTime + 10 * 3600 * 1000, angleId: 'angle-1' },
-      { id: '3', title: 'Breaking B', publishedAt: baseTime + 10 * 3600 * 1000 + 10 * 60 * 1000, angleId: 'angle-2' },
-      { id: '4', title: 'Last', publishedAt: baseTime + span, angleId: 'angle-1' },
+      { id: '1', title: 'First', publishedAt: baseTime, threadId: 'thread-1' },
+      // Article 2 and 3 are 10 minutes apart in a 48h timeline (~0.3% apart) with DIFFERENT threads
+      { id: '2', title: 'Breaking A', publishedAt: baseTime + 10 * 3600 * 1000, threadId: 'thread-1' },
+      { id: '3', title: 'Breaking B', publishedAt: baseTime + 10 * 3600 * 1000 + 10 * 60 * 1000, threadId: 'thread-2' },
+      { id: '4', title: 'Last', publishedAt: baseTime + span, threadId: 'thread-1' },
     ];
 
     const layout = buildTimelineMarkers(articles, { colorMap });
@@ -47,7 +47,7 @@ describe('ArticleTimelineSparkline buildTimelineMarkers', () => {
     // All 4 articles are preserved! None are consolidated away
     expect(layout?.markers).toHaveLength(4);
 
-    // Article 2 has Angle 1 color (#4F6D7A) and Article 3 has Angle 2 color (#DD6E42)
+    // Article 2 has Thread 1 color (#4F6D7A) and Article 3 has Thread 2 color (#DD6E42)
     expect(layout?.markers[1].color).toBe('#4F6D7A');
     expect(layout?.markers[2].color).toBe('#DD6E42');
   });

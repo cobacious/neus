@@ -33,7 +33,7 @@ describe('resolveStoryStatus', () => {
     expect(
       resolveStoryStatus(
         'developing',
-        { createdAt: eightDaysAgo, lastUpdatedAt: eightDaysAgo, isMultiAngle: true },
+        { createdAt: eightDaysAgo, lastUpdatedAt: eightDaysAgo, isMultiThread: true },
         now
       )
     ).toBeNull();
@@ -41,7 +41,7 @@ describe('resolveStoryStatus', () => {
     expect(
       resolveStoryStatus(
         'breaking',
-        { createdAt: eightDaysAgo, lastUpdatedAt: eightDaysAgo, isMultiAngle: false },
+        { createdAt: eightDaysAgo, lastUpdatedAt: eightDaysAgo, isMultiThread: false },
         now
       )
     ).toBeNull();
@@ -55,30 +55,30 @@ describe('resolveStoryStatus', () => {
     expect(
       resolveStoryStatus(
         'breaking',
-        { createdAt: twoHoursAgo, lastUpdatedAt: oneHourAgo, isMultiAngle: false },
+        { createdAt: twoHoursAgo, lastUpdatedAt: oneHourAgo, isMultiThread: false },
         now
       )
     ).toBe('breaking');
 
-    // Multi-angle story
+    // Multi-thread story
     expect(
       resolveStoryStatus(
         'breaking',
-        { createdAt: twoHoursAgo, lastUpdatedAt: oneHourAgo, isMultiAngle: true },
+        { createdAt: twoHoursAgo, lastUpdatedAt: oneHourAgo, isMultiThread: true },
         now
       )
     ).toBe('breaking');
   });
 
-  it('decays breaking multi-angle stories to developing after initial breaking window', () => {
+  it('decays breaking multi-thread stories to developing after initial breaking window', () => {
     const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
     const twoHoursAgo = now - 2 * 60 * 60 * 1000;
 
-    // Multi-angle story decays to developing
+    // Multi-thread story decays to developing
     expect(
       resolveStoryStatus(
         'breaking',
-        { createdAt: threeDaysAgo, lastUpdatedAt: twoHoursAgo, isMultiAngle: true },
+        { createdAt: threeDaysAgo, lastUpdatedAt: twoHoursAgo, isMultiThread: true },
         now
       )
     ).toBe('developing');
@@ -92,7 +92,7 @@ describe('resolveStoryStatus', () => {
     expect(
       resolveStoryStatus(
         'breaking',
-        { createdAt: threeDaysAgo, lastUpdatedAt: twoHoursAgo, isMultiAngle: false },
+        { createdAt: threeDaysAgo, lastUpdatedAt: twoHoursAgo, isMultiThread: false },
         now
       )
     ).toBeNull();
@@ -104,18 +104,18 @@ describe('resolveStoryStatus', () => {
     expect(
       resolveStoryStatus(
         'developing',
-        { createdAt: oneDayAgo, lastUpdatedAt: now, isMultiAngle: false },
+        { createdAt: oneDayAgo, lastUpdatedAt: now, isMultiThread: false },
         now
       )
     ).toBeNull();
   });
 
-  it('assigns developing to active multi-angle stories', () => {
+  it('assigns developing to active multi-thread stories', () => {
     const twoDaysAgo = now - 2 * 24 * 60 * 60 * 1000;
     expect(
       resolveStoryStatus(
         'developing',
-        { createdAt: twoDaysAgo, lastUpdatedAt: now, isMultiAngle: true },
+        { createdAt: twoDaysAgo, lastUpdatedAt: now, isMultiThread: true },
         now
       )
     ).toBe('developing');
@@ -129,7 +129,7 @@ describe('resolveStoryStatus', () => {
     expect(
       resolveStoryStatus(
         null,
-        { createdAt: threeDaysAgo, lastUpdatedAt: oneHourAgo, isMultiAngle: false },
+        { createdAt: threeDaysAgo, lastUpdatedAt: oneHourAgo, isMultiThread: false },
         now
       )
     ).toBeNull();
@@ -138,7 +138,7 @@ describe('resolveStoryStatus', () => {
     expect(
       resolveStoryStatus(
         null,
-        { createdAt: now - 2 * 60 * 60 * 1000, lastUpdatedAt: now - 1 * 60 * 60 * 1000, isMultiAngle: false },
+        { createdAt: now - 2 * 60 * 60 * 1000, lastUpdatedAt: now - 1 * 60 * 60 * 1000, isMultiThread: false },
         now
       )
     ).toBe('breaking');
