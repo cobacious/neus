@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ThreadColorStyle, createThreadColorMap } from '../utils/threadColors';
 
 export interface ThreadItem {
@@ -13,7 +14,16 @@ export interface StoryThreadPillsProps {
   size?: 'sm' | 'md';
   className?: string;
   activeThreadId?: string | null;
+  baseUrl?: string;
   onSelectThread?: (threadId: string) => void;
+}
+
+/**
+ * Builds the URL to view a story with a specific thread pre-filtered and scrolled into view.
+ */
+export function buildThreadFilterUrl(baseUrl: string, threadId: string): string {
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}thread=${encodeURIComponent(threadId)}#articles-coverage`;
 }
 
 export default function StoryThreadPills({
@@ -22,6 +32,7 @@ export default function StoryThreadPills({
   size = 'sm',
   className = '',
   activeThreadId,
+  baseUrl,
   onSelectThread,
 }: StoryThreadPillsProps) {
   if (!threads || threads.length === 0) return null;
@@ -33,6 +44,7 @@ export default function StoryThreadPills({
   const sizeClasses = size === 'md' ? 'px-3 py-1 text-xs' : 'px-2.5 py-0.5 text-[11px]';
 
   const isInteractive = typeof onSelectThread === 'function';
+  const isLink = Boolean(baseUrl);
 
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
@@ -46,8 +58,15 @@ export default function StoryThreadPills({
         const label = thread.name || 'Thread';
         const isActive = isInteractive && activeThreadId === thread.id;
 
-        const Component = isInteractive ? 'button' : 'span';
-        const interactiveProps = isInteractive
+        const Component = isLink ? Link : isInteractive ? 'button' : 'span';
+        const interactiveProps = isLink
+          ? {
+              to: buildThreadFilterUrl(baseUrl!, thread.id),
+              onClick: (e: React.MouseEvent) => e.stopPropagation(),
+              title: `Filter by ${label} thread`,
+              'aria-label': `Filter by ${label} thread (${thread.articleCount ?? 0} articles)`,
+            }
+          : isInteractive
           ? {
               type: 'button' as const,
               onClick: () => onSelectThread(thread.id),
@@ -58,14 +77,14 @@ export default function StoryThreadPills({
         return (
           <Component
             key={thread.id}
-            {...interactiveProps}
+            {...(interactiveProps as any)}
             style={{
               backgroundColor: isActive ? style.border : style.bg,
               borderColor: style.border,
               color: isActive ? '#FFFFFF' : style.text,
             }}
-            className={`inline-flex items-center gap-1 font-medium rounded-full border transition-all duration-150 ${sizeClasses} ${
-              isInteractive
+            className={`inline-flex items-center gap-1 font-medium rounded-full border transition-all duration-150 pointer-events-auto ${sizeClasses} ${
+              isLink || isInteractive
                 ? 'cursor-pointer hover:opacity-90 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1'
                 : ''
             } ${isActive ? 'shadow-sm font-semibold' : ''}`}

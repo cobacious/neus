@@ -141,10 +141,10 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   const extraSources = sources.length - visibleSources.length;
 
   const statusConfig = status ? STATUS_CONFIG[status] : null;
+  const storyUrl = `/${cluster.slug || cluster.id}`;
 
   return (
-    <Link
-      to={`/${cluster.slug || cluster.id}`}
+    <article
       className="relative block bg-white border border-gray-200 shadow-xs hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
       style={
         statusConfig ? { borderTopColor: statusConfig.topBorder, borderTopWidth: 2 } : undefined
@@ -152,42 +152,54 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
     >
       {/* Straddling Top-Border Status Badge */}
       {status && (
-        <div className="absolute right-4 top-0 -translate-y-1/2 z-10">
+        <div className="absolute right-4 top-0 -translate-y-1/2 z-10 pointer-events-none">
           <StatusBadge status={status} size="sm" />
         </div>
       )}
 
-      {/* Main Headline */}
+      {/* Main Headline with Stretched Link covering the card surface */}
       <h2 className="text-xl font-bold text-gray-900 mb-2 leading-snug">
-        {isMultiThreadStory && story ? story.title : cluster.headline}
+        <Link
+          to={storyUrl}
+          className="focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 rounded-xs"
+        >
+          <span className="absolute inset-0 z-0" aria-hidden="true" />
+          {isMultiThreadStory && story ? story.title : cluster.headline}
+        </Link>
       </h2>
 
       {/* Summary */}
-      <p className="text-gray-700 mb-3 line-clamp-3 text-sm leading-relaxed">
+      <p className="text-gray-700 mb-3 line-clamp-3 text-sm leading-relaxed pointer-events-none">
         {isMultiThreadStory && story?.overview ? story.overview : cluster.summary}
       </p>
 
       {/* Representation of threads on multi-thread stories */}
       {threads.length > 1 && (
-        <div className="mb-3">
-          <StoryThreadPills threads={threads} colorMap={colorMap} size="sm" />
+        <div className="relative z-10 mb-3 pointer-events-none">
+          <StoryThreadPills
+            threads={threads}
+            colorMap={colorMap}
+            size="sm"
+            baseUrl={storyUrl}
+          />
         </div>
       )}
 
       {/* Timeline Sparkline replacing old text */}
-      <div className="mb-3 pt-1 border-t border-gray-100">
+      <div className="relative z-10 mb-3 pt-1 border-t border-gray-100 pointer-events-none">
         <ArticleTimelineSparkline
           articles={timelineArticles}
           colorMap={colorMap}
           fallbackFirstSeen={cluster.createdAt}
           fallbackLastUpdated={cluster.lastUpdatedAt}
+          className="[&_button]:pointer-events-auto"
         />
       </div>
 
       {/* Footer: Sources & Article count */}
       <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-1.5 pt-1">
         {visibleSources.length > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0 flex-nowrap" aria-label="Sources">
+          <div className="relative z-10 flex items-center gap-1.5 shrink-0 flex-nowrap" aria-label="Sources">
             {visibleSources.map((source) => (
               <SourceFavicon key={source.id} source={source} showPaywallBadge />
             ))}
@@ -196,10 +208,10 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
             )}
           </div>
         )}
-        <span className="text-xs text-gray-500 font-medium shrink-0">
+        <span className="text-xs text-gray-500 font-medium shrink-0 pointer-events-none">
           {timelineArticles.length} {timelineArticles.length === 1 ? 'article' : 'articles'}
         </span>
       </div>
-    </Link>
+    </article>
   );
 }
