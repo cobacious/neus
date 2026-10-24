@@ -126,6 +126,20 @@ export default function ClusterDetailPage() {
     }
   };
 
+  // Scroll to articles coverage section when arriving with an active thread filter or hash
+  useEffect(() => {
+    if (fetching || !cluster) return;
+    if (selectedThreadId || window.location.hash === '#articles-coverage') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('articles-coverage');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [fetching, cluster?.id, selectedThreadId]);
+
   useEffect(() => {
     if (!headline) return;
 
@@ -399,7 +413,7 @@ export default function ClusterDetailPage() {
       </div>
 
       {/* Articles grouped by Thread */}
-      <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-6">
+      <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-20">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-lg font-bold text-gray-900">
             {isMultiThreadStory ? 'Articles by Thread' : 'Articles Coverage'}

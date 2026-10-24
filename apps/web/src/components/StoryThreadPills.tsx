@@ -19,11 +19,11 @@ export interface StoryThreadPillsProps {
 }
 
 /**
- * Builds the URL to view a story with a specific thread pre-filtered.
+ * Builds the URL to view a story with a specific thread pre-filtered and scrolled into view.
  */
 export function buildThreadFilterUrl(baseUrl: string, threadId: string): string {
   const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}thread=${encodeURIComponent(threadId)}`;
+  return `${baseUrl}${separator}thread=${encodeURIComponent(threadId)}#articles-coverage`;
 }
 
 export default function StoryThreadPills({
