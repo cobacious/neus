@@ -78,8 +78,9 @@ const CLUSTER_QUERY = `
 export default function ClusterDetailPage() {
   const { slug } = useParams();
   const [result] = useQuery({ query: CLUSTER_QUERY, variables: { slug } });
+  const { fetching, error, data } = result;
 
-  const cluster = result.data?.cluster;
+  const cluster = data?.cluster;
   const story = cluster?.story;
   const isMultiThreadStory = Boolean(story && story.clusters && story.clusters.length > 1);
   const headline = isMultiThreadStory && story ? story.title : cluster?.headline;
@@ -125,6 +126,20 @@ export default function ClusterDetailPage() {
       }
     }
   };
+
+  // Scroll to articles coverage section when arriving with an active thread filter or hash
+  useEffect(() => {
+    if (fetching || !cluster) return;
+    if (selectedThreadId || window.location.hash === '#articles-coverage') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('articles-coverage');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [fetching, cluster?.id, selectedThreadId]);
 
   useEffect(() => {
     if (!headline) return;
@@ -183,8 +198,8 @@ export default function ClusterDetailPage() {
     };
   }, [headline, summary, slug]);
 
-  if (result.fetching) return <Loading />;
-  if (result.error || !cluster) {
+  if (fetching) return <Loading />;
+  if (error || !cluster) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto ring-8 ring-amber-50/60">
@@ -399,7 +414,7 @@ export default function ClusterDetailPage() {
       </div>
 
       {/* Articles grouped by Thread */}
-      <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-6">
+      <div id="articles-coverage" className="mt-8 pt-4 border-t border-gray-200 scroll-mt-20">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-lg font-bold text-gray-900">
             {isMultiThreadStory ? 'Articles by Thread' : 'Articles Coverage'}
