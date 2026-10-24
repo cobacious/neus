@@ -78,8 +78,9 @@ const CLUSTER_QUERY = `
 export default function ClusterDetailPage() {
   const { slug } = useParams();
   const [result] = useQuery({ query: CLUSTER_QUERY, variables: { slug } });
+  const { fetching, error, data } = result;
 
-  const cluster = result.data?.cluster;
+  const cluster = data?.cluster;
   const story = cluster?.story;
   const isMultiThreadStory = Boolean(story && story.clusters && story.clusters.length > 1);
   const headline = isMultiThreadStory && story ? story.title : cluster?.headline;
@@ -197,8 +198,8 @@ export default function ClusterDetailPage() {
     };
   }, [headline, summary, slug]);
 
-  if (result.fetching) return <Loading />;
-  if (result.error || !cluster) {
+  if (fetching) return <Loading />;
+  if (error || !cluster) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto ring-8 ring-amber-50/60">
