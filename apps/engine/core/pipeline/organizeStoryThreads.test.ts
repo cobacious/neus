@@ -30,6 +30,7 @@ beforeAll(async () => {
 describe('organizeStoryThreads', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    delete process.env.TYPESAFE_API_KEY;
     (mockDb.getStoriesForMatching as jest.Mock).mockResolvedValue([]);
     (mockDb.markDormantStories as jest.Mock).mockResolvedValue(0);
     (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([]);
@@ -78,27 +79,20 @@ describe('organizeStoryThreads', () => {
       { id: 'dormant-story-1', title: 'Botched Execution', status: 'dormant', overview: 'Old overview', embedding: [1, 0] },
     ]);
 
-    const mockLlmResponse = {
+    const mockCopywritingResponse = {
       candidates: [
         {
           content: {
             parts: [
               {
                 text: JSON.stringify({
-                  merges: [
-                    { targetClusterId: 'c1', sourceClusterIds: ['c2'] },
+                  storyTitle: 'Christa Pike Execution Attempt and Aftermath',
+                  status: 'developing',
+                  overview: 'Macro overview of the event.',
+                  threads: [
+                    { clusterId: 'c1', thread: 'Botched Execution Attempt' },
+                    { clusterId: 'c3', thread: 'Hospital Awakening' },
                   ],
-                  story: {
-                    existingStoryId: 'dormant-story-1',
-                    storyTitle: 'Christa Pike Execution Attempt and Aftermath',
-                    status: 'developing',
-                    overview: 'Macro overview of the event.',
-                    angles: [
-                      { clusterId: 'c1', angle: 'Botched Execution Attempt' },
-                      { clusterId: 'c2', angle: 'Duplicate' },
-                      { clusterId: 'c3', angle: 'Hospital Awakening' },
-                    ],
-                  },
                 }),
               },
             ],
@@ -110,18 +104,29 @@ describe('organizeStoryThreads', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => mockLlmResponse,
+      json: async () => mockCopywritingResponse,
     });
 
     (mockDb.mergeClusters as jest.Mock).mockResolvedValue(2);
     (mockDb.syncStoryWithThreads as jest.Mock).mockResolvedValue({ id: 'dormant-story-1' });
 
-    await organizeStoryThreads();
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: async () => [{ targetClusterId: 'c1', sourceClusterIds: ['c2'] }],
+        detectStorySagas: async () => [
+          {
+            existingStoryId: 'dormant-story-1',
+            clusterIds: ['c1', 'c3'],
+          },
+        ],
+      }
+    );
 
     // 1. mergeClusters called with target c1 and source [c2]
     expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
 
-    // 2. syncStoryWithAngles called with existingStoryId to reactivate the story
+    // 2. syncStoryWithThreads called with existingStoryId to reactivate the story
     expect(mockDb.syncStoryWithThreads).toHaveBeenCalledWith({
       existingStoryId: 'dormant-story-1',
       storyTitle: 'Christa Pike Execution Attempt and Aftermath',
@@ -138,87 +143,46 @@ describe('organizeStoryThreads', () => {
     expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
   });
 
-  it('handles duplicate merges with null story', async () => {
+  it('handles duplicate merges and skips story when only 1 cluster remains', async () => {
     (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
       { id: 'c1', headline: 'Norfolk GP attack', summary: 'S1', embedding: [1, 0], createdAt: new Date() },
       { id: 'c2', headline: 'Norfolk surgery stabbing', summary: 'S2', embedding: [1, 0], createdAt: new Date() },
     ]);
 
-    const mockLlmResponse = {
-      candidates: [
-        {
-          content: {
-            parts: [
-              {
-                text: JSON.stringify({
-                  merges: [
-                    { targetClusterId: 'c1', sourceClusterIds: ['c2'] },
-                  ],
-                  story: null,
-                }),
-              },
-            ],
-          },
-        },
-      ],
-    };
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockLlmResponse,
-    });
-
     (mockDb.mergeClusters as jest.Mock).mockResolvedValue(1);
 
-    await organizeStoryThreads();
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: async () => [{ targetClusterId: 'c1', sourceClusterIds: ['c2'] }],
+      }
+    );
 
     expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
     expect(mockDb.markDormantStories).toHaveBeenCalledWith(7);
   });
 
-  it('realigns misclassified articles across story angles when LLM returns updated assignments', async () => {
+  it('realigns misclassified articles across story threads when classifier returns updated assignments', async () => {
     (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
       { id: 'c1', headline: 'Corrections Chief Resigns', summary: 'Resignation', embedding: [1, 0], createdAt: new Date() },
       { id: 'c2', headline: 'Inmate Hospitalized', summary: 'Recovery in ICU', embedding: [1, 0], createdAt: new Date() },
     ]);
 
-    const mockEvaluationResponse = {
+    const mockCopywritingResponse = {
       candidates: [
         {
           content: {
             parts: [
               {
                 text: JSON.stringify({
-                  merges: [],
-                  story: {
-                    storyTitle: 'Christa Pike Aftermath',
-                    status: 'developing',
-                    overview: 'Botched execution saga',
-                    angles: [
-                      { clusterId: 'c1', angle: 'Chief Resignation' },
-                      { clusterId: 'c2', angle: 'Hospital Recovery' },
-                    ],
-                  },
-                }),
-              },
-            ],
-          },
-        },
-      ],
-    };
-
-    const mockRealignmentResponse = {
-      candidates: [
-        {
-          content: {
-            parts: [
-              {
-                text: JSON.stringify({
-                  assignments: [
-                    { articleId: 'art-1', targetClusterId: 'c1' },
-                    { articleId: 'art-2', targetClusterId: 'c2' }, // misclassified article moved from c1 to c2
+                  storyTitle: 'Christa Pike Aftermath',
+                  status: 'developing',
+                  overview: 'Botched execution saga',
+                  threads: [
+                    { clusterId: 'c1', thread: 'Chief Resignation' },
+                    { clusterId: 'c2', thread: 'Hospital Recovery' },
                   ],
                 }),
               },
@@ -228,17 +192,11 @@ describe('organizeStoryThreads', () => {
       ],
     };
 
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockEvaluationResponse,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockRealignmentResponse,
-      });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCopywritingResponse,
+    });
 
     (mockDb.syncStoryWithThreads as jest.Mock).mockResolvedValue({ id: 'story-1' });
     (mockDb.getStoryArticlesForRealignment as jest.Mock).mockResolvedValue([
@@ -250,7 +208,22 @@ describe('organizeStoryThreads', () => {
       affectedClusters: ['c1', 'c2'],
     });
 
-    await organizeStoryThreads();
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: async () => [],
+        detectStorySagas: async () => [
+          {
+            existingStoryId: null,
+            clusterIds: ['c1', 'c2'],
+          },
+        ],
+        classifyArticleThreads: async () => [
+          { articleId: 'art-1', targetClusterId: 'c1' },
+          { articleId: 'art-2', targetClusterId: 'c2' },
+        ],
+      }
+    );
 
     expect(mockDb.getStoryArticlesForRealignment).toHaveBeenCalledWith(['c1', 'c2']);
     expect(mockDb.realignStoryArticles).toHaveBeenCalledWith([
@@ -278,38 +251,21 @@ describe('organizeStoryThreads', () => {
       },
     ]);
 
-    const mockStandaloneEvaluationResponse = {
-      candidates: [
-        {
-          content: {
-            parts: [
-              {
-                text: JSON.stringify({
-                  merges: [],
-                  stories: [],
-                }),
-              },
-            ],
-          },
-        },
-      ],
-    };
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => mockStandaloneEvaluationResponse,
-    });
-
     (mockDb.dissociateClusters as jest.Mock).mockResolvedValue({ count: 2 });
     (mockDb.disbandUnderpopulatedStories as jest.Mock).mockResolvedValue({
       disbandedStoriesCount: 1,
       dissociatedClustersCount: 0,
     });
 
-    await organizeStoryThreads();
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: async () => [],
+        detectStorySagas: async () => [], // No sagas found
+      }
+    );
 
-    // Both clusters should be dissociated since they had storyIds but were not included in any story angles
+    // Both clusters should be dissociated since they had storyIds but were not included in any story threads
     expect(mockDb.dissociateClusters).toHaveBeenCalledWith([
       'c-badenoch-scrutiny',
       'c-badenoch-tax',
@@ -350,11 +306,35 @@ describe('organizeStoryThreads', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: JSON.stringify({ merges: [], story: null }) }] } }],
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    storyTitle: 'Story Title',
+                    status: 'developing',
+                    overview: 'Overview',
+                    threads: [
+                      { clusterId: 'new1', thread: 'Thread 1' },
+                      { clusterId: 'new2', thread: 'Thread 2' },
+                    ],
+                  }),
+                },
+              ],
+            },
+          },
+        ],
       }),
     });
 
-    await organizeStoryThreads();
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: async () => [],
+        detectStorySagas: async (c) => [{ clusterIds: c.map((x) => x.id) }],
+      }
+    );
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const firstBody = (mockFetch.mock.calls[0] as [string, any])[1].body as string;
@@ -408,5 +388,128 @@ describe('organizeStoryThreads', () => {
     expect(mockDb.mergeClusters).not.toHaveBeenCalled();
     // Realignment not invoked
     expect(mockDb.realignStoryArticles).not.toHaveBeenCalled();
+  });
+
+  it('uses TypeSafe System One to detect duplicate clusters upfront before saga detection', async () => {
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      {
+        id: 'c1',
+        headline: 'Fatal tiger incident at Doncaster park',
+        summary: 'S1',
+        embedding: [0.95, 0.05],
+        createdAt: new Date(),
+        _count: { articleAssignments: 4 },
+      },
+      {
+        id: 'c2',
+        headline: 'Keeper dies in tiger enclosure attack',
+        summary: 'S2',
+        embedding: [0.94, 0.06],
+        createdAt: new Date(),
+        _count: { articleAssignments: 2 },
+      },
+    ]);
+
+    const mockDetectDuplicates = jest.fn().mockResolvedValue([
+      { targetClusterId: 'c1', sourceClusterIds: ['c2'] },
+    ]);
+
+    await organizeStoryThreads({}, { detectDuplicateClusters: mockDetectDuplicates as any });
+
+    // c2 should be merged into c1
+    expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
+
+    // Since only 1 cluster remains, story sync should not be called
+    expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
+  });
+
+  it('uses TypeSafe System One Noul for saga detection and calls Gemini strictly for copywriting', async () => {
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      { id: 'c1', headline: 'Botched execution attempt', summary: 'S1', embedding: [1, 0], createdAt: new Date() },
+      { id: 'c2', headline: 'Botched execution wire duplicate', summary: 'S2', embedding: [1, 0], createdAt: new Date() },
+      { id: 'c3', headline: 'Inmate wakes up in hospital', summary: 'S3', embedding: [1, 0], createdAt: new Date() },
+    ]);
+
+    (mockDb.getStoriesForMatching as jest.Mock).mockResolvedValue([
+      { id: 'dormant-story-1', title: 'Botched Execution', status: 'dormant', overview: 'Old overview', embedding: [1, 0] },
+    ]);
+
+    const mockCopywritingResult = {
+      storyTitle: 'Christa Pike Execution Attempt and Aftermath',
+      status: 'developing' as const,
+      overview: 'Macro overview of the event.',
+      threads: [
+        { clusterId: 'c1', thread: 'Botched Execution Attempt' },
+        { clusterId: 'c3', thread: 'Hospital Awakening' },
+      ],
+    };
+
+    const mockDetectDuplicates = jest.fn().mockResolvedValue([
+      { targetClusterId: 'c1', sourceClusterIds: ['c2'] },
+    ]);
+
+    const mockDetectSagas = jest.fn().mockResolvedValue([
+      {
+        existingStoryId: 'dormant-story-1',
+        clusterIds: ['c1', 'c3'],
+      },
+    ]);
+
+    const mockSynthesizeCopy = jest.fn().mockResolvedValue(mockCopywritingResult);
+
+    (mockDb.mergeClusters as jest.Mock).mockResolvedValue(2);
+    (mockDb.syncStoryWithThreads as jest.Mock).mockResolvedValue({ id: 'dormant-story-1' });
+
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: mockDetectDuplicates as any,
+        detectStorySagas: mockDetectSagas as any,
+        synthesizeStoryCopy: mockSynthesizeCopy as any,
+      }
+    );
+
+    expect(mockDetectDuplicates).toHaveBeenCalledTimes(1);
+    expect(mockDb.mergeClusters).toHaveBeenCalledWith('c1', ['c2']);
+    expect(mockDetectSagas).toHaveBeenCalledTimes(1);
+    expect(mockSynthesizeCopy).toHaveBeenCalledTimes(1);
+
+    expect(mockDb.syncStoryWithThreads).toHaveBeenCalledWith({
+      existingStoryId: 'dormant-story-1',
+      storyTitle: 'Christa Pike Execution Attempt and Aftermath',
+      status: 'developing',
+      overview: 'Macro overview of the event.',
+      embedding: [1, 0],
+      threads: [
+        { clusterId: 'c1', thread: 'Botched Execution Attempt' },
+        { clusterId: 'c3', thread: 'Hospital Awakening' },
+      ],
+    });
+  });
+
+  it('skips copywriting completely when System One detects no sagas in neighborhood', async () => {
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      { id: 'c1', headline: 'French student protests', summary: 'S1', embedding: [1, 0], createdAt: new Date() },
+      { id: 'c2', headline: 'Bordeaux wine harvest', summary: 'S2', embedding: [1, 0], createdAt: new Date() },
+    ]);
+
+    const mockDetectDuplicates = jest.fn().mockResolvedValue([]);
+    const mockDetectSagas = jest.fn().mockResolvedValue([]);
+    const mockSynthesizeCopy = jest.fn();
+
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: mockDetectDuplicates as any,
+        detectStorySagas: mockDetectSagas as any,
+        synthesizeStoryCopy: mockSynthesizeCopy as any,
+      }
+    );
+
+    expect(mockDetectDuplicates).toHaveBeenCalledTimes(1);
+    expect(mockDetectSagas).toHaveBeenCalledTimes(1);
+    // Zero LLM calls when no sagas are confirmed
+    expect(mockSynthesizeCopy).not.toHaveBeenCalled();
+    expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
   });
 });

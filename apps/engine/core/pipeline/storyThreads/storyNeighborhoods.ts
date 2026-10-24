@@ -1,4 +1,5 @@
 import { cosineSimilarity } from '../utils';
+export { CandidateClusterForMerge } from '../../../lib/typesafeClient';
 
 export type CandidateStory = {
   id: string;

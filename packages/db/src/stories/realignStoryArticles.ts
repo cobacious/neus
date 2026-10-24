@@ -17,6 +17,8 @@ export async function getStoryArticlesForRealignment(clusterIds: string[]) {
         select: {
           id: true,
           title: true,
+          snippet: true,
+          content: true,
           embedding: true,
         },
       },
@@ -27,6 +29,8 @@ export async function getStoryArticlesForRealignment(clusterIds: string[]) {
     articleId: a.articleId,
     currentClusterId: a.clusterId,
     title: a.article.title,
+    snippet: a.article.snippet ?? undefined,
+    content: a.article.content ?? undefined,
     embedding: a.article.embedding,
   }));
 }

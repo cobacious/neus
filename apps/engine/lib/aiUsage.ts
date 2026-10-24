@@ -4,8 +4,8 @@
  * (step, provider, model, operation) so we can see exactly where time and spend go.
  */
 
-export type AiProvider = 'gemini' | 'openai';
-export type AiOperation = 'generate' | 'embed';
+export type AiProvider = 'gemini' | 'openai' | 'typesafe';
+export type AiOperation = 'generate' | 'embed' | 'judge';
 
 export interface AiUsageRecord {
   step: string;
@@ -88,6 +88,17 @@ export const AI_MODEL_PRICING: Record<string, ModelPricing> = {
     outputPerMillion: 0,
     notes: 'OpenAI 1536-dimension embeddings',
   },
+  // TypeSafe Models (as of 23/10/2026)
+  'jev-latest': {
+    inputPerMillion: 0.042,
+    outputPerMillion: 0.0,
+    notes: 'TypeSafe System One flagship model (free output tokens)',
+  },
+  'jev-preview': {
+    inputPerMillion: 0.042,
+    outputPerMillion: 0.0,
+    notes: 'TypeSafe System One preview model (free output tokens)',
+  },
 };
 
 /**
@@ -131,6 +142,14 @@ export function estimateCostUsd(
     const fallbackRate = AI_MODEL_PRICING['gpt-4o-mini'];
     return (
       (promptTokens * fallbackRate.inputPerMillion + totalOutput * fallbackRate.outputPerMillion) /
+      1_000_000
+    );
+  }
+
+  if (provider === 'typesafe') {
+    const pricing = AI_MODEL_PRICING[model] || AI_MODEL_PRICING['jev-latest'];
+    return (
+      (promptTokens * pricing.inputPerMillion + totalOutput * pricing.outputPerMillion) /
       1_000_000
     );
   }
@@ -198,20 +217,23 @@ export function getTotalAiCostUsd(): {
   totalUsd: number;
   geminiUsd: number;
   openaiUsd: number;
+  typesafeUsd: number;
   totalGbpVat: number;
 } {
   let totalUsd = 0;
   let geminiUsd = 0;
   let openaiUsd = 0;
+  let typesafeUsd = 0;
 
   for (const t of totals.values()) {
     totalUsd += t.estimatedCostUsd;
     if (t.provider === 'gemini') geminiUsd += t.estimatedCostUsd;
     if (t.provider === 'openai') openaiUsd += t.estimatedCostUsd;
+    if (t.provider === 'typesafe') typesafeUsd += t.estimatedCostUsd;
   }
 
   const totalGbpVat = usdToGbpWithVat(totalUsd);
-  return { totalUsd, geminiUsd, openaiUsd, totalGbpVat };
+  return { totalUsd, geminiUsd, openaiUsd, typesafeUsd, totalGbpVat };
 }
 
 /** One human readable line per bucket, suitable for the pipeline log. */

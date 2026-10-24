@@ -24,13 +24,20 @@ import {
   isSettledNeighborhood,
 } from './storyThreads/storyNeighborhoods';
 import {
-  evaluateStoryNeighborhood,
-  NeighborhoodEvaluation,
-} from './storyThreads/evaluateStoryNeighborhood';
+  synthesizeStoryCopy,
+  StoryCopyResult,
+} from './storyThreads/synthesizeStoryCopy';
 import { classifyArticleThreads } from './storyThreads/classifyArticleThreads';
+import {
+  detectDuplicateClusters,
+  detectStorySagas,
+  CandidateClusterForMerge,
+} from '../../lib/typesafeClient';
 
 export interface OrganizeStoryThreadsDependencies {
-  evaluateNeighborhood?: typeof evaluateStoryNeighborhood;
+  detectDuplicateClusters?: typeof detectDuplicateClusters;
+  detectStorySagas?: typeof detectStorySagas;
+  synthesizeStoryCopy?: typeof synthesizeStoryCopy;
   classifyArticleThreads?: typeof classifyArticleThreads;
 }
 
@@ -38,7 +45,9 @@ export async function organizeStoryThreads(
   options: { timeBudgetMs?: number } = {},
   deps: OrganizeStoryThreadsDependencies = {}
 ) {
-  const evaluateNeighborhoodFn = deps.evaluateNeighborhood ?? evaluateStoryNeighborhood;
+  const detectDuplicatesFn = deps.detectDuplicateClusters ?? detectDuplicateClusters;
+  const detectSagasFn = deps.detectStorySagas ?? detectStorySagas;
+  const synthesizeCopyFn = deps.synthesizeStoryCopy ?? synthesizeStoryCopy;
   const classifyThreadsFn = deps.classifyArticleThreads ?? classifyArticleThreads;
 
   logPipelineStep(
@@ -169,32 +178,28 @@ export async function organizeStoryThreads(
     }
     totalEvaluated++;
 
-    const candidateStories = findCandidateStoriesForNeighborhood(neighborhood, existingStories);
+    const neighborhoodClusterIds = new Set(neighborhood.map((c) => c.id));
+    const mergedSourceIds = new Set<string>();
+    const assignedClusterIds = new Set<string>();
 
-    const clustersForPrompt = neighborhood.map((c) => ({
+    // 1. Evaluate candidate duplicate clusters in the neighborhood via TypeSafe Jev (Noul)
+    const candidatesForMerge: CandidateClusterForMerge[] = neighborhood.map((c) => ({
       id: c.id,
       headline: c.headline ?? null,
       summary: c.summary ?? null,
-      date: new Date(c.createdAt).toISOString().split('T')[0],
+      storyId: c.storyId,
       articleCount: c._count?.articleAssignments ?? 0,
+      createdAt: c.createdAt,
+      embedding: (Array.isArray(c.embedding) ? c.embedding : null) as number[] | null,
     }));
 
-    let evalResult: NeighborhoodEvaluation;
-    try {
-      evalResult = await evaluateNeighborhoodFn(clustersForPrompt, candidateStories);
-    } catch (err: any) {
-      logger.error(
-        `[${PipelineStep.Organize}] Failed evaluating neighborhood ${i + 1}/${orderedNeighborhoods.length}: ${err.message || err}`
-      );
-      continue;
-    }
+      const merges = await detectDuplicatesFn(candidatesForMerge, {
+        minCosineSimilarity: 0.78,
+        minDuplicateProbability: 0.85,
+        step: PipelineStep.Organize,
+      });
 
-    const neighborhoodClusterIds = new Set(neighborhood.map((c) => c.id));
-    const mergedSourceIds = new Set<string>();
-
-    // 1. Process merges
-    for (const m of evalResult.merges || []) {
-      if (m.targetClusterId && Array.isArray(m.sourceClusterIds)) {
+      for (const m of merges) {
         const validSources = m.sourceClusterIds.filter(
           (s) =>
             s !== m.targetClusterId &&
@@ -211,47 +216,94 @@ export async function organizeStoryThreads(
           );
         }
       }
-    }
 
-    // 2. Process story grouping & reactivation
-    const storiesToSync =
-      evalResult.stories ||
-      (evalResult.story ? [evalResult.story] : []);
+      const survivingNeighborhood = neighborhood.filter((c) => !mergedSourceIds.has(c.id));
+      if (survivingNeighborhood.length < 2) {
+        logger.info(
+          `[${PipelineStep.Organize}] Only ${survivingNeighborhood.length} cluster(s) remain in neighborhood after merging duplicates. Skipping story umbrella evaluation.`
+        );
+        continue;
+      }
 
-    const assignedClusterIds = new Set<string>();
+      const candidateStories = findCandidateStoriesForNeighborhood(
+        survivingNeighborhood,
+        existingStories
+      );
 
-    for (const storyItem of storiesToSync) {
-      const storyThreads = storyItem.threads || (storyItem as any).angles;
-      if (Array.isArray(storyThreads)) {
-        const survivingThreads = storyThreads.filter(
+      // 2. Evaluate story sagas using TypeSafe System One (Noul pairwise judgments)
+      const candidatesForSaga: CandidateClusterForMerge[] = survivingNeighborhood.map((c) => ({
+        id: c.id,
+        headline: c.headline ?? null,
+        summary: c.summary ?? null,
+        storyId: c.storyId,
+        articleCount: c._count?.articleAssignments ?? 0,
+        createdAt: c.createdAt,
+        embedding: (Array.isArray(c.embedding) ? c.embedding : null) as number[] | null,
+      }));
+
+      const sagaDecisions = await detectSagasFn(candidatesForSaga, candidateStories, {
+        step: PipelineStep.Organize,
+      });
+
+      if (sagaDecisions.length === 0) {
+        logger.info(
+          `[${PipelineStep.Organize}] System One identified no multi-thread sagas in neighborhood (${survivingNeighborhood.length} clusters remain standalone). Skipping copywriting.`
+        );
+      }
+
+      // 3. For each confirmed saga (>= 2 clusters), invoke Gemini strictly for copywriting
+      for (const saga of sagaDecisions) {
+        const sagaClusters = survivingNeighborhood.filter((c) => saga.clusterIds.includes(c.id));
+        if (sagaClusters.length < 2) continue;
+
+        const existingStory = saga.existingStoryId
+          ? existingStories.find((s) => s.id === saga.existingStoryId)
+          : null;
+
+        const clustersForCopy = sagaClusters.map((c) => ({
+          id: c.id,
+          headline: c.headline ?? null,
+          summary: c.summary ?? null,
+          date: new Date(c.createdAt).toISOString().split('T')[0],
+          articleCount: c._count?.articleAssignments ?? 0,
+        }));
+
+        let copyResult: StoryCopyResult;
+        try {
+          copyResult = await synthesizeCopyFn(clustersForCopy, existingStory);
+        } catch (err: any) {
+          logger.error(
+            `[${PipelineStep.Organize}] Failed synthesizing story copy: ${err.message || err}`
+          );
+          continue;
+        }
+
+        const survivingThreads = copyResult.threads.filter(
           (t) => !mergedSourceIds.has(t.clusterId) && neighborhoodClusterIds.has(t.clusterId)
         );
 
         if (survivingThreads.length >= 2) {
           survivingThreads.forEach((t) => assignedClusterIds.add(t.clusterId));
-          const survivingClusters = neighborhood.filter((c) =>
-            survivingThreads.some((t) => t.clusterId === c.id)
-          );
-          const storyEmbedding = computeCentroidEmbedding(survivingClusters);
+          const storyEmbedding = computeCentroidEmbedding(sagaClusters);
 
           const targetStoryId =
-            storyItem.existingStoryId ||
-            survivingClusters.find((c) => c.storyId)?.storyId;
+            saga.existingStoryId ||
+            sagaClusters.find((c) => c.storyId)?.storyId;
 
           await syncStoryWithThreads({
             existingStoryId: targetStoryId || undefined,
-            storyTitle: storyItem.storyTitle,
-            status: storyItem.status || 'developing',
-            overview: storyItem.overview,
+            storyTitle: copyResult.storyTitle,
+            status: copyResult.status || 'developing',
+            overview: copyResult.overview,
             embedding: storyEmbedding,
             threads: survivingThreads.map((t) => ({
               clusterId: t.clusterId,
-              thread: t.thread || (t as any).angle,
+              thread: t.thread,
             })),
           });
           totalStoriesSynced++;
           logger.info(
-            `[${PipelineStep.Organize}] Grouped ${survivingThreads.length} threads under story: "${storyItem.storyTitle}"${
+            `[${PipelineStep.Organize}] Grouped ${survivingThreads.length} threads under story: "${copyResult.storyTitle}"${
               targetStoryId ? ` (updated/reactivated: ${targetStoryId})` : ''
             }`
           );
@@ -271,7 +323,7 @@ export async function organizeStoryThreads(
             const storyUpdatedMs = targetStory?.updatedAt
               ? new Date(targetStory.updatedAt).getTime()
               : 0;
-            const hasNewClusterSinceUpdate = survivingClusters.some(
+            const hasNewClusterSinceUpdate = sagaClusters.some(
               (c) => new Date(c.createdAt).getTime() > storyUpdatedMs + 60000
             );
 
@@ -280,17 +332,17 @@ export async function organizeStoryThreads(
               (!targetStoryId || hasThreadCountChange || hasNewClusterSinceUpdate)
             ) {
               const threadsWithHeadlines = survivingThreads.map((t) => {
-                const cluster = survivingClusters.find((c) => c.id === t.clusterId);
+                const cluster = sagaClusters.find((c) => c.id === t.clusterId);
                 return {
                   clusterId: t.clusterId,
-                  thread: t.thread || (t as any).angle,
+                  thread: t.thread,
                   headline: cluster?.headline ?? null,
                   embedding: (Array.isArray(cluster?.embedding) ? cluster.embedding : null) as number[] | null,
                 };
               });
 
               const newClusterIds = new Set(
-                survivingClusters
+                sagaClusters
                   .filter(
                     (c) =>
                       new Date(c.createdAt).getTime() > storyUpdatedMs + 60000 ||
@@ -300,7 +352,7 @@ export async function organizeStoryThreads(
               );
 
               const assignments = await classifyThreadsFn(
-                storyItem.storyTitle,
+                copyResult.storyTitle,
                 threadsWithHeadlines,
                 storyArticles,
                 {
@@ -322,19 +374,18 @@ export async function organizeStoryThreads(
                 const { updatedCount } = await realignStoryArticles(validReassignments);
                 if (updatedCount > 0) {
                   logger.info(
-                    `[${PipelineStep.Organize}] Realigned ${updatedCount} article(s) across threads for story "${storyItem.storyTitle}"`
+                    `[${PipelineStep.Organize}] Realigned ${updatedCount} article(s) across threads for story "${copyResult.storyTitle}"`
                   );
                 }
               }
             }
           } catch (realignErr: any) {
             logger.warn(
-              `[${PipelineStep.Organize}] Article realignment skipped for "${storyItem.storyTitle}": ${realignErr.message || realignErr}`
+              `[${PipelineStep.Organize}] Article realignment skipped for "${copyResult.storyTitle}": ${realignErr.message || realignErr}`
             );
           }
         }
       }
-    }
 
     // 3. Dissociate any clusters in this neighborhood that had a storyId but were NOT assigned to any story
     const unassignedNeighborhoodClusters = neighborhood.filter(

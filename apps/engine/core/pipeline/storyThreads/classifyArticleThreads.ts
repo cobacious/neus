@@ -1,6 +1,6 @@
 import { cosineSimilarity } from '../utils';
 import { logger, PipelineStep } from '../../../lib/pipelineLogger';
-import { generateStructuredJson } from '../../../lib/aiClient';
+import { classifyArticleThreadsBatch } from '../../../lib/typesafeClient';
 
 export type StoryThreadWithHeadline = {
   clusterId: string;
@@ -12,6 +12,10 @@ export type StoryThreadWithHeadline = {
 // Backward compatibility alias
 export type StoryAngleWithHeadline = StoryThreadWithHeadline;
 
+export interface ClassifyArticleThreadsDependencies {
+  classifyBatch?: typeof classifyArticleThreadsBatch;
+}
+
 export async function classifyArticleThreads(
   storyTitle: string,
   threads: StoryThreadWithHeadline[],
@@ -19,12 +23,15 @@ export async function classifyArticleThreads(
     articleId: string;
     currentClusterId: string;
     title: string;
+    snippet?: string | null;
+    content?: string | null;
     embedding?: unknown;
   }>,
   options?: {
     isExistingStory?: boolean;
     newClusterIds?: Set<string>;
-  }
+  },
+  deps: ClassifyArticleThreadsDependencies = {}
 ): Promise<Array<{ articleId: string; targetClusterId: string }>> {
   if (threads.length < 2 || articles.length === 0) return [];
 
@@ -33,7 +40,13 @@ export async function classifyArticleThreads(
   );
 
   const resolvedAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
-  const ambiguousArticles: Array<{ articleId: string; currentClusterId: string; title: string }> = [];
+  const ambiguousArticles: Array<{
+    articleId: string;
+    currentClusterId: string;
+    title: string;
+    snippet?: string | null;
+    content?: string | null;
+  }> = [];
 
   const isExistingStory = options?.isExistingStory ?? false;
   const newClusterIds = options?.newClusterIds ?? new Set<string>();
@@ -101,11 +114,13 @@ export async function classifyArticleThreads(
       continue;
     }
 
-    // Ambiguous, unassigned or new cluster article without high confidence: defer to LLM
+    // Ambiguous, unassigned or new cluster article without high confidence: defer to model evaluation
     ambiguousArticles.push({
       articleId: article.articleId,
       currentClusterId: article.currentClusterId,
       title: article.title,
+      snippet: article.snippet,
+      content: article.content,
     });
   }
 
@@ -118,65 +133,39 @@ export async function classifyArticleThreads(
 
   if (resolvedAssignments.length > 0) {
     logger.info(
-      `[${PipelineStep.Organize}] ${resolvedAssignments.length}/${articles.length} article(s) resolved via vector similarity; classifying remaining ${ambiguousArticles.length} article(s) with LLM...`
+      `[${PipelineStep.Organize}] ${resolvedAssignments.length}/${articles.length} article(s) resolved via vector similarity; classifying remaining ${ambiguousArticles.length} article(s)...`
     );
   }
 
-  const BATCH_SIZE = 25;
   const llmAssignments: Array<{ articleId: string; targetClusterId: string }> = [];
+  const classifyBatchFn = deps.classifyBatch ?? classifyArticleThreadsBatch;
 
-  for (let i = 0; i < ambiguousArticles.length; i += BATCH_SIZE) {
-    const batch = ambiguousArticles.slice(i, i + BATCH_SIZE);
-    const batchIndex = Math.floor(i / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(ambiguousArticles.length / BATCH_SIZE);
+  logger.info(
+    `[${PipelineStep.Organize}] Classifying ${ambiguousArticles.length} ambiguous article(s) for "${storyTitle}" with TypeSafe Jev (parallel)...`
+  );
 
-    logger.info(
-      `[${PipelineStep.Organize}] Classifying batch ${batchIndex}/${totalBatches} (${batch.length} articles) for "${storyTitle}"...`
-    );
+  const jevResults = await classifyBatchFn({
+    articles: ambiguousArticles.map((a) => ({
+      id: a.articleId,
+      title: a.title,
+      snippet: a.snippet,
+      content: a.content,
+    })),
+    threads: threads.map((t) => ({
+      clusterId: t.clusterId,
+      thread: t.thread,
+      headline: t.headline,
+    })),
+    storyTitle,
+    step: PipelineStep.Organize,
+  });
 
-    const prompt = `You are an objective news editor organizing a multi-thread story.
-Story: "${storyTitle}"
-
-Defined Threads in this Story:
-${threads.map((t) => `- ID: "${t.clusterId}" | Thread: "${t.thread}"${t.headline ? ` | Headline: "${t.headline}"` : ''}`).join('\n')}
-
-Articles to assign:
-${batch.map((a, idx) => `${idx + 1}. ID: "${a.articleId}" | Title: "${a.title}"`).join('\n')}
-
-TASK:
-For each article, determine which thread ID it most accurately represents based on its headline and core event.
-Assign every article to the single best-matching thread cluster ID.
-
-Return JSON with key "assignments": Array<{ articleId: string, targetClusterId: string }>`;
-
-    const parsed = await generateStructuredJson<{
-      assignments: Array<{ articleId: string; targetClusterId: string }>;
-    }>({
-      prompt,
-      systemInstruction:
-        'You are an objective news editor. Assign articles to their most accurate thread. Return strict JSON only.',
-      step: PipelineStep.Organize,
-      schema: {
-        type: 'OBJECT',
-        properties: {
-          assignments: {
-            type: 'ARRAY',
-            items: {
-              type: 'OBJECT',
-              properties: {
-                articleId: { type: 'STRING' },
-                targetClusterId: { type: 'STRING' },
-              },
-              required: ['articleId', 'targetClusterId'],
-            },
-          },
-        },
-        required: ['assignments'],
-      },
-    });
-
-    if (parsed && Array.isArray(parsed.assignments)) {
-      llmAssignments.push(...parsed.assignments);
+  for (const res of jevResults) {
+    if (res.targetClusterId) {
+      llmAssignments.push({
+        articleId: res.articleId,
+        targetClusterId: res.targetClusterId,
+      });
     }
   }
 
