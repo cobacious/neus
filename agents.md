@@ -89,6 +89,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Card footer layout & source wrap**: Reorder card footer with source logos first, `justify-between` article count and 8-icon limit.
 - [x] **About Page & Footer Navigation**: Created About page, hamburger drawer menu, persistent site footer, public-code licensing disclaimer and retired BetaBanner.
 - [x] **Story Angle Filtering & Navigation**: Interactive angle pills, mobile-friendly segmented filter tabs, URL synchronization (`?angle=<id>`), progressive disclosure (10 articles with expander) and newest-first chronological sorting.
+- [x] **Feed card thread pill linking & auto-scroll**: Replaced card `<Link>` with `<article>` stretched-link pattern, wired thread pills to `${storyUrl}?thread=${thread.id}#articles-coverage` and added auto-scrolling to the active thread section.
 
 ### Track 2: Editorial Source Quality (`packages/db`)
 - [x] **Drop The Sun**: Deactivated in both local dev and production database sources and removed from active seed list.
@@ -107,6 +108,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Batch embeddings & parallel summaries**: Gemini `batchEmbedContents` (up to 100 per call) and `mapConcurrent(clusters, 3)` for summaries.
 - [x] **Settled neighborhood skip**: Skip inactive candidate neighborhoods (< 48h) in `organizeStoryAngles.ts` before calling Gemini.
 - [x] **Article angle classification pre-filtering**: Use in-memory vector cosine similarity and incremental preservation to resolve article angles with minimal LLM calls.
+- [x] **TypeSafe System One editorial decision engine**: Integrated Jev `1.14.0` for cluster deduplication (`Noul`), story saga formation (`Noul`) and article-to-thread classification (`Choice`), reducing organize step costs by ~90% and latency to ~58ms with zero Gemini decision fallbacks.
 - [x] **Pulse Sentinel continuous ingestion & tri-trigger policy**: Built continuous zero-cost RSS feed watcher in [`apps/api/pulse.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/api/pulse.ts) and [`packages/db`](file:///Users/jwalton/Code/cobacious/neus/packages/db) with breaking surge, batch accumulation and heartbeat staleness policies; currently shadow testing in preview sandbox. (See [`docs/handoffs/pulse-sentinel-architecture.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/pulse-sentinel-architecture.md)).
 
 ### Track 5: CI/CD & Testing Automation (`.github/workflows`)
@@ -121,6 +123,22 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Outbound RSS feed**: Created `/feed.xml` and `/rss.xml` with Atom namespace, story-angle grouping, RFC 822 pubDate and autodiscovery in `index.html`.
 - [x] **Dynamic sitemap & robots.txt**: Implemented `/sitemap.xml` conforming to Sitemap 0.9 protocol and `robots.txt` for search crawler indexing.
 - [x] **Weekly Substack markdown draft generator**: Built CLI tool (`pnpm substack:draft`) in [`apps/engine/lib/generateWeeklyDigest.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/lib/generateWeeklyDigest.ts) that synthesises top multi-angle stories and source breakdowns for zero-slop newsletters.
+
+### Track 8: Progressive Web App (`apps/web`)
+- [ ] **Web App Manifest**: Create standalone manifest with Neus palette branding (`#4F6D7A` Blue Slate), theme color, start URL and icons.
+- [ ] **Service Worker & Offline Fallback**: Pre-cache static assets and establish offline reading caching strategy for previously loaded stories.
+- [ ] **iOS & Mobile Meta Integration**: Add apple-touch-icon, mobile web app viewport meta tags and install affordance in drawer navigation.
+
+### Track 9: Topic Taxonomy & Categorisation (`apps/engine`, `packages/db`, `apps/web`)
+- [ ] **TypeSafe Jev Topic Classification**: Calibrated `Choice` judgment on clusters during summarization across core verticals (UK Politics, World, Economy, Tech & Science, Environment, Culture & Society and Sport) at ~$0.000005 per cluster.
+- [ ] **Topic Schema & API Exposure**: Add additive `topic` field to `Cluster` and `Story` in `@neus/db` with `@@index([topic, score])` and expose in GraphQL `feed(topic: String)`.
+- [ ] **Frontend Topic Navigation**: Horizontal topic filter tabs on homepage feed, URL routing (`/?topic=<slug>`) and topic badges on cards.
+
+### Track 10: Search & Information Retrieval (`packages/db`, `apps/api`, `apps/web`)
+- [ ] **PostgreSQL Full-Text Search**: Native GIN `tsvector` index across stories and clusters in Neon DB with zero external infrastructure cost.
+- [ ] **GraphQL Search Endpoint**: Expose `searchStories(query: String!, limit: Int)` returning matching stories, thread breakdowns and relevance ranks.
+- [ ] **TypeSafe Semantic Reranking (Phase 2)**: Rerank top 20 candidate search results with Jev `Score` / `Choice` for entity-level search accuracy.
+- [ ] **Frontend Search UX**: Header search bar or `⌘K` modal with instant debounced querying and keyboard navigation.
 
 ---
 
