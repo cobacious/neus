@@ -66,17 +66,25 @@ export function registerServiceWorker() {
 }
 
 /**
+ * Detects whether the web app is running in standalone PWA mode
+ * (installed to Home Screen on iOS, Android or Desktop).
+ * Also supports `?pwa=1` for testing in standard browser tabs.
+ */
+export function isStandalonePwa(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as any).standalone === true ||
+    new URLSearchParams(window.location.search).has('pwa')
+  );
+}
+
+/**
  * React hook to manage PWA installation affordances.
  */
 export function usePwaInstall() {
   const [isInstallable, setIsInstallable] = useState<boolean>(Boolean(deferredPrompt));
-  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return (
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as any).standalone === true
-    );
-  });
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => isStandalonePwa());
 
   useEffect(() => {
     const handleUpdate = (canInstall: boolean) => {

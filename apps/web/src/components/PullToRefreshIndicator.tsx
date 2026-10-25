@@ -1,34 +1,50 @@
+import { RefreshStatus } from '../hooks/usePullToRefresh';
+
 interface PullToRefreshIndicatorProps {
   pullDistance: number;
-  isRefreshing: boolean;
+  status: RefreshStatus;
+  isPulling?: boolean;
   threshold?: number;
 }
 
 export default function PullToRefreshIndicator({
   pullDistance,
-  isRefreshing,
-  threshold = 65,
+  status,
+  isPulling = false,
+  threshold = 60,
 }: PullToRefreshIndicatorProps) {
-  if (pullDistance <= 0 && !isRefreshing) {
+  if (status === 'idle' && pullDistance <= 0) {
     return null;
   }
 
   const progress = Math.min(1, pullDistance / threshold);
-  const isTriggered = pullDistance >= threshold;
+  const isTriggered = status === 'can-release';
+  const isRefreshing = status === 'refreshing';
+  const isSuccess = status === 'success';
+  const isError = status === 'error';
 
   return (
     <div
-      className="fixed left-0 right-0 top-14 z-30 flex justify-center pointer-events-none transition-transform duration-100 ease-out"
+      className="absolute top-0 inset-x-0 flex items-center justify-center pointer-events-none overflow-hidden z-10"
       style={{
-        transform: `translateY(${pullDistance * 0.75}px)`,
+        height: `${pullDistance}px`,
+        transition: isPulling ? 'none' : 'height 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease',
+        opacity: pullDistance > 8 || isRefreshing || isSuccess || isError ? 1 : 0,
       }}
-      aria-hidden="true"
+      aria-live="polite"
     >
-      <div className="bg-white border border-gray-200 shadow-md rounded-full px-3.5 py-1.5 flex items-center gap-2">
-        {isRefreshing ? (
+      <div
+        className={`
+          inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full shadow-xs border text-xs font-medium transition-all duration-200
+          ${isSuccess ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : ''}
+          ${isError ? 'bg-amber-50 text-amber-800 border-amber-200' : ''}
+          ${!isSuccess && !isError ? 'bg-white text-gray-700 border-gray-200 shadow-sm' : ''}
+        `}
+      >
+        {isRefreshing && (
           <>
             <svg
-              className="animate-spin h-4 w-4 text-[#4F6D7A]"
+              className="animate-spin h-3.5 w-3.5 text-[#4F6D7A]"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -47,14 +63,50 @@ export default function PullToRefreshIndicator({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span className="text-xs font-medium text-gray-700">Updating feed...</span>
+            <span>Checking for updates...</span>
           </>
-        ) : (
+        )}
+
+        {isSuccess && (
           <>
             <svg
-              className="h-4 w-4 text-gray-500 transition-transform duration-200"
+              className="h-3.5 w-3.5 text-emerald-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Feed up to date</span>
+          </>
+        )}
+
+        {isError && (
+          <>
+            <svg
+              className="h-3.5 w-3.5 text-amber-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <span>Could not reach server</span>
+          </>
+        )}
+
+        {!isRefreshing && !isSuccess && !isError && (
+          <>
+            <svg
+              className="h-3.5 w-3.5 text-gray-500 transition-transform duration-150"
               style={{
-                transform: `rotate(${isTriggered ? 180 : progress * 140}deg)`,
+                transform: `rotate(${isTriggered ? 180 : progress * 150}deg)`,
               }}
               fill="none"
               viewBox="0 0 24 24"
@@ -63,9 +115,7 @@ export default function PullToRefreshIndicator({
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
             </svg>
-            <span className="text-xs font-medium text-gray-600">
-              {isTriggered ? 'Release to refresh' : 'Pull to refresh'}
-            </span>
+            <span>{isTriggered ? 'Release to refresh' : 'Pull to refresh'}</span>
           </>
         )}
       </div>

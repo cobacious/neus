@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from 'urql';
+import { useQuery, useClient } from 'urql';
 import ClusterCard from './ClusterCard';
 import ClusterCardSkeleton from './ClusterCardSkeleton';
 import Loading from './Loading';
 import PullToRefreshIndicator from './PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useStaleRefresh } from '../hooks/useStaleRefresh';
+import { isStandalonePwa } from '../pwa';
 
 const CLUSTERS_QUERY = `
   query GetClusters($limit: Int, $offset: Int) {
@@ -68,6 +69,7 @@ const CLUSTERS_PER_PAGE = 15;
 export default function ClusterList() {
   const [displayedClusters, setDisplayedClusters] = useState<any[]>([]);
   const [offset, setOffset] = useState(0);
+  const client = useClient();
 
   const [result, reexecuteQuery] = useQuery({
     query: CLUSTERS_QUERY,
@@ -75,14 +77,38 @@ export default function ClusterList() {
     requestPolicy: 'cache-and-network',
   });
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async (): Promise<boolean> => {
     setOffset(0);
-    reexecuteQuery({ requestPolicy: 'network-only' });
-  }, [reexecuteQuery]);
+    try {
+      const res = await client
+        .query(CLUSTERS_QUERY, { limit: CLUSTERS_PER_PAGE, offset: 0 }, { requestPolicy: 'network-only' })
+        .toPromise();
 
-  const { pullDistance, isRefreshing, threshold } = usePullToRefresh({
+      if (res.data?.clusters) {
+        setDisplayedClusters(res.data.clusters);
+        return true;
+      }
+      return !res.error;
+    } catch (_) {
+      return false;
+    }
+  }, [client]);
+
+  const isStandalone = isStandalonePwa();
+
+  const { pullDistance, status, isPulling, threshold, contentStyle } = usePullToRefresh({
     onRefresh: handleRefresh,
+    disabled: !isStandalone,
   });
+
+  useEffect(() => {
+    if (isStandalone) {
+      document.documentElement.style.overscrollBehaviorY = 'none';
+      return () => {
+        document.documentElement.style.overscrollBehaviorY = '';
+      };
+    }
+  }, [isStandalone]);
 
   const { markFresh } = useStaleRefresh({
     onRefresh: handleRefresh,
@@ -127,7 +153,7 @@ export default function ClusterList() {
     );
   }
 
-  if (result.error) {
+  if (result.error && displayedClusters.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto ring-8 ring-amber-50/60">
@@ -171,32 +197,33 @@ export default function ClusterList() {
   const hasMore = displayedClusters.length < totalClusters;
 
   return (
-    <>
+    <div className="relative">
       <PullToRefreshIndicator
         pullDistance={pullDistance}
-        isRefreshing={isRefreshing}
+        status={status}
+        isPulling={isPulling}
         threshold={threshold}
       />
-      <div className="space-y-5">
+      <div className="space-y-5" style={contentStyle}>
         {displayedClusters.map((cluster: any) => (
           <ClusterCard key={cluster.id} cluster={cluster} />
         ))}
 
-      {hasMore && (
-        <div className="pt-4 pb-8 text-center">
-          <button
-            onClick={handleLoadMore}
-            disabled={result.fetching}
-            className="w-full px-8 py-3 bg-white text-gray-900 rounded-lg font-medium hover:bg-gray-900 hover:text-white disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-all border border-gray-300 hover:border-gray-900 disabled:border-gray-200"
-          >
-            {result.fetching ? 'Loading...' : 'Load more'}
-          </button>
-          <p className="text-xs text-gray-400 mt-2">
-            No infinite scroll here, you decide if you want more.
-          </p>
-        </div>
-      )}
+        {hasMore && (
+          <div className="pt-4 pb-8 text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={result.fetching}
+              className="w-full px-8 py-3 bg-white text-gray-900 rounded-lg font-medium hover:bg-gray-900 hover:text-white disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-all border border-gray-300 hover:border-gray-900 disabled:border-gray-200"
+            >
+              {result.fetching ? 'Loading...' : 'Load more'}
+            </button>
+            <p className="text-xs text-gray-400 mt-2">
+              No infinite scroll here, you decide if you want more.
+            </p>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
