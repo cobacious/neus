@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from 'urql';
 import ClusterCard from './ClusterCard';
 import ClusterCardSkeleton from './ClusterCardSkeleton';
 import Loading from './Loading';
+import PullToRefreshIndicator from './PullToRefreshIndicator';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { useStaleRefresh } from '../hooks/useStaleRefresh';
 
 const CLUSTERS_QUERY = `
   query GetClusters($limit: Int, $offset: Int) {
@@ -66,10 +69,24 @@ export default function ClusterList() {
   const [displayedClusters, setDisplayedClusters] = useState<any[]>([]);
   const [offset, setOffset] = useState(0);
 
-  const [result] = useQuery({
+  const [result, reexecuteQuery] = useQuery({
     query: CLUSTERS_QUERY,
     variables: { limit: CLUSTERS_PER_PAGE, offset },
     requestPolicy: 'cache-and-network',
+  });
+
+  const handleRefresh = useCallback(async () => {
+    setOffset(0);
+    reexecuteQuery({ requestPolicy: 'network-only' });
+  }, [reexecuteQuery]);
+
+  const { pullDistance, isRefreshing, threshold } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
+
+  const { markFresh } = useStaleRefresh({
+    onRefresh: handleRefresh,
+    staleDurationMs: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -79,9 +96,10 @@ export default function ClusterList() {
   // Update displayed clusters when new data arrives
   useEffect(() => {
     if (result.data && !result.fetching) {
+      markFresh();
       const rawClusters = result.data.clusters || [];
       if (offset === 0) {
-        // Initial load
+        // Initial load or refresh
         setDisplayedClusters(rawClusters);
       } else if (rawClusters.length > 0) {
         // Loading more - append new clusters avoiding duplicate IDs across pages
@@ -92,7 +110,7 @@ export default function ClusterList() {
         });
       }
     }
-  }, [result.data, result.fetching, offset]);
+  }, [result.data, result.fetching, offset, markFresh]);
 
   const handleLoadMore = () => {
     setOffset(displayedClusters.length);
@@ -153,10 +171,16 @@ export default function ClusterList() {
   const hasMore = displayedClusters.length < totalClusters;
 
   return (
-    <div className="space-y-5">
-      {displayedClusters.map((cluster: any) => (
-        <ClusterCard key={cluster.id} cluster={cluster} />
-      ))}
+    <>
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        threshold={threshold}
+      />
+      <div className="space-y-5">
+        {displayedClusters.map((cluster: any) => (
+          <ClusterCard key={cluster.id} cluster={cluster} />
+        ))}
 
       {hasMore && (
         <div className="pt-4 pb-8 text-center">
@@ -172,6 +196,7 @@ export default function ClusterList() {
           </p>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
