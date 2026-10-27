@@ -43,7 +43,7 @@ export default function PullToRefreshIndicator({
     >
       <div
         className={`
-          shrink-0 inline-flex items-center justify-center gap-1.5 px-4 h-8 min-w-[148px] rounded-full border text-xs font-medium
+          shrink-0 inline-flex items-center justify-center gap-1.5 px-4 h-8 min-w-[172px] rounded-full border text-xs font-medium
           transition-all duration-200 shadow-xs
           ${isClosing ? 'opacity-0 scale-95 duration-150' : 'opacity-100'}
           ${isSuccess ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : ''}
@@ -76,7 +76,7 @@ export default function PullToRefreshIndicator({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span className="whitespace-nowrap">Checking for updates...</span>
+            <span className="whitespace-nowrap">Updating feed...</span>
           </>
         )}
 
