@@ -22,24 +22,39 @@ export default function PullToRefreshIndicator({
   const isRefreshing = status === 'refreshing';
   const isSuccess = status === 'success';
   const isError = status === 'error';
+  const isClosing = !isPulling && pullDistance === 0 && (isSuccess || isError);
+
+  // Gap between header and cards is 24px (main.pt-6) + pullDistance.
+  // Center of gap from header = (24 + pullDistance) / 2.
+  // Relative to ClusterList (24px below header): pillY = (pullDistance - 56) / 2.
+  // At resting distance 56px: pillY = 0px. Space above = 24px, space below = 24px.
+  const pillY = Math.max(0, (pullDistance - 56) / 2);
 
   return (
     <div
-      className="absolute top-0 inset-x-0 flex items-center justify-center pointer-events-none overflow-hidden z-10"
+      className="absolute inset-x-0 top-0 flex justify-center pointer-events-none z-0"
       style={{
-        height: `${pullDistance}px`,
-        transition: isPulling ? 'none' : 'height 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease',
-        opacity: pullDistance > 8 || isRefreshing || isSuccess || isError ? 1 : 0,
+        transform: `translate3d(0, ${pillY}px, 0)`,
+        transition: isPulling
+          ? 'none'
+          : 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
       }}
       aria-live="polite"
     >
       <div
         className={`
-          inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full shadow-xs border text-xs font-medium transition-all duration-200
+          shrink-0 inline-flex items-center gap-2 px-3.5 h-8 rounded-full border text-xs font-medium
+          transition-all duration-200
+          ${isClosing ? 'opacity-0 scale-95 duration-150' : 'opacity-100'}
+          ${!isClosing && isTriggered ? 'scale-105 shadow-sm' : ''}
+          ${!isClosing && !isTriggered ? 'scale-100 shadow-xs' : ''}
           ${isSuccess ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : ''}
           ${isError ? 'bg-amber-50 text-amber-800 border-amber-200' : ''}
-          ${!isSuccess && !isError ? 'bg-white text-gray-700 border-gray-200 shadow-sm' : ''}
+          ${!isSuccess && !isError ? 'bg-white text-gray-700 border-gray-200' : ''}
         `}
+        style={{
+          opacity: isClosing ? 0 : pullDistance > 10 || isRefreshing || isSuccess || isError ? 1 : 0,
+        }}
       >
         {isRefreshing && (
           <>

@@ -204,7 +204,7 @@ export default function ClusterList() {
         isPulling={isPulling}
         threshold={threshold}
       />
-      <div className="space-y-5" style={contentStyle}>
+      <div className="space-y-5 relative z-10" style={contentStyle}>
         {displayedClusters.map((cluster: any) => (
           <ClusterCard key={cluster.id} cluster={cluster} />
         ))}

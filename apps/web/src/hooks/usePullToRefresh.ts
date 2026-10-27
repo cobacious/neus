@@ -24,7 +24,6 @@ export function usePullToRefresh({
   const startYRef = useRef(0);
   const isPullingRef = useRef(false);
   const pullDistanceRef = useRef(0);
-  const hasVibratedRef = useRef(false);
 
   const updateDistance = (dist: number) => {
     pullDistanceRef.current = dist;
@@ -37,7 +36,6 @@ export function usePullToRefresh({
       if (window.scrollY <= 0) {
         startYRef.current = e.touches[0].clientY;
         isPullingRef.current = true;
-        hasVibratedRef.current = false;
         setIsPulling(true);
       }
     },
@@ -64,19 +62,8 @@ export function usePullToRefresh({
         updateDistance(damped);
 
         if (damped >= threshold) {
-          if (!hasVibratedRef.current) {
-            hasVibratedRef.current = true;
-            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-              try {
-                navigator.vibrate(12);
-              } catch (_) {
-                // Ignore vibration failure
-              }
-            }
-          }
           setStatus('can-release');
         } else {
-          hasVibratedRef.current = false;
           setStatus('pulling');
         }
       } else {
@@ -94,7 +81,7 @@ export function usePullToRefresh({
 
     if (pullDistanceRef.current >= threshold && status !== 'refreshing' && !disabled) {
       setStatus('refreshing');
-      updateDistance(50); // Rest position during refresh
+      updateDistance(56); // Rest position during refresh (balanced 24px above and below)
 
       try {
         const result = await onRefresh();
