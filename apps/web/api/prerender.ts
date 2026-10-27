@@ -33,6 +33,7 @@ export interface PrerenderArticle {
 export interface PrerenderClusterData {
   id: string;
   headline?: string | null;
+  slug?: string | null;
   summary?: string | null;
   storyAngle?: string | null;
   articleCount?: number | null;
@@ -178,6 +179,7 @@ export default async function handler(req: any, res?: any) {
           cluster(slug: $slug) {
             id
             headline
+            slug
             summary
             storyAngle
             articleCount
@@ -227,6 +229,20 @@ export default async function handler(req: any, res?: any) {
         const json: any = await response.json();
         const cluster = json?.data?.cluster;
         if (cluster) {
+          // If the cluster has an updated canonical slug (e.g. following a merge or alias redirect),
+          // return an immediate HTTP 301 Moved Permanently redirect so crawlers and visitors reach the canonical story
+          if (cluster.slug && cluster.slug !== slug) {
+            if (res && typeof res.setHeader === 'function') {
+              res.setHeader('Location', `/${cluster.slug}`);
+              res.statusCode = 301;
+              return res.end();
+            }
+            return new Response(null, {
+              status: 301,
+              headers: { Location: `/${cluster.slug}` },
+            });
+          }
+
           clusterData = cluster;
           const story = cluster.story;
           const isMultiThread = Boolean(story && story.clusters && story.clusters.length > 1);

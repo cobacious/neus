@@ -232,4 +232,40 @@ describe('Prerender Handler', () => {
     expect(text).toContain('<title>Test Story - Neus</title>');
     expect(text).toContain('<h1>Test Story</h1>');
   });
+
+  it('returns HTTP 301 redirect when cluster has an updated or merged slug', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          cluster: {
+            id: 'c1',
+            slug: 'canonical-surviving-story-slug',
+            headline: 'Updated Canonical Story Headline',
+          },
+        },
+      }),
+    } as any);
+
+    const headers: Record<string, string> = {};
+    let statusCode = 200;
+    let ended = false;
+
+    const req = { query: { slug: 'old-merged-story-slug' } };
+    const res = {
+      setHeader: (k: string, v: string) => {
+        headers[k] = v;
+      },
+      statusCode: 200,
+      end: () => {
+        ended = true;
+      },
+    };
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(301);
+    expect(headers['Location']).toBe('/canonical-surviving-story-slug');
+    expect(ended).toBe(true);
+  });
 });

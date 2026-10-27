@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from 'urql';
 import Loading from './components/Loading';
 import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './components/StatusBadge';
@@ -77,6 +77,7 @@ const CLUSTER_QUERY = `
 
 export default function ClusterDetailPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [result] = useQuery({ query: CLUSTER_QUERY, variables: { slug } });
   const { fetching, error, data } = result;
 
@@ -85,6 +86,13 @@ export default function ClusterDetailPage() {
   const isMultiThreadStory = Boolean(story && story.clusters && story.clusters.length > 1);
   const headline = isMultiThreadStory && story ? story.title : cluster?.headline;
   const summary = isMultiThreadStory && story?.overview ? story.overview : cluster?.summary;
+
+  // Canonicalize URL if the cluster slug differs from the URL slug (e.g. following an alias resolution)
+  useEffect(() => {
+    if (cluster?.slug && cluster.slug !== slug) {
+      navigate(`/${cluster.slug}`, { replace: true });
+    }
+  }, [cluster?.slug, slug, navigate]);
 
   const [expandedThreadIds, setExpandedThreadIds] = useState<Set<string>>(new Set());
   const [searchParams, setSearchParams] = useSearchParams();
@@ -199,7 +207,8 @@ export default function ClusterDetailPage() {
   }, [headline, summary, slug]);
 
   if (fetching) return <Loading />;
-  if (error || !cluster) {
+
+  if (error) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto ring-8 ring-amber-50/60">
@@ -219,16 +228,62 @@ export default function ClusterDetailPage() {
         </div>
         <div className="space-y-1.5">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-            Story Temporarily Unavailable
+            Unable to Load Story
           </h2>
           <p className="text-sm text-gray-600 max-w-md mx-auto leading-normal">
-            Unable to load this story due to an ongoing platform incident at our database hosting
-            provider.
+            We had trouble connecting to the feed service. Please check your internet connection and try again.
+          </p>
+        </div>
+        <div className="pt-2 flex items-center justify-center gap-3">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-gray-900 text-white rounded-lg font-medium text-xs hover:bg-gray-800 transition-colors"
+          >
+            Retry Connection
+          </button>
+          <Link
+            to="/"
+            className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium text-xs transition-colors"
+          >
+            Back to Feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!cluster) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center mx-auto ring-8 ring-gray-100/60">
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+            Story Not Found
+          </h2>
+          <p className="text-sm text-gray-600 max-w-md mx-auto leading-normal">
+            This story may have been updated, consolidated into another angle or archived.
           </p>
         </div>
         <div className="pt-2">
-          <Link to="/" className="text-blue-600 hover:text-blue-800 font-medium text-sm">
-            ← Back to Home
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg font-medium text-xs hover:bg-gray-800 transition-colors"
+          >
+            ← Return to Live Feed
           </Link>
         </div>
       </div>

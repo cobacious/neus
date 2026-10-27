@@ -164,13 +164,10 @@ export default function ClusterList() {
         <div className="space-y-1.5">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">Live Feed Temporarily Unavailable</h2>
           <p className="text-sm text-gray-600 max-w-md mx-auto leading-normal">
-            Neus is unable to connect to the news database due to an ongoing platform outage at our hosting provider (Railway).
-          </p>
-          <p className="text-xs text-gray-500 max-w-md mx-auto pt-1 leading-normal">
-            Stories will reappear automatically as soon as upstream database connectivity is restored.
+            Neus is unable to connect to the news feed right now. Please check your internet connection and try again.
           </p>
         </div>
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs">
+        <div className="pt-2 flex items-center justify-center gap-3 text-xs">
           <button
             onClick={() => window.location.reload()}
             className="w-full sm:w-auto px-4 py-2 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors inline-flex items-center justify-center gap-1.5"
@@ -180,14 +177,6 @@ export default function ClusterList() {
             </svg>
             Retry Connection
           </button>
-          <a
-            href="https://status.railway.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors"
-          >
-            Check Railway Status →
-          </a>
         </div>
       </div>
     );

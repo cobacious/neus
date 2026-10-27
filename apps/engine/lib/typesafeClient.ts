@@ -512,9 +512,9 @@ export async function detectDuplicateClusters(
     if (mergedSources.has(c1.id) || mergedSources.has(c2.id)) continue;
 
     // Determine target vs source:
-    // 1. Prefer cluster with existing storyId
-    // 2. Prefer cluster with more articles
-    // 3. Prefer older cluster
+    // 1. Prefer cluster with existing storyId to preserve established story grouping
+    // 2. Prefer older cluster (createdAt) to preserve established permalinks, slugs and syndication URLs
+    // 3. Prefer cluster with more articles if creation timestamps are identical
     let target = c1;
     let source = c2;
 
@@ -524,18 +524,21 @@ export async function detectDuplicateClusters(
     } else if (c1.storyId && !c2.storyId) {
       target = c1;
       source = c2;
-    } else if (c2.articleCount > c1.articleCount) {
-      target = c2;
-      source = c1;
-    } else if (c1.articleCount > c2.articleCount) {
-      target = c1;
-      source = c2;
     } else {
       const time1 = new Date(c1.createdAt).getTime();
       const time2 = new Date(c2.createdAt).getTime();
       if (time2 < time1) {
         target = c2;
         source = c1;
+      } else if (time1 < time2) {
+        target = c1;
+        source = c2;
+      } else if (c2.articleCount > c1.articleCount) {
+        target = c2;
+        source = c1;
+      } else {
+        target = c1;
+        source = c2;
       }
     }
 
