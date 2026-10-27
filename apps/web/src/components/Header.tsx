@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import GitHubIcon from './GitHubIcon';
 import BlueskyIcon from './BlueskyIcon';
+import { usePwaInstall, useOnlineStatus } from '../pwa';
 
 const BRAND_COLORS = [
   '#4F6D7A', // Blue Slate
@@ -17,6 +18,8 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const isOnline = useOnlineStatus();
+  const { isInstallable, isInstalled, promptInstall } = usePwaInstall();
 
   // Randomize segment weights on initial page load
   const [paletteSegments] = useState(() => {
@@ -112,37 +115,50 @@ export default function Header() {
               <span className="sr-only">Neus - Neutral news</span>
             </Link>
           </h1>
-          <button
-            type="button"
-            onClick={toggleMenu}
-            className="text-gray-600 hover:text-gray-900 transition-colors p-1.5 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
-            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={isMenuOpen}
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
+          <div className="flex items-center gap-2 sm:gap-3">
+            {!isOnline && (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
+                role="status"
+                aria-label="Offline: viewing cached stories"
+                title="Offline: viewing cached stories"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
+                <span>Offline</span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={toggleMenu}
+              className="text-gray-600 hover:text-gray-900 transition-colors p-1.5 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMenuOpen}
             >
-              {isMenuOpen ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              )}
-            </svg>
-          </button>
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                {isMenuOpen ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -204,6 +220,21 @@ export default function Header() {
                   </svg>
                   <span>About Neus</span>
                 </Link>
+                {isInstallable && !isInstalled && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      closeMenu();
+                      await promptInstall();
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors text-left"
+                  >
+                    <svg className="h-4 w-4 text-[#4F6D7A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Install App</span>
+                  </button>
+                )}
               </div>
 
               <div className="border-t border-gray-100 pt-5 space-y-1">

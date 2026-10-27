@@ -125,9 +125,9 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Weekly Substack markdown draft generator**: Built CLI tool (`pnpm substack:draft`) in [`apps/engine/lib/generateWeeklyDigest.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/lib/generateWeeklyDigest.ts) that synthesises top multi-angle stories and source breakdowns for zero-slop newsletters.
 
 ### Track 8: Progressive Web App (`apps/web`)
-- [ ] **Web App Manifest**: Create standalone manifest with Neus palette branding (`#4F6D7A` Blue Slate), theme color, start URL and icons.
-- [ ] **Service Worker & Offline Fallback**: Pre-cache static assets and establish offline reading caching strategy for previously loaded stories.
-- [ ] **iOS & Mobile Meta Integration**: Add apple-touch-icon, mobile web app viewport meta tags and install affordance in drawer navigation.
+- [x] **Web App Manifest**: Create standalone manifest with Neus palette branding (`#4F6D7A` Blue Slate), theme color, start URL and icons.
+- [x] **Service Worker & Offline Fallback**: Pre-cache static assets and establish offline reading caching strategy for previously loaded stories.
+- [x] **iOS & Mobile Meta Integration**: Add apple-touch-icon, mobile web app viewport meta tags and install affordance in drawer navigation.
 
 ### Track 9: Topic Taxonomy & Categorisation (`apps/engine`, `packages/db`, `apps/web`)
 - [ ] **TypeSafe Jev Topic Classification**: Calibrated `Choice` judgment on clusters during summarization across core verticals (UK Politics, World, Economy, Tech & Science, Environment, Culture & Society and Sport) at ~$0.000005 per cluster.
@@ -154,6 +154,10 @@ When starting a session or subagent, select from these decoupled tracks:
   - **Strictly NO Oxford commas** in any documentation, code comments, commit messages or agent communications.
   - **Strictly NO em dashes** in any documentation, code comments, commit messages or agent communications. Use colons, parentheses, semicolons or separate sentences.
   - **Clickable markdown links**: Always use markdown links with the `file://` scheme for all file paths and symbols.
+- **Artifact Viewing in CLI (`agy`)**:
+  - The developer operates exclusively in the `agy` CLI on macOS, not the Antigravity desktop IDE.
+  - Standard markdown viewers outside the IDE cannot render ````carousel widgets, ````mermaid blocks or local absolute file paths.
+  - Whenever generating or editing an artifact containing carousels, mermaid diagrams or visual media, compile an interactive companion HTML file and provide the clickable `file:///...html` link in the response so it can be opened instantly in the browser via Cmd+click or `open`.
 - **Code Quality**:
   - Prefer modular, composable design.
   - Avoid overengineering: move fast, iterate incrementally.

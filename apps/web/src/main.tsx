@@ -4,6 +4,9 @@ import { cacheExchange, createClient, fetchExchange, Provider } from 'urql';
 import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import './index.css';
+import { registerServiceWorker } from './pwa';
+
+registerServiceWorker();
 
 // Vite exposes environment variables prefixed with `VITE_` via `import.meta.env`.
 // Allow the GraphQL endpoint to be configured at build time with `VITE_API_URL`.
@@ -12,6 +15,7 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/graphql';
 const client = createClient({
   url: apiUrl,
   exchanges: [cacheExchange, fetchExchange],
+  preferGetMethod: true,
 });
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
