@@ -43,10 +43,9 @@ export default function PullToRefreshIndicator({
     >
       <div
         className={`
-          shrink-0 inline-flex items-center justify-center gap-2 px-3.5 h-8 min-w-[152px] rounded-full border text-xs font-medium
-          transition-all duration-200
+          shrink-0 inline-flex items-center justify-center gap-1.5 px-4 h-8 min-w-[148px] rounded-full border text-xs font-medium
+          transition-all duration-200 shadow-xs
           ${isClosing ? 'opacity-0 scale-95 duration-150' : 'opacity-100'}
-          ${!isClosing && isTriggered ? 'shadow-sm' : 'shadow-xs'}
           ${isSuccess ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : ''}
           ${isError ? 'bg-amber-50 text-amber-800 border-amber-200' : ''}
           ${!isSuccess && !isError ? 'bg-white text-gray-700 border-gray-200' : ''}
@@ -58,7 +57,7 @@ export default function PullToRefreshIndicator({
         {isRefreshing && (
           <>
             <svg
-              className="animate-spin h-3.5 w-3.5 text-[#4F6D7A]"
+              className="animate-spin h-3.5 w-3.5 text-[#4F6D7A] shrink-0"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -77,14 +76,14 @@ export default function PullToRefreshIndicator({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span>Checking for updates...</span>
+            <span className="whitespace-nowrap">Checking for updates...</span>
           </>
         )}
 
         {isSuccess && (
           <>
             <svg
-              className="h-3.5 w-3.5 text-emerald-600"
+              className="h-3.5 w-3.5 text-emerald-600 shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -92,14 +91,14 @@ export default function PullToRefreshIndicator({
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
-            <span>Feed up to date</span>
+            <span className="whitespace-nowrap">Feed up to date</span>
           </>
         )}
 
         {isError && (
           <>
             <svg
-              className="h-3.5 w-3.5 text-amber-600"
+              className="h-3.5 w-3.5 text-amber-600 shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -111,14 +110,14 @@ export default function PullToRefreshIndicator({
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
               />
             </svg>
-            <span>Could not reach server</span>
+            <span className="whitespace-nowrap">Could not reach server</span>
           </>
         )}
 
         {!isRefreshing && !isSuccess && !isError && (
-          <div className="inline-flex items-center gap-2">
+          <>
             <svg
-              className="h-3.5 w-3.5 text-gray-500 transition-transform duration-200 ease-out"
+              className="h-3.5 w-3.5 text-gray-500 shrink-0 transition-transform duration-200 ease-out"
               style={{
                 transform: `rotate(${isTriggered ? 180 : 0}deg)`,
               }}
@@ -129,23 +128,10 @@ export default function PullToRefreshIndicator({
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
             </svg>
-            <span className="relative inline-block w-[104px] h-4 overflow-hidden whitespace-nowrap text-left">
-              <span
-                className={`absolute inset-0 flex items-center transition-all duration-200 ease-out ${
-                  isTriggered ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
-                }`}
-              >
-                Pull to refresh
-              </span>
-              <span
-                className={`absolute inset-0 flex items-center transition-all duration-200 ease-out ${
-                  isTriggered ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
-                }`}
-              >
-                Release to refresh
-              </span>
+            <span className="whitespace-nowrap">
+              {isTriggered ? 'Release to refresh' : 'Pull to refresh'}
             </span>
-          </div>
+          </>
         )}
       </div>
     </div>
