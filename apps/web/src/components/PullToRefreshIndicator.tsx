@@ -43,11 +43,10 @@ export default function PullToRefreshIndicator({
     >
       <div
         className={`
-          shrink-0 inline-flex items-center gap-2 px-3.5 h-8 rounded-full border text-xs font-medium
+          shrink-0 inline-flex items-center justify-center gap-2 px-3.5 h-8 min-w-[152px] rounded-full border text-xs font-medium
           transition-all duration-200
           ${isClosing ? 'opacity-0 scale-95 duration-150' : 'opacity-100'}
-          ${!isClosing && isTriggered ? 'scale-105 shadow-sm' : ''}
-          ${!isClosing && !isTriggered ? 'scale-100 shadow-xs' : ''}
+          ${!isClosing && isTriggered ? 'shadow-sm' : 'shadow-xs'}
           ${isSuccess ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : ''}
           ${isError ? 'bg-amber-50 text-amber-800 border-amber-200' : ''}
           ${!isSuccess && !isError ? 'bg-white text-gray-700 border-gray-200' : ''}
@@ -117,11 +116,11 @@ export default function PullToRefreshIndicator({
         )}
 
         {!isRefreshing && !isSuccess && !isError && (
-          <>
+          <div className="inline-flex items-center gap-2">
             <svg
-              className="h-3.5 w-3.5 text-gray-500 transition-transform duration-150"
+              className="h-3.5 w-3.5 text-gray-500 transition-transform duration-200 ease-out"
               style={{
-                transform: `rotate(${isTriggered ? 180 : progress * 150}deg)`,
+                transform: `rotate(${isTriggered ? 180 : 0}deg)`,
               }}
               fill="none"
               viewBox="0 0 24 24"
@@ -130,8 +129,23 @@ export default function PullToRefreshIndicator({
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
             </svg>
-            <span>{isTriggered ? 'Release to refresh' : 'Pull to refresh'}</span>
-          </>
+            <span className="relative inline-block w-[104px] h-4 overflow-hidden whitespace-nowrap text-left">
+              <span
+                className={`absolute inset-0 flex items-center transition-all duration-200 ease-out ${
+                  isTriggered ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+                }`}
+              >
+                Pull to refresh
+              </span>
+              <span
+                className={`absolute inset-0 flex items-center transition-all duration-200 ease-out ${
+                  isTriggered ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
+                }`}
+              >
+                Release to refresh
+              </span>
+            </span>
+          </div>
         )}
       </div>
     </div>
