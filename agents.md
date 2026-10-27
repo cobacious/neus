@@ -157,7 +157,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - **Artifact Viewing in CLI (`agy`)**:
   - The developer operates exclusively in the `agy` CLI on macOS, not the Antigravity desktop IDE.
   - Standard markdown viewers outside the IDE cannot render ````carousel widgets, ````mermaid blocks or local absolute file paths.
-  - Whenever generating or editing an artifact containing carousels, mermaid diagrams or visual media, compile an interactive companion HTML file using `python3 scripts/compile_artifact.py <path-to-artifact.md>` and provide the clickable `file:///...html` link in the response so it can be opened instantly in the browser via Cmd+click or `open`.
+  - Whenever generating or editing an artifact containing carousels, mermaid diagrams or visual media, compile an interactive companion HTML file and provide the clickable `file:///...html` link in the response so it can be opened instantly in the browser via Cmd+click or `open`.
 - **Code Quality**:
   - Prefer modular, composable design.
   - Avoid overengineering: move fast, iterate incrementally.
