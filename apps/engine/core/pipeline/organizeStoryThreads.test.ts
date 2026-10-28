@@ -512,4 +512,70 @@ describe('organizeStoryThreads', () => {
     expect(mockSynthesizeCopy).not.toHaveBeenCalled();
     expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
   });
+
+  it('skips LLM copywriting when an existing story saga has unchanged cluster composition', async () => {
+    const existingStory = {
+      id: 'story-settled',
+      title: 'Settled Existing Story Title',
+      overview: 'Settled Existing Story Overview',
+      status: 'developing',
+      _count: { clusters: 2 },
+    };
+
+    (mockDb.getStoriesForMatching as jest.Mock).mockResolvedValue([existingStory]);
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      {
+        id: 'c1',
+        headline: 'Cluster 1',
+        summary: 'Summary 1',
+        storyId: 'story-settled',
+        storyAngle: 'Angle 1',
+        embedding: [1, 0],
+        createdAt: new Date(),
+      },
+      {
+        id: 'c2',
+        headline: 'Cluster 2',
+        summary: 'Summary 2',
+        storyId: 'story-settled',
+        storyAngle: 'Angle 2',
+        embedding: [1, 0],
+        createdAt: new Date(),
+      },
+    ]);
+
+    const mockDetectDuplicates = jest.fn().mockResolvedValue([]);
+    const mockDetectSagas = jest.fn().mockResolvedValue([
+      {
+        existingStoryId: 'story-settled',
+        clusterIds: ['c1', 'c2'],
+      },
+    ]);
+    const mockSynthesizeCopy = jest.fn();
+
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: mockDetectDuplicates as any,
+        detectStorySagas: mockDetectSagas as any,
+        synthesizeStoryCopy: mockSynthesizeCopy as any,
+      }
+    );
+
+    expect(mockDetectDuplicates).toHaveBeenCalledTimes(1);
+    expect(mockDetectSagas).toHaveBeenCalledTimes(1);
+    // Zero LLM copywriting calls because story already has copy and cluster composition is unchanged
+    expect(mockSynthesizeCopy).not.toHaveBeenCalled();
+    expect(mockDb.syncStoryWithThreads).toHaveBeenCalledWith(
+      expect.objectContaining({
+        existingStoryId: 'story-settled',
+        storyTitle: 'Settled Existing Story Title',
+        overview: 'Settled Existing Story Overview',
+        threads: [
+          { clusterId: 'c1', thread: 'Angle 1' },
+          { clusterId: 'c2', thread: 'Angle 2' },
+        ],
+      })
+    );
+  });
 });

@@ -260,22 +260,43 @@ export async function organizeStoryThreads(
           ? existingStories.find((s) => s.id === saga.existingStoryId)
           : null;
 
-        const clustersForCopy = sagaClusters.map((c) => ({
-          id: c.id,
-          headline: c.headline ?? null,
-          summary: c.summary ?? null,
-          date: new Date(c.createdAt).toISOString().split('T')[0],
-          articleCount: c._count?.articleAssignments ?? 0,
-        }));
+        // Skip expensive LLM copywriting if this is an established story whose cluster composition has not changed
+        const canReuseExistingCopy =
+          Boolean(existingStory && existingStory.title && existingStory.overview) &&
+          existingStory?._count?.clusters === sagaClusters.length &&
+          sagaClusters.every((c) => c.storyId === existingStory.id && Boolean(c.storyAngle));
 
         let copyResult: StoryCopyResult;
-        try {
-          copyResult = await synthesizeCopyFn(clustersForCopy, existingStory);
-        } catch (err: any) {
-          logger.error(
-            `[${PipelineStep.Organize}] Failed synthesizing story copy: ${err.message || err}`
+        if (canReuseExistingCopy && existingStory) {
+          logger.info(
+            `[${PipelineStep.Organize}] Reusing existing copy for settled story "${existingStory.title}" (${sagaClusters.length} threads). Skipping LLM copywriting.`
           );
-          continue;
+          copyResult = {
+            storyTitle: existingStory.title,
+            overview: existingStory.overview,
+            status: existingStory.status,
+            threads: sagaClusters.map((c) => ({
+              clusterId: c.id,
+              thread: c.storyAngle!,
+            })),
+          };
+        } else {
+          const clustersForCopy = sagaClusters.map((c) => ({
+            id: c.id,
+            headline: c.headline ?? null,
+            summary: c.summary ?? null,
+            date: new Date(c.createdAt).toISOString().split('T')[0],
+            articleCount: c._count?.articleAssignments ?? 0,
+          }));
+
+          try {
+            copyResult = await synthesizeCopyFn(clustersForCopy, existingStory);
+          } catch (err: any) {
+            logger.error(
+              `[${PipelineStep.Organize}] Failed synthesizing story copy: ${err.message || err}`
+            );
+            continue;
+          }
         }
 
         const survivingThreads = copyResult.threads.filter(
