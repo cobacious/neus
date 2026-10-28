@@ -304,6 +304,9 @@ export async function generateEmbedding(
 
         if (!res.ok) {
           const errorText = await res.text();
+          if (res.status === 402) {
+            throw new Error(`Gemini embedding API error (402): BILLING_DEPLETED - Your prepayment credits are depleted: ${errorText}`);
+          }
           throw new Error(`Gemini embedding API error (${res.status}): ${errorText}`);
         }
 
@@ -379,6 +382,9 @@ export async function generateEmbeddingsBatch(
 
           if (!res.ok) {
             const errorText = await res.text();
+            if (res.status === 402) {
+              throw new Error(`Gemini batch embedding API error (402): BILLING_DEPLETED - Your prepayment credits are depleted: ${errorText}`);
+            }
             throw new Error(`Gemini batch embedding API error (${res.status}): ${errorText}`);
           }
 

@@ -77,6 +77,11 @@ export async function embedNewArticles() {
         }
       }
     } catch (err: any) {
+      if (err.message?.includes('BILLING_DEPLETED') || err.message?.includes('402')) {
+        throw new Error(
+          `Google AI Studio prepayment credits depleted (HTTP 402). Top up credits at https://ai.studio/projects to resume embedding.`
+        );
+      }
       logger.error(
         `[${PipelineStep.Embed}] Batch embedding failed for ${batch.length} articles, falling back to individual:`,
         err.message || err
@@ -87,6 +92,11 @@ export async function embedNewArticles() {
           await updateArticleEmbedding(item.id, vector);
           embedded++;
         } catch (singleErr: any) {
+          if (singleErr.message?.includes('BILLING_DEPLETED') || singleErr.message?.includes('402')) {
+            throw new Error(
+              `Google AI Studio prepayment credits depleted (HTTP 402). Top up credits at https://ai.studio/projects to resume embedding.`
+            );
+          }
           logger.error(
             `[${PipelineStep.Embed}] Failed embedding for article ${item.id}:`,
             singleErr.message || singleErr
@@ -94,6 +104,12 @@ export async function embedNewArticles() {
         }
       }
     }
+  }
+
+  if (validArticles.length > 0 && embedded === 0) {
+    throw new Error(
+      `[${PipelineStep.Embed}] Failed to embed any of the ${validArticles.length} pending articles. Check AI provider status and API credentials.`
+    );
   }
 
   logPipelineSection(PipelineStep.Embed, `Successfully embedded ${embedded} articles`);
