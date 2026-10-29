@@ -5,8 +5,8 @@
   "dependencies": {
     "@graphql-yoga/plugin-disable-introspection": "^2.25.4",
     "@neus/db": "workspace:^",
-    "dotenv": "^16.5.0",
-    "graphql": "^16.8.1",
+    "dotenv": "^16.6.1",
+    "graphql": "^16.14.2",
     "graphql-yoga": "^5.24.4",
     "lru-cache": "^11.2.2",
     "nexus": "^1.3.0",
@@ -18,7 +18,7 @@
     "start": "node dist/index.js"
   },
   "devDependencies": {
-    "@types/node": "^22.10.1",
-    "typescript": "^5.3.3"
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
   }
 }

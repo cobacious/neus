@@ -13,7 +13,7 @@
     }
   },
   "dependencies": {
-    "@prisma/client": "^6.9.0",
+    "@prisma/client": "^6.19.0",
     "slugify": "^1.6.6"
   },
   "scripts": {
@@ -21,9 +21,9 @@
     "build": "tsc --project tsconfig.build.json"
   },
   "devDependencies": {
-    "@types/node": "^22.10.1",
-    "prisma": "^6.9.0",
-    "typescript": "^5.3.3"
+    "@types/node": "^22.20.5",
+    "prisma": "^6.19.0",
+    "typescript": "^5.9.3"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
