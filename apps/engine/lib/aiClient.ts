@@ -1,20 +1,10 @@
-import OpenAI from 'openai';
 import { logger, PipelineStep } from './pipelineLogger';
 import { recordAiUsage } from './aiUsage';
 
 const GEMINI_API_BASE_URL =
   process.env.GEMINI_API_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-export const openai =
-  OPENAI_API_KEY || process.env.NODE_ENV === 'test'
-    ? new OpenAI({
-        apiKey: OPENAI_API_KEY || 'mock-key',
-        baseURL: process.env.OPENAI_BASE_URL,
-      })
-    : null;
 
 let geminiDisabled = false;
 
@@ -35,17 +25,13 @@ export function resolveSummaryModel(): string {
     envModel === 'gpt-4o-mini' ||
     envModel === 'gemini-flash-latest'
   ) {
-    return isGeminiActive() ? 'gemini-flash-lite-latest' : 'gpt-4o-mini';
+    return 'gemini-flash-lite-latest';
   }
   return envModel;
 }
 
-export function resolveEmbeddingModel(provider?: 'gemini' | 'openai'): string {
-  const targetProvider = provider || (isGeminiActive() ? 'gemini' : 'openai');
-  if (targetProvider === 'gemini') {
-    return process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2';
-  }
-  return process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-large';
+export function resolveEmbeddingModel(): string {
+  return process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2';
 }
 
 export function cleanJsonResponse<T>(text: string): T {
@@ -83,8 +69,8 @@ export interface StructuredJsonRequest {
 }
 
 /**
- * Generates structured JSON using either Gemini or OpenAI, depending on configured environment keys.
- * Encapsulates provider endpoints, response format translation, retry backoff, and error logging.
+ * Generates structured JSON using Gemini.
+ * Encapsulates provider endpoints, response format translation, retry backoff and error logging.
  */
 export async function generateStructuredJson<T>(
   request: StructuredJsonRequest,
@@ -92,179 +78,139 @@ export async function generateStructuredJson<T>(
 ): Promise<T> {
   const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (geminiKey && !geminiDisabled) {
-    const model = request.model || resolveSummaryModel();
-    const url = `${GEMINI_API_BASE_URL}/models/${model}:generateContent?key=${geminiKey}`;
-
-    const generationConfig: Record<string, unknown> = {
-      responseMimeType: 'application/json',
-      temperature: request.temperature ?? 0.1,
-      maxOutputTokens: request.maxTokens ?? 16384,
-    };
-
-    // Models with thinking enabled by default (e.g. gemini-flash-latest or thinking variants)
-    // waste budget generating hidden reasoning tokens on structured JSON tasks.
-    // Models without thinking (such as flash-lite) reject thinkingConfig, so only set when appropriate.
-    if (model.includes('thinking') || model === 'gemini-flash-latest') {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: 0,
-      };
-    }
-
-    const body: Record<string, unknown> = {
-      contents: [{ parts: [{ text: request.prompt }] }],
-      generationConfig,
-    };
-
-    if (request.systemInstruction) {
-      body.systemInstruction = {
-        parts: [{ text: request.systemInstruction }],
-      };
-    }
-
-    if (request.schema) {
-      (body.generationConfig as any).responseSchema = request.schema;
-    }
-
-    try {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const startedAt = Date.now();
-        const usageStep = request.step || PipelineStep.Cluster;
-        let res: Response;
-        try {
-          res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-            signal: AbortSignal.timeout(90000),
-          });
-        } catch (fetchErr) {
-          recordAiUsage({
-            step: usageStep,
-            provider: 'gemini',
-            model,
-            operation: 'generate',
-            durationMs: Date.now() - startedAt,
-            failed: true,
-          });
-          throw fetchErr;
-        }
-
-        if (res.status === 429) {
-          if (res.body && typeof res.body.cancel === 'function') {
-            await res.body.cancel().catch(() => {});
-          }
-          recordAiUsage({
-            step: usageStep,
-            provider: 'gemini',
-            model,
-            operation: 'generate',
-            durationMs: Date.now() - startedAt,
-            failed: true,
-          });
-          const backoffMs = Math.pow(2, attempt) * 2000;
-          logger.warn(
-            `[${request.step || PipelineStep.Cluster}] Gemini rate limit (429) on attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
-          );
-          if (process.env.NODE_ENV !== 'test') {
-            await new Promise((r) => setTimeout(r, backoffMs));
-          }
-          continue;
-        }
-
-        if (!res.ok) {
-          recordAiUsage({
-            step: usageStep,
-            provider: 'gemini',
-            model,
-            operation: 'generate',
-            durationMs: Date.now() - startedAt,
-            failed: true,
-          });
-          const errorText = await res.text();
-          if (res.status === 402 || res.status === 401 || res.status === 403) {
-            geminiDisabled = true;
-            logger.warn(
-              `[${request.step || PipelineStep.Cluster}] Gemini API returned ${res.status}. Disabling Gemini for this run and falling back to OpenAI.`
-            );
-          }
-          throw new Error(`Gemini API error (${res.status}): ${errorText}`);
-        }
-
-        const data = (await res.json()) as any;
-        recordAiUsage({
-          step: usageStep,
-          provider: 'gemini',
-          model,
-          operation: 'generate',
-          durationMs: Date.now() - startedAt,
-          promptTokens: data.usageMetadata?.promptTokenCount,
-          outputTokens: data.usageMetadata?.candidatesTokenCount,
-          thoughtTokens: data.usageMetadata?.thoughtsTokenCount,
-        });
-        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!content) throw new Error('Gemini response missing text');
-
-        try {
-          return cleanJsonResponse<T>(content);
-        } catch (parseErr: any) {
-          logger.error(
-            `[${request.step || PipelineStep.Cluster}] JSON parse failed on text (length ${content.length}, finishReason: ${data.candidates?.[0]?.finishReason}): ${content.slice(0, 400)}`
-          );
-          throw parseErr;
-        }
-      }
-    } catch (geminiError: any) {
-      if (openai) {
-        logger.warn(
-          `[${request.step || PipelineStep.Cluster}] Gemini structured JSON failed (${geminiError.message || geminiError}), falling back to OpenAI...`
-        );
-      } else {
-        throw geminiError;
-      }
-    }
+  if (!geminiKey || geminiDisabled) {
+    throw new Error('GEMINI_API_KEY is required for structured JSON generation');
   }
 
-  if (openai) {
-    const model =
-      request.model && !request.model.startsWith('gemini')
-        ? request.model
-        : process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+  const model = request.model || resolveSummaryModel();
+  const url = `${GEMINI_API_BASE_URL}/models/${model}:generateContent?key=${geminiKey}`;
 
-    if (request.systemInstruction) {
-      messages.push({ role: 'system', content: request.systemInstruction });
+  const generationConfig: Record<string, unknown> = {
+    responseMimeType: 'application/json',
+    temperature: request.temperature ?? 0.1,
+    maxOutputTokens: request.maxTokens ?? 16384,
+  };
+
+  // Models with thinking enabled by default (such as gemini-flash-latest or thinking variants)
+  // waste budget generating hidden reasoning tokens on structured JSON tasks.
+  // Models without thinking (such as flash-lite) reject thinkingConfig, so only set when appropriate.
+  if (model.includes('thinking') || model === 'gemini-flash-latest') {
+    generationConfig.thinkingConfig = {
+      thinkingBudget: 0,
+    };
+  }
+
+  const body: Record<string, unknown> = {
+    contents: [{ parts: [{ text: request.prompt }] }],
+    generationConfig,
+  };
+
+  if (request.systemInstruction) {
+    body.systemInstruction = {
+      parts: [{ text: request.systemInstruction }],
+    };
+  }
+
+  if (request.schema) {
+    (body.generationConfig as any).responseSchema = request.schema;
+  }
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const startedAt = Date.now();
+    const usageStep = request.step || PipelineStep.Cluster;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(90000),
+      });
+    } catch (fetchErr) {
+      recordAiUsage({
+        step: usageStep,
+        provider: 'gemini',
+        model,
+        operation: 'generate',
+        durationMs: Date.now() - startedAt,
+        failed: true,
+      });
+      if (attempt === maxRetries) {
+        throw fetchErr;
+      }
+      continue;
     }
-    messages.push({ role: 'user', content: request.prompt });
 
-    const openaiStartedAt = Date.now();
-    const completion = await openai.chat.completions.create({
-      model,
-      messages,
-      response_format: { type: 'json_object' },
-      max_tokens: request.maxTokens ?? 4096,
-      temperature: request.temperature ?? 0.1,
-    });
+    if (res.status === 429) {
+      if (res.body && typeof res.body.cancel === 'function') {
+        await res.body.cancel().catch(() => {});
+      }
+      recordAiUsage({
+        step: usageStep,
+        provider: 'gemini',
+        model,
+        operation: 'generate',
+        durationMs: Date.now() - startedAt,
+        failed: true,
+      });
+      const backoffMs = Math.pow(2, attempt) * 2000;
+      logger.warn(
+        `[${request.step || PipelineStep.Cluster}] Gemini rate limit (429) on attempt ${attempt}/${maxRetries}. Backing off for ${backoffMs / 1000}s...`
+      );
+      if (process.env.NODE_ENV !== 'test') {
+        await new Promise((r) => setTimeout(r, backoffMs));
+      }
+      continue;
+    }
+
+    if (!res.ok) {
+      recordAiUsage({
+        step: usageStep,
+        provider: 'gemini',
+        model,
+        operation: 'generate',
+        durationMs: Date.now() - startedAt,
+        failed: true,
+      });
+      const errorText = await res.text();
+      if (res.status === 402 || res.status === 401 || res.status === 403) {
+        geminiDisabled = true;
+        logger.warn(
+          `[${request.step || PipelineStep.Cluster}] Gemini API returned ${res.status}. Disabling Gemini for this run.`
+        );
+      }
+      throw new Error(`Gemini API error (${res.status}): ${errorText}`);
+    }
+
+    const data = (await res.json()) as any;
     recordAiUsage({
-      step: request.step || PipelineStep.Cluster,
-      provider: 'openai',
+      step: usageStep,
+      provider: 'gemini',
       model,
       operation: 'generate',
-      durationMs: Date.now() - openaiStartedAt,
-      promptTokens: completion.usage?.prompt_tokens,
-      outputTokens: completion.usage?.completion_tokens,
+      durationMs: Date.now() - startedAt,
+      promptTokens: data.usageMetadata?.promptTokenCount,
+      outputTokens: data.usageMetadata?.candidatesTokenCount,
+      thoughtTokens: data.usageMetadata?.thoughtsTokenCount,
     });
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) throw new Error('Gemini response missing text');
 
-    const content = completion.choices[0].message.content;
-    if (!content) throw new Error('OpenAI returned empty response');
-    return cleanJsonResponse<T>(content);
+    try {
+      return cleanJsonResponse<T>(content);
+    } catch (parseErr: any) {
+      logger.error(
+        `[${request.step || PipelineStep.Cluster}] JSON parse failed on text (length ${content.length}, finishReason: ${data.candidates?.[0]?.finishReason}): ${content.slice(0, 400)}`
+      );
+      throw parseErr;
+    }
   }
 
-  throw new Error('No Gemini or OpenAI API key configured for structured JSON generation');
+  throw new Error(`Exhausted ${maxRetries} retries for Gemini structured JSON generation`);
 }
 
 /**
- * Generates an embedding vector using Gemini or OpenAI, depending on configured environment keys.
+ * Generates an embedding vector using Gemini.
  */
 export async function generateEmbedding(
   text: string,
@@ -273,7 +219,7 @@ export async function generateEmbedding(
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (geminiKey && !geminiDisabled) {
-    const model = resolveEmbeddingModel('gemini');
+    const model = resolveEmbeddingModel();
     const url = `${GEMINI_API_BASE_URL}/models/${model}:embedContent?key=${geminiKey}`;
 
     try {
@@ -330,7 +276,7 @@ export async function generateEmbedding(
 }
 
 /**
- * Generates embedding vectors in batches using Gemini batchEmbedContents or OpenAI embeddings.
+ * Generates embedding vectors in batches using Gemini batchEmbedContents.
  * Chunks inputs into batches of up to 100 texts to respect Gemini batch size limits.
  */
 export async function generateEmbeddingsBatch(
@@ -347,7 +293,7 @@ export async function generateEmbeddingsBatch(
     const geminiKey = process.env.GEMINI_API_KEY;
 
     if (geminiKey && !geminiDisabled) {
-      const model = resolveEmbeddingModel('gemini');
+      const model = resolveEmbeddingModel();
       const url = `${GEMINI_API_BASE_URL}/models/${model}:batchEmbedContents?key=${geminiKey}`;
 
       let succeeded = false;

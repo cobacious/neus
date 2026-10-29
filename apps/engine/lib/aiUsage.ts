@@ -4,7 +4,7 @@
  * (step, provider, model, operation) so we can see exactly where time and spend go.
  */
 
-export type AiProvider = 'gemini' | 'openai' | 'typesafe';
+export type AiProvider = 'gemini' | 'typesafe';
 export type AiOperation = 'generate' | 'embed' | 'judge';
 
 export interface AiUsageRecord {
@@ -44,7 +44,6 @@ export interface AiUsageTotals {
  *
  * NOTE: As of 16/10/2026: Check and update periodically against official provider pricing sheets:
  * - Google Cloud & AI Studio: https://ai.google.dev/pricing
- * - OpenAI Platform: https://openai.com/api/pricing/
  *
  * NOTE ON GEMINI CALIBRATION:
  * While Google AI Studio lists theoretical promotional rates of $0.075/1M input and $0.30/1M output
@@ -71,22 +70,6 @@ export const AI_MODEL_PRICING: Record<string, ModelPricing> = {
     inputPerMillion: 0.75,
     outputPerMillion: 3.75,
     notes: 'Conservative Google Cloud Billing pay-as-you-go rate for Flash generative calls',
-  },
-  // OpenAI Models (as of 16/10/2026)
-  'gpt-4o-mini': {
-    inputPerMillion: 0.15,
-    outputPerMillion: 0.60,
-    notes: 'OpenAI gpt-4o-mini standard tier',
-  },
-  'text-embedding-3-large': {
-    inputPerMillion: 0.13,
-    outputPerMillion: 0,
-    notes: 'OpenAI 3072-dimension embeddings',
-  },
-  'text-embedding-3-small': {
-    inputPerMillion: 0.02,
-    outputPerMillion: 0,
-    notes: 'OpenAI 1536-dimension embeddings',
   },
   // TypeSafe Models (as of 23/10/2026)
   'jev-latest': {
@@ -124,26 +107,6 @@ export function estimateCostUsd(
     }
     const rate = AI_MODEL_PRICING['gemini-flash-latest'];
     return (promptTokens * rate.inputPerMillion + totalOutput * rate.outputPerMillion) / 1_000_000;
-  }
-
-  if (provider === 'openai') {
-    if (model.includes('gpt-4o-mini')) {
-      const rate = AI_MODEL_PRICING['gpt-4o-mini'];
-      return (promptTokens * rate.inputPerMillion + totalOutput * rate.outputPerMillion) / 1_000_000;
-    }
-    if (model.includes('embedding-3-large')) {
-      const rate = AI_MODEL_PRICING['text-embedding-3-large'].inputPerMillion;
-      return (promptTokens * rate) / 1_000_000;
-    }
-    if (model.includes('embedding-3-small')) {
-      const rate = AI_MODEL_PRICING['text-embedding-3-small'].inputPerMillion;
-      return (promptTokens * rate) / 1_000_000;
-    }
-    const fallbackRate = AI_MODEL_PRICING['gpt-4o-mini'];
-    return (
-      (promptTokens * fallbackRate.inputPerMillion + totalOutput * fallbackRate.outputPerMillion) /
-      1_000_000
-    );
   }
 
   if (provider === 'typesafe') {
@@ -216,24 +179,21 @@ export function getAiUsageTotals(): AiUsageTotals[] {
 export function getTotalAiCostUsd(): {
   totalUsd: number;
   geminiUsd: number;
-  openaiUsd: number;
   typesafeUsd: number;
   totalGbpVat: number;
 } {
   let totalUsd = 0;
   let geminiUsd = 0;
-  let openaiUsd = 0;
   let typesafeUsd = 0;
 
   for (const t of totals.values()) {
     totalUsd += t.estimatedCostUsd;
     if (t.provider === 'gemini') geminiUsd += t.estimatedCostUsd;
-    if (t.provider === 'openai') openaiUsd += t.estimatedCostUsd;
     if (t.provider === 'typesafe') typesafeUsd += t.estimatedCostUsd;
   }
 
   const totalGbpVat = usdToGbpWithVat(totalUsd);
-  return { totalUsd, geminiUsd, openaiUsd, typesafeUsd, totalGbpVat };
+  return { totalUsd, geminiUsd, typesafeUsd, totalGbpVat };
 }
 
 /** One human readable line per bucket, suitable for the pipeline log. */

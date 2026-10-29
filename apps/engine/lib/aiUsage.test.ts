@@ -57,28 +57,28 @@ describe('aiUsage', () => {
     recordAiUsage({
       step: 'EMBED',
       provider: 'gemini',
-      model: 'text-embedding-004',
+      model: 'gemini-embedding-2',
       operation: 'embed',
       durationMs: 10,
       items: 50,
       promptTokens: 5000,
     });
     recordAiUsage({
-      step: 'EMBED',
-      provider: 'openai',
-      model: 'text-embedding-3-large',
-      operation: 'embed',
+      step: 'ORGANIZE',
+      provider: 'typesafe',
+      model: 'jev-latest',
+      operation: 'judge',
       durationMs: 20,
-      items: 5,
       promptTokens: 1000,
+      outputTokens: 0,
     });
 
     expect(getAiUsageTotals()).toHaveLength(2);
     const lines = formatAiUsageLines();
-    expect(lines[0]).toContain('[EMBED] gemini/text-embedding-004 embed calls=1');
+    expect(lines[0]).toContain('[EMBED] gemini/gemini-embedding-2 embed calls=1');
     expect(lines[0]).toContain('items=50');
     expect(lines[0]).toContain('estCost=$');
-    expect(lines[1]).toContain('openai/text-embedding-3-large');
+    expect(lines[1]).toContain('typesafe/jev-latest judge calls=1');
   });
 
   it('calculates total spend correctly across providers', () => {
@@ -92,15 +92,6 @@ describe('aiUsage', () => {
       outputTokens: 500,
     });
     recordAiUsage({
-      step: 'SUMMARIZE',
-      provider: 'openai',
-      model: 'gpt-4o-mini',
-      operation: 'generate',
-      durationMs: 300,
-      promptTokens: 5000,
-      outputTokens: 200,
-    });
-    recordAiUsage({
       step: 'ORGANIZE',
       provider: 'typesafe',
       model: 'jev-latest',
@@ -112,9 +103,8 @@ describe('aiUsage', () => {
 
     const cost = getTotalAiCostUsd();
     expect(cost.geminiUsd).toBeGreaterThan(0);
-    expect(cost.openaiUsd).toBeGreaterThan(0);
     expect(cost.typesafeUsd).toBeGreaterThan(0);
-    expect(cost.totalUsd).toBeCloseTo(cost.geminiUsd + cost.openaiUsd + cost.typesafeUsd, 6);
+    expect(cost.totalUsd).toBeCloseTo(cost.geminiUsd + cost.typesafeUsd, 6);
   });
 
   it('resets between runs', () => {

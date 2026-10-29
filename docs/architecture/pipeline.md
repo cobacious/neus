@@ -15,7 +15,7 @@ This creates a fundamental operational tension:
 - **Editorial Standard**: Articles must be accurately clustered by event, stories must present multi-perspective angles neutrally, headlines and summaries must be concise and balanced and low-quality or clickbait articles must not dominate.
 - **Economic Reality**: The operational budget is strictly constrained to **£5 to £10 per month** across all AI compute and cloud infrastructure.
 
-Every cloud API call (Gemini input/output tokens, text embeddings and OpenAI fallback requests) debits real money from a personal prepaid account. A single poorly designed loop or un-cached re-classification can deplete an entire month's budget in a few hours.
+Every cloud API call (Gemini input/output tokens, text embeddings and TypeSafe System One judgments) debits real money from a personal prepaid account. A single poorly designed loop or un-cached re-classification can deplete an entire month's budget in a few hours.
 
 > **The Golden Rule of Neus Engineering:**
 > **Deterministic computation first; LLM completion last.**
@@ -170,12 +170,11 @@ All LLM and embedding operations route through [`apps/engine/lib/aiClient.ts`](f
 
 ```mermaid
 flowchart LR
-    Caller["Pipeline Step"] --> Client["aiClient.ts"]
-    Client --> Primary{"Gemini API<br/>Configured & Active?"}
-    Primary -- Yes --> Gemini["Google Gemini API<br/>(gemini-flash-lite / embedding-2)"]
-    Primary -- No / Rate Limit / Error --> OpenAI["OpenAI API<br/>(gpt-4o-mini)"]
+    Caller["Pipeline Step"] --> Client["aiClient.ts / Jev"]
+    Client --> Gemini["Google Gemini API<br/>(gemini-flash-lite / embedding-2)"]
+    Client --> TypeSafe["TypeSafe System One<br/>(jev-latest)"]
     Gemini --> Usage["aiUsage.ts<br/>(Token & Cost Accounting)"]
-    OpenAI --> Usage
+    TypeSafe --> Usage
 ```
 
 ### Active Pricing Baseline (As of 16/10/2026)
@@ -183,16 +182,14 @@ flowchart LR
 > [!IMPORTANT]
 > **Pricing Verification**: As of 16/10/2026: Check and update periodically against official provider pricing sheets:
 > - [Google AI Developer Pricing](https://ai.google.dev/pricing)
-> - [OpenAI API Pricing](https://openai.com/api/pricing/)
 > - [Google Cloud Billing Console](https://console.cloud.google.com/billing)
 
 | Provider | Model | Operation | Input Rate (per 1M tokens) | Output Rate (per 1M tokens) | Role in Neus |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Gemini** | `gemini-embedding-2` | Embed | $0.20 | N/A | Article semantic vector representation |
 | **Gemini** | `gemini-flash-latest` | Generate | $0.75 | $3.75 | Conservative Google Cloud Billing rate for generative calls |
-| **OpenAI** | `gpt-4o-mini` | Generate | $0.15 | $0.60 | Defensive secondary fallback on Gemini outage |
-| **OpenAI** | `text-embedding-3-large` | Embed | $0.13 | N/A | Secondary embedding fallback |
-| **OpenAI** | `text-embedding-3-small` | Embed | $0.02 | N/A | Lightweight embedding fallback |
+| **TypeSafe** | `jev-latest` | Judge | $0.042 | $0.00 | System One editorial classification and deduplication |
+| **TypeSafe** | `jev-preview` | Judge | $0.042 | $0.00 | Preview System One model (free output tokens) |
 
 *Note: GBP conversions in pipeline logs apply a 20% UK VAT adjustment based on an approximate $1.30 per £1 exchange rate.*
 
@@ -203,7 +200,7 @@ While Google AI Studio lists promotional rates of $0.075/1M input and $0.30/1M o
 To ensure cost telemetry remains accurate over time:
 1. **Periodic Spot Checks**: Once a month or when modifying AI models, cross-reference the estimated spend in GitHub Actions pipeline summaries with the actual charges in the [Google Cloud Billing Console](https://console.cloud.google.com/billing).
 2. **Account for Aggregation Latency**: Google Cloud Billing reports have a 12 to 24 hour reporting lag. Prepaid credits are debited in real time, but itemized daily SKU charts only finalize after UTC midnight.
-3. **Updating Rates**: If Google or OpenAI updates pricing:
+3. **Updating Rates**: If Google or TypeSafe updates pricing:
    - Update `PRICING_LAST_VERIFIED` and `AI_MODEL_PRICING` in [`apps/engine/lib/aiUsage.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/lib/aiUsage.ts).
    - Update the rate table and "As of" date in this document.
    - Run `pnpm test aiUsage` to verify that calculations pass.

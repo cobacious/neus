@@ -7,7 +7,6 @@ let generateStructuredJson: typeof import('./aiClient').generateStructuredJson;
 let cleanJsonResponse: typeof import('./aiClient').cleanJsonResponse;
 let generateEmbedding: typeof import('./aiClient').generateEmbedding;
 let generateEmbeddingsBatch: typeof import('./aiClient').generateEmbeddingsBatch;
-let openai: typeof import('./aiClient').openai;
 let isGeminiActive: typeof import('./aiClient').isGeminiActive;
 let resetAiClientState: typeof import('./aiClient').resetAiClientState;
 
@@ -19,7 +18,6 @@ beforeAll(async () => {
     cleanJsonResponse,
     generateEmbedding,
     generateEmbeddingsBatch,
-    openai,
     isGeminiActive,
     resetAiClientState,
   } = await import('./aiClient'));
@@ -106,20 +104,16 @@ describe('aiClient', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('falls back to OpenAI when Gemini returns 402 and disables Gemini for subsequent calls', async () => {
+    it('throws error and disables Gemini when Gemini returns 402', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 402,
         text: async () => 'Your prepayment credits are depleted',
       });
 
-      const spy = jest.spyOn(openai!.chat.completions, 'create').mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ fallback: true }) } }],
-      } as any);
-
-      const res = await generateStructuredJson<{ fallback: boolean }>({ prompt: 'test' });
-      expect(res).toEqual({ fallback: true });
-      expect(spy).toHaveBeenCalled();
+      await expect(generateStructuredJson<{ fallback: boolean }>({ prompt: 'test' })).rejects.toThrow(
+        'Gemini API error (402)'
+      );
       expect(isGeminiActive()).toBe(false);
     });
   });
@@ -141,18 +135,15 @@ describe('aiClient', () => {
       expect(url).toContain('https://mock.gemini.api/v1beta/models/gemini-embedding-2:embedContent');
     });
 
-    it('throws error and does not fall back to OpenAI when Gemini embedding fails', async () => {
+    it('throws error when Gemini embedding fails', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 402,
         text: async () => 'Your prepayment credits are depleted',
       });
 
-      const spy = jest.spyOn(openai!.embeddings, 'create');
-
       await expect(generateEmbedding('first call')).rejects.toThrow('Gemini embedding API error (402)');
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(spy).not.toHaveBeenCalled();
     });
   });
 
@@ -188,19 +179,16 @@ describe('aiClient', () => {
       expect(body.requests[0].content.parts[0].text).toBe('first');
     });
 
-    it('throws error when Gemini batch fails and does not fall back to OpenAI', async () => {
+    it('throws error when Gemini batch fails', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
         text: async () => 'Gemini error',
       });
 
-      const spy = jest.spyOn(openai!.embeddings, 'create');
-
       await expect(generateEmbeddingsBatch(['first', 'second'])).rejects.toThrow(
         'Gemini batch embedding API error (500)'
       );
-      expect(spy).not.toHaveBeenCalled();
     });
   });
 });

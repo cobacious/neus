@@ -110,7 +110,7 @@ neus/
 - Node.js `>= 22.0.0`
 - pnpm `>= 10.0.0`
 - PostgreSQL (local instance or Neon database branch)
-- Google Gemini API key (or OpenAI API key)
+- Google Gemini API key and TypeSafe API key
 
 ### Getting Started
 
@@ -132,7 +132,7 @@ neus/
 3. **Configure Pipeline Engine**:
    ```bash
    cp apps/engine/.env.example apps/engine/.env
-   # Add your GEMINI_API_KEY (or OPENAI_API_KEY) and DATABASE_URL
+   # Add your GEMINI_API_KEY, TYPESAFE_API_KEY and DATABASE_URL
    ```
 
 4. **Run Services Locally**:
