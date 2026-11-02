@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import GitHubIcon from './GitHubIcon';
 import BlueskyIcon from './BlueskyIcon';
 import Logo from './Logo';
+import LastUpdated from './LastUpdated';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -68,7 +69,10 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-100 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-400 gap-2">
-          <p>© {currentYear} Neus. All rights reserved.</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p>© {currentYear} Neus. All rights reserved.</p>
+            <LastUpdated />
+          </div>
           <p>Public repository for transparency. Not licensed for redistribution.</p>
         </div>
       </div>

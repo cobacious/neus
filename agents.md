@@ -90,6 +90,10 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **About Page & Footer Navigation**: Created About page, hamburger drawer menu, persistent site footer, public-code licensing disclaimer and retired BetaBanner.
 - [x] **Story Angle Filtering & Navigation**: Interactive angle pills, mobile-friendly segmented filter tabs, URL synchronization (`?angle=<id>`), progressive disclosure (10 articles with expander) and newest-first chronological sorting.
 - [x] **Feed card thread pill linking & auto-scroll**: Replaced card `<Link>` with `<article>` stretched-link pattern, wired thread pills to `${storyUrl}?thread=${thread.id}#articles-coverage` and added auto-scrolling to the active thread section.
+- [x] **Surface pipeline "Last Updated" metadata**: Expose `pipelineStatus` in GraphQL, update `getLatestPipelineRunTime` across clusters, articles and active sources, and display a discreet relative timestamp string ("Updated 18m ago") in the persistent footer as a lightweight debugging aid.
+- [ ] **Sparkline touch optimisation & interactive linking**: Expand SVG touch targets to 44x44px hit areas on mobile, add active tactile state feedback and wire marker taps to jump directly to the matching thread or article anchor.
+- [ ] **Enhanced filtering on story view**: Expand `/story/[slug]` controls to group, sort and filter articles across multiple facets: outlet/publication, chronological date order and topic.
+- [ ] **Dark theme**: Implement system preference detection (`prefers-color-scheme`) and manual theme toggle in drawer with dark mode tokens for the 6-color editorial palette, cards, charts and contrast ratios.
 
 ### Track 2: Editorial Source Quality (`packages/db`)
 - [x] **Drop The Sun**: Deactivated in both local dev and production database sources and removed from active seed list.

@@ -19,6 +19,7 @@ import {
   getSources,
   createSource,
   updateSource,
+  getPipelineStatus,
 } from '@neus/db';
 import { getOrSetCache, clearQueryCache } from './cache';
 
@@ -116,6 +117,16 @@ const ArticleSummary = objectType({
   },
 });
 
+const PipelineStatus = objectType({
+  name: 'PipelineStatus',
+  definition(t) {
+    t.nonNull.float('lastRunAt');
+    t.nonNull.string('lastRunIso');
+    t.nonNull.int('activeClusters');
+    t.nonNull.int('totalArticles');
+  },
+});
+
 const Query = queryType({
   definition(t) {
     t.list.field('clusters', {
@@ -191,6 +202,12 @@ const Query = queryType({
         return getOrSetCache('sources', () => getSources());
       },
     });
+    t.nonNull.field('pipelineStatus', {
+      type: PipelineStatus,
+      resolve: async () => {
+        return getOrSetCache('pipelineStatus', () => getPipelineStatus());
+      },
+    });
   },
 });
 
@@ -236,6 +253,6 @@ const Mutation = mutationType({
 });
 
 export const schema = makeSchema({
-  types: [Query, Mutation, Cluster, ArticleSummary, Source, Story],
+  types: [Query, Mutation, Cluster, ArticleSummary, Source, Story, PipelineStatus],
   outputs: false,
 });

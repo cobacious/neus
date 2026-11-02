@@ -51,6 +51,7 @@ export * from './maintenance/cleanSpamClusters';
 export * from './maintenance/purgeDeactivatedSourceArticles';
 export * from './sources/syncSourceTrustScores';
 export * from './metrics/getDatabaseUsageMetrics';
+export * from './metrics/getPipelineStatus';
 export * from './articles/countUnclusteredArticles';
 export * from './articles/getRecentArticlesForPulse';
 export * from './clusters/getLatestPipelineRunTime';
