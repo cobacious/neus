@@ -135,10 +135,51 @@ export default function ClusterDetailPage() {
     }
   };
 
-  // Scroll to articles coverage section when arriving with an active thread filter or hash
+  const handleSelectArticle = (article: TimelineArticle) => {
+    // If multi-thread, ensure thread is active and expanded
+    if (article.threadId) {
+      if (selectedThreadId && selectedThreadId !== article.threadId) {
+        handleSelectThread(article.threadId, false);
+      }
+      setExpandedThreadIds((prev) => new Set(prev).add(article.threadId!));
+    }
+
+    setTimeout(() => {
+      const el = document.getElementById(`article-${article.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('highlight-pulse');
+        setTimeout(() => el.classList.remove('highlight-pulse'), 2000);
+      }
+    }, 60);
+  };
+
+  // Scroll to article or articles coverage section when arriving with an active thread filter or hash
   useEffect(() => {
     if (fetching || !cluster) return;
-    if (selectedThreadId || window.location.hash === '#articles-coverage') {
+
+    const hash = window.location.hash;
+    if (hash.startsWith('#article-')) {
+      const articleId = hash.slice('#article-'.length);
+      if (isMultiThreadStory && story?.clusters) {
+        const parentCluster = story.clusters.find((c: any) =>
+          (c.articles || []).some((a: any) => a.id === articleId)
+        );
+        if (parentCluster) {
+          setExpandedThreadIds((prev) => new Set(prev).add(parentCluster.id));
+        }
+      }
+
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`article-${articleId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('highlight-pulse');
+          setTimeout(() => el.classList.remove('highlight-pulse'), 2000);
+        }
+      }, 120);
+      return () => clearTimeout(timer);
+    } else if (selectedThreadId || hash === '#articles-coverage') {
       const timer = setTimeout(() => {
         const el = document.getElementById('articles-coverage');
         if (el) {
@@ -147,7 +188,7 @@ export default function ClusterDetailPage() {
       }, 80);
       return () => clearTimeout(timer);
     }
-  }, [fetching, cluster?.id, selectedThreadId]);
+  }, [fetching, cluster?.id, selectedThreadId, isMultiThreadStory, story?.clusters]);
 
   useEffect(() => {
     if (!headline) return;
@@ -460,6 +501,7 @@ export default function ClusterDetailPage() {
           colorMap={colorMap}
           fallbackFirstSeen={cluster.createdAt}
           fallbackLastUpdated={cluster.lastUpdatedAt}
+          onSelectArticle={handleSelectArticle}
         />
       </div>
 
@@ -544,7 +586,11 @@ export default function ClusterDetailPage() {
                   {/* Thread Articles List */}
                   <ul className="space-y-2 sm:space-y-2.5 mt-3">
                     {visibleArticles.map((article: any) => (
-                      <li key={article.id}>
+                      <li
+                        key={article.id}
+                        id={`article-${article.id}`}
+                        className="scroll-mt-24 transition-all"
+                      >
                         <a
                           href={article.url}
                           className="flex items-start gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-lg border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 transition-all group"
@@ -619,7 +665,11 @@ export default function ClusterDetailPage() {
                 </h4>
                 <ul className="space-y-2.5">
                   {standaloneArticlesByDate[date].map((article: any) => (
-                    <li key={article.id}>
+                    <li
+                      key={article.id}
+                      id={`article-${article.id}`}
+                      className="scroll-mt-24 transition-all"
+                    >
                       <a
                         href={article.url}
                         className="flex items-start gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all group"

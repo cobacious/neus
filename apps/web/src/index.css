@@ -7,3 +7,23 @@
     scrollbar-gutter: stable;
   }
 }
+
+@keyframes highlight-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(221, 110, 66, 0.45);
+    border-color: #DD6E42;
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(79, 109, 122, 0.35);
+    border-color: #4F6D7A;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(221, 110, 66, 0);
+  }
+}
+
+.highlight-pulse {
+  animation: highlight-pulse 2s ease-in-out;
+  border-radius: 0.5rem;
+}
+
