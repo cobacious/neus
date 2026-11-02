@@ -77,72 +77,9 @@ All backend pipeline logic lives primarily in `apps/engine` with database helper
 
 ## Active Backlog & Workstreams
 
-When starting a session or subagent, select from these decoupled tracks:
+Roadmap priorities, active workstream tracks and task checklists are canonically tracked in [`docs/roadmap/ROADMAP.md`](file:///Users/jwalton/Code/cobacious/neus/docs/roadmap/ROADMAP.md).
 
-### Track 1: Frontend UI Polish (`apps/web`)
-- [x] **"Invalid date" display bug**: Fix instances where "Invalid date" renders instead of formatted dates.
-- [x] **Sparkline endpoints**: Ensure sparklines visually anchor dots at both ends (first seen and latest updated) rather than floating.
-- [x] **Sparkline tooltip collision**: Prevent tooltips on closely clustered timeline markers from bunching or overlapping.
-- [x] **"Breaking" status decay**: Review criteria so stories active for multiple days transition appropriately to "Developing".
-- [x] **Histogram adaptive bucketing**: Dynamic binning (15m/30m/1h/2h/1d) so breaking news stories distribute chronologically.
-- [x] **Angle summary truncation**: Remove 2-line truncation (`line-clamp-2`) on angle summaries in cluster detail view so the full summary is visible.
-- [x] **Card footer layout & source wrap**: Reorder card footer with source logos first, `justify-between` article count and 8-icon limit.
-- [x] **About Page & Footer Navigation**: Created About page, hamburger drawer menu, persistent site footer, public-code licensing disclaimer and retired BetaBanner.
-- [x] **Story Angle Filtering & Navigation**: Interactive angle pills, mobile-friendly segmented filter tabs, URL synchronization (`?angle=<id>`), progressive disclosure (10 articles with expander) and newest-first chronological sorting.
-- [x] **Feed card thread pill linking & auto-scroll**: Replaced card `<Link>` with `<article>` stretched-link pattern, wired thread pills to `${storyUrl}?thread=${thread.id}#articles-coverage` and added auto-scrolling to the active thread section.
-- [x] **Surface pipeline "Last Updated" metadata**: Expose `pipelineStatus` in GraphQL, update `getLatestPipelineRunTime` across clusters, articles and active sources, and display a discreet relative timestamp string ("Updated 18m ago") in the persistent footer as a lightweight debugging aid.
-- [ ] **Sparkline touch optimisation & interactive linking**: Expand SVG touch targets to 44x44px hit areas on mobile, add active tactile state feedback and wire marker taps to jump directly to the matching thread or article anchor.
-- [ ] **Enhanced filtering on story view**: Expand `/story/[slug]` controls to group, sort and filter articles across multiple facets: outlet/publication, chronological date order and topic.
-- [ ] **Dark theme**: Implement system preference detection (`prefers-color-scheme`) and manual theme toggle in drawer with dark mode tokens for the 6-color editorial palette, cards, charts and contrast ratios.
-
-### Track 2: Editorial Source Quality (`packages/db`)
-- [x] **Drop The Sun**: Deactivated in both local dev and production database sources and removed from active seed list.
-- [x] **Drop Daily Express**: Deactivated due to low editorial quality and high-frequency clickbait headline spam; removed from active seed list.
-- [x] **Google Favicon CDN migration**: Migrated `Source.faviconUrl` from `icon.horse` to Google's public Favicon CDN with defensive `<SourceFavicon>` fallback.
-
-### Track 3: Ranking & Taxonomy Analysis (`apps/engine`, `packages/db`)
-- [x] **Feed ranking & sorting**: Implemented consensus recency to defeat single-source recency hijacking, enforced multi-source cluster gating (`uniqueSources >= 2`), activated canonical source trust scores, archived 292 legacy single-source/deactivated spam clusters and re-scored all active clusters with zero LLM API cost. (See [`docs/handoffs/ranking-algorithm-review.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/ranking-algorithm-review.md)).
-- [ ] **French Protests angle alignment**: Investigate article-to-angle assignments for the French education protests story. (See handoff in [`docs/handoffs/french-protests-angle-grouping.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/french-protests-angle-grouping.md)).
-
-### Track 4: Pipeline Performance & Cost Optimization (`apps/engine`, `packages/db`)
-- [x] **Content extraction failure loop**: Stop retrying failed article URL fetches in `fillMissingContent.ts` by marking failed extractions and cap/parallelize fetches.
-- [x] **Paywalled feed skip**: Mark paywalled feeds with a `paywalled: true` flag on `Source` so the extractor never attempts HTTP scraping.
-- [x] **Unclustered lookback window**: Shorten lookback window in `getUnclusteredArticles.ts` from 7 days to 3 days to prevent $O(N^2)$ quadratic slowdown.
-- [x] **Article extractor DOMException fix**: Dropped `exclusiveFilter` function in `setSanitizeHtmlOptions` which threw `DataCloneError` under structured clone.
-- [x] **Batch embeddings & parallel summaries**: Gemini `batchEmbedContents` (up to 100 per call) and `mapConcurrent(clusters, 3)` for summaries.
-- [x] **Settled neighborhood skip**: Skip inactive candidate neighborhoods (< 48h) in `organizeStoryAngles.ts` before calling Gemini.
-- [x] **Article angle classification pre-filtering**: Use in-memory vector cosine similarity and incremental preservation to resolve article angles with minimal LLM calls.
-- [x] **TypeSafe System One editorial decision engine**: Integrated Jev `1.14.0` for cluster deduplication (`Noul`), story saga formation (`Noul`) and article-to-thread classification (`Choice`), reducing organize step costs by ~90% and latency to ~58ms with zero Gemini decision fallbacks.
-- [x] **Pulse Sentinel continuous ingestion & tri-trigger policy**: Built continuous zero-cost RSS feed watcher in [`apps/api/pulse.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/api/pulse.ts) and [`packages/db`](file:///Users/jwalton/Code/cobacious/neus/packages/db) with breaking surge, batch accumulation and heartbeat staleness policies; currently shadow testing in preview sandbox. (See [`docs/handoffs/pulse-sentinel-architecture.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/pulse-sentinel-architecture.md)).
-
-### Track 5: CI/CD & Testing Automation (`.github/workflows`)
-- [x] **PR test & build gating CI**: Created GitHub Actions CI workflow in [`.github/workflows/ci.yml`](file:///Users/jwalton/Code/cobacious/neus/.github/workflows/ci.yml) that runs dependency caching, Prisma generation, `pnpm build` and `pnpm test` on pull requests and main pushes.
-
-### Track 6: Admin Editorial & Cluster Management (`apps/admin`, `apps/api`)
-- [ ] **Cluster browser and search**: List, filter and search active clusters across environments.
-- [ ] **Cluster merge and story grouping**: Support merging duplicate clusters and grouping related clusters into story umbrellas with distinct angles. (See handoff in [`docs/handoffs/admin-cluster-management.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/admin-cluster-management.md)).
-- [x] **Yorkshire tiger incident consolidation**: Consolidated under single story umbrella "Fatal Tiger Enclosure Incident at Yorkshire Wildlife Park and Aftermath" with 3 distinct multi-source angles. (See handoff in [`docs/handoffs/yorkshire-tiger-story-merge.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/yorkshire-tiger-story-merge.md)).
-
-### Track 7: Syndication, SEO and Soft Launch Distribution (`apps/web`, `apps/engine`)
-- [x] **Outbound RSS feed**: Created `/feed.xml` and `/rss.xml` with Atom namespace, story-angle grouping, RFC 822 pubDate and autodiscovery in `index.html`.
-- [x] **Dynamic sitemap & robots.txt**: Implemented `/sitemap.xml` conforming to Sitemap 0.9 protocol and `robots.txt` for search crawler indexing.
-- [x] **Weekly Substack markdown draft generator**: Built CLI tool (`pnpm substack:draft`) in [`apps/engine/lib/generateWeeklyDigest.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/lib/generateWeeklyDigest.ts) that synthesises top multi-angle stories and source breakdowns for zero-slop newsletters.
-
-### Track 8: Progressive Web App (`apps/web`)
-- [x] **Web App Manifest**: Create standalone manifest with Neus palette branding (`#4F6D7A` Blue Slate), theme color, start URL and icons.
-- [x] **Service Worker & Offline Fallback**: Pre-cache static assets and establish offline reading caching strategy for previously loaded stories.
-- [x] **iOS & Mobile Meta Integration**: Add apple-touch-icon, mobile web app viewport meta tags and install affordance in drawer navigation.
-
-### Track 9: Topic Taxonomy & Categorisation (`apps/engine`, `packages/db`, `apps/web`)
-- [ ] **TypeSafe Jev Topic Classification**: Calibrated `Choice` judgment on clusters during summarization across core verticals (UK Politics, World, Economy, Tech & Science, Environment, Culture & Society and Sport) at ~$0.000005 per cluster.
-- [ ] **Topic Schema & API Exposure**: Add additive `topic` field to `Cluster` and `Story` in `@neus/db` with `@@index([topic, score])` and expose in GraphQL `feed(topic: String)`.
-- [ ] **Frontend Topic Navigation**: Horizontal topic filter tabs on homepage feed, URL routing (`/?topic=<slug>`) and topic badges on cards.
-
-### Track 10: Search & Information Retrieval (`packages/db`, `apps/api`, `apps/web`)
-- [ ] **PostgreSQL Full-Text Search**: Native GIN `tsvector` index across stories and clusters in Neon DB with zero external infrastructure cost.
-- [ ] **GraphQL Search Endpoint**: Expose `searchStories(query: String!, limit: Int)` returning matching stories, thread breakdowns and relevance ranks.
-- [ ] **TypeSafe Semantic Reranking (Phase 2)**: Rerank top 20 candidate search results with Jev `Score` / `Choice` for entity-level search accuracy.
-- [ ] **Frontend Search UX**: Header search bar or `⌘K` modal with instant debounced querying and keyboard navigation.
+Always consult [`docs/roadmap/ROADMAP.md`](file:///Users/jwalton/Code/cobacious/neus/docs/roadmap/ROADMAP.md) and [`docs/prds/`](file:///Users/jwalton/Code/cobacious/neus/docs/prds) before selecting or beginning work on any track.
 
 ---
 
