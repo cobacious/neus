@@ -3,7 +3,7 @@
 This document serves as the canonical, living roadmap for Neus. It tracks the prioritized delivery sequence, functional workstream tracks and links to detailed Product Requirement Documents (PRDs) stored in [`docs/prds/`](file:///Users/jwalton/Code/cobacious/neus/docs/prds).
 
 - **Last Updated**: 2 November 2026
-- **Current Active Focus**: [`PRD-002`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-and-linking.md) (Sparkline Touch Ergonomics & Deep Linking)
+- **Current Active Focus**: [`PRD-002`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-scrubber.md) (Sparkline Touch Scrubber & Latched Tooltip Deep Linking)
 
 ---
 
@@ -26,7 +26,7 @@ Items are ranked in execution order based on reader trust impact, mobile usabili
 | Rank | Identifier | Title | Target Scope | Effort | Status | Canonical PRD |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **P1** | `PRD-001` | **Pipeline Freshness & Last Updated Metadata** | `apps/api`, `apps/web` | Small (~1h) | Completed | [`PRD-001-pipeline-freshness-metadata.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-001-pipeline-freshness-metadata.md) |
-| **P2** | `PRD-002` | **Sparkline Touch Ergonomics & Deep Linking** | `apps/web` | Small to Medium | Ready for Dev | [`PRD-002-sparkline-touch-and-linking.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-and-linking.md) |
+| **P2** | `PRD-002` | **Sparkline Touch Scrubber & Latched Tooltip Deep Linking** | `apps/web` | Medium (~3-4h) | Ready for Dev | [`PRD-002-sparkline-touch-scrubber.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-scrubber.md) |
 | **P3** | `PRD-003` | **Topic Taxonomy & Verticals (TypeSafe Jev)** | `apps/engine`, `packages/db`, `apps/web` | Medium | In Discovery | [`PRD-003-topic-taxonomy-and-verticals.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md) |
 | **P4** | `PRD-004` | **Faceted Story View Filtering (Outlet, Date & Topic)** | `apps/web` | Medium | Backlog | [`PRD-004-story-view-faceted-filtering.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-004-story-view-faceted-filtering.md) |
 | **P5** | `PRD-005` | **Native PostgreSQL Full-Text Search** | `packages/db`, `apps/api`, `apps/web` | Medium | Backlog | [`PRD-005-postgresql-full-text-search.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-005-postgresql-full-text-search.md) |
@@ -52,7 +52,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Story Angle Filtering & Navigation**: Interactive angle pills, mobile-friendly segmented filter tabs, URL synchronization (`?angle=<id>`), progressive disclosure (10 articles with expander) and newest-first chronological sorting.
 - [x] **Feed card thread pill linking & auto-scroll**: Replaced card `<Link>` with `<article>` stretched-link pattern, wired thread pills to `${storyUrl}?thread=${thread.id}#articles-coverage` and added auto-scrolling to the active thread section.
 - [x] **Surface pipeline "Last Updated" metadata** ([`PRD-001`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-001-pipeline-freshness-metadata.md)): Expose `pipelineStatus` in GraphQL, update `getLatestPipelineRunTime` across clusters, articles and active sources and display a discreet relative timestamp string ("Updated 18m ago") via `<LastUpdated />` in the persistent footer.
-- [ ] **Sparkline touch optimisation & interactive linking** ([`PRD-002`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-and-linking.md)): Expand SVG touch targets to 44x44px hit areas on mobile, add active tactile state feedback and wire marker taps to jump directly to the matching thread or article anchor.
+- [ ] **Sparkline touch scrubber & latched tooltip deep linking** ([`PRD-002`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-scrubber.md)): Unified Pointer Event scrub track (44px), cluster-aware drag resolution and latched tooltip deep linking to article anchors.
 - [ ] **Enhanced filtering on story view** ([`PRD-004`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-004-story-view-faceted-filtering.md)): Expand `/story/[slug]` controls to group, sort and filter articles across multiple facets: outlet/publication, chronological date order and topic.
 - [ ] **Dark theme** ([`PRD-006`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-006-dark-theme-system.md)): Implement system preference detection (`prefers-color-scheme`) and manual theme toggle in drawer with dark mode tokens for the 6-color editorial palette, cards, charts and contrast ratios.
 
