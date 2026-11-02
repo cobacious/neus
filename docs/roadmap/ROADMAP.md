@@ -2,6 +2,9 @@
 
 This document serves as the canonical, living roadmap for Neus. It tracks the prioritized delivery sequence, functional workstream tracks and links to detailed Product Requirement Documents (PRDs) stored in [`docs/prds/`](file:///Users/jwalton/Code/cobacious/neus/docs/prds).
 
+- **Last Updated**: 2 November 2026
+- **Current Active Focus**: [`PRD-002`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-and-linking.md) (Sparkline Touch Ergonomics & Deep Linking)
+
 ---
 
 ## Operating Framework: Roadmap-as-Code
@@ -53,3 +56,9 @@ Items are ranked in execution order based on reader trust impact, mobile usabili
 
 ### Track 4: Operations & Administration (`apps/admin`, `apps/api`)
 - [ ] `PRD-007`: Cluster browser, search and manual angle merge interface.
+
+---
+
+## Completed Milestones
+
+- **2026-11-02**: [`PRD-001`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-001-pipeline-freshness-metadata.md) (Pipeline Freshness & Last Updated Metadata): Expose `pipelineStatus` in GraphQL, calculate composite latest run timestamp across clusters, articles and active sources in `@neus/db` and render subtle `<LastUpdated />` indicator in the persistent footer.
