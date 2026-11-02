@@ -271,6 +271,15 @@ describe('ArticleTimelineSparkline sparklineStateReducer', () => {
     expect(s2).toEqual({ mode: 'idle', activeIndex: null });
   });
 
+  it('latches activeIndex directly on LATCH action from hovering or idle', () => {
+    const s1 = sparklineStateReducer(initialState, { type: 'LATCH', index: 2 });
+    expect(s1).toEqual({ mode: 'latched', activeIndex: 2 });
+
+    const hoveringState: SparklineState = { mode: 'hovering', activeIndex: 3 };
+    const s2 = sparklineStateReducer(hoveringState, { type: 'LATCH', index: 5 });
+    expect(s2).toEqual({ mode: 'latched', activeIndex: 5 });
+  });
+
   it('ignores HOVER_ENTER if already scrubbing or latched', () => {
     const scrubbingState: SparklineState = { mode: 'scrubbing', activeIndex: 2 };
     expect(sparklineStateReducer(scrubbingState, { type: 'HOVER_ENTER', index: 5 })).toEqual(

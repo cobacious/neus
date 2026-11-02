@@ -53,6 +53,7 @@ export type SparklineAction =
   | { type: 'SCRUB_START'; index: number }
   | { type: 'SCRUB_MOVE'; index: number }
   | { type: 'SCRUB_END' }
+  | { type: 'LATCH'; index: number }
   | { type: 'STEP'; delta: number; maxIndex: number }
   | { type: 'KEY_NAV'; delta: number; maxIndex: number }
   | { type: 'DISMISS' };
@@ -90,6 +91,8 @@ export function sparklineStateReducer(
     case 'SCRUB_END':
       if (state.mode !== 'scrubbing') return state;
       return { mode: 'latched', activeIndex: state.activeIndex };
+    case 'LATCH':
+      return { mode: 'latched', activeIndex: action.index };
     case 'STEP': {
       if (state.activeIndex === null) return state;
       const nextIndex = Math.max(0, Math.min(action.maxIndex, state.activeIndex + action.delta));
@@ -445,10 +448,10 @@ export default function ArticleTimelineSparkline({
       }
       dispatch({ type: 'SCRUB_START', index });
     } else {
-      // Desktop mouse click: resolve nearest physical marker
+      // Desktop mouse click: resolve nearest physical marker and latch
       const index = resolveNearestMarkerIndex(e.clientX, cachedRectRef.current, markers);
       if (index !== null) {
-        dispatch({ type: 'HOVER_ENTER', index });
+        dispatch({ type: 'LATCH', index });
       }
     }
   };
@@ -639,11 +642,8 @@ export default function ArticleTimelineSparkline({
                   e.stopPropagation();
                   if (state.mode === 'latched' && state.activeIndex === index) {
                     handleArticleNavigate(marker.article);
-                  } else if (state.mode === 'hovering' || e.nativeEvent instanceof MouseEvent) {
-                    handleArticleNavigate(marker.article);
                   } else {
-                    dispatch({ type: 'SCRUB_START', index });
-                    dispatch({ type: 'SCRUB_END' });
+                    dispatch({ type: 'LATCH', index });
                   }
                 }}
                 onPointerEnter={(e) => {
@@ -839,7 +839,7 @@ export default function ArticleTimelineSparkline({
           {/* Latched Hint Footer */}
           {state.mode === 'latched' && (
             <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-gray-400">
-              <span className="font-sans">Tap card to jump to article</span>
+              <span className="font-sans">Click or tap card to jump to article</span>
               <span className="text-slate-300 font-semibold flex items-center gap-0.5">
                 <span>Open</span>
                 <span aria-hidden="true">↗</span>
