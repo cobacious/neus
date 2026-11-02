@@ -108,11 +108,42 @@ export function sparklineStateReducer(
 }
 
 /**
+ * Resolves the marker whose physical position along the track is closest to clientX.
+ * Used for high-precision desktop mouse hover so hovering over or near a dot always
+ * selects that specific marker without any virtual displacement.
+ */
+export function resolveNearestMarkerIndex(
+  clientX: number,
+  rect: { left: number; width: number },
+  markers: TimelineMarker[]
+): number | null {
+  if (!markers || markers.length === 0) return null;
+  if (markers.length === 1) return 0;
+  const W = rect.width;
+  if (W <= 0) return 0;
+
+  const pX = Math.max(0, Math.min(W, clientX - rect.left));
+  let closestIndex = 0;
+  let minDistance = Infinity;
+
+  for (let i = 0; i < markers.length; i++) {
+    const physX = (markers[i].pct / 100) * W;
+    const dist = Math.abs(physX - pX);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestIndex = i;
+    }
+  }
+
+  return closestIndex;
+}
+
+/**
  * Cluster-aware scrub resolution:
  * Resolves the marker index corresponding to clientX within rect.
- * For overlapping or densely clustered markers, iterative relaxation guarantees
- * a minimum hit target separation (minSpacing) so thumb movement cleanly isolates
- * each marker without adjacent dots being skipped.
+ * Preserves solitary markers at their exact physical positions while expanding
+ * tight clusters (where adjacent markers have gap < 12px) so touch scrubbing with
+ * a thumb cleanly isolates each overlapping marker in chronological order.
  */
 export function resolveScrubIndex(
   clientX: number,
@@ -125,48 +156,61 @@ export function resolveScrubIndex(
   const W = rect.width;
   if (W <= 0) return 0;
 
-  const minSpacing = Math.min(12, W / N);
   const rawCenters = markers.map((m) => (m.pct / 100) * W);
-  const centers = [...rawCenters];
-
-  // Iterative relaxation to guarantee minimum virtual separation between markers
-  for (let iter = 0; iter < 20; iter++) {
-    let adjusted = false;
-    for (let i = 0; i < N - 1; i++) {
-      const gap = centers[i + 1] - centers[i];
-      if (gap < minSpacing) {
-        adjusted = true;
-        const deficit = (minSpacing - gap) / 2;
-        centers[i] -= deficit;
-        centers[i + 1] += deficit;
-      }
-    }
-    if (centers[0] < 0) {
-      const shift = -centers[0];
-      for (let i = 0; i < N; i++) centers[i] += shift;
-    }
-    if (centers[N - 1] > W) {
-      const shift = centers[N - 1] - W;
-      for (let i = 0; i < N; i++) centers[i] -= shift;
-    }
-    if (!adjusted) break;
-  }
-
   const pX = Math.max(0, Math.min(W, clientX - rect.left));
 
-  // Determine virtual boundaries between adjacent markers
-  const boundaries: number[] = [0];
-  for (let i = 1; i < N; i++) {
-    boundaries.push((centers[i - 1] + centers[i]) / 2);
-  }
-  boundaries.push(W);
+  // Identify clusters where adjacent markers have physical distance < 12px
+  const clusters: number[][] = [];
+  let currentCluster: number[] = [0];
 
-  for (let i = 0; i < N; i++) {
-    if (pX >= boundaries[i] && pX <= boundaries[i + 1]) {
-      return i;
+  for (let i = 1; i < N; i++) {
+    if (rawCenters[i] - rawCenters[i - 1] < 12) {
+      currentCluster.push(i);
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [i];
     }
   }
-  return N - 1;
+  clusters.push(currentCluster);
+
+  // Compute virtual centers
+  const virtualCenters = new Array<number>(N);
+
+  for (let c = 0; c < clusters.length; c++) {
+    const indices = clusters[c];
+    if (indices.length === 1) {
+      virtualCenters[indices[0]] = rawCenters[indices[0]];
+    } else {
+      const K = indices.length;
+      const prevX = c > 0 ? rawCenters[clusters[c - 1][clusters[c - 1].length - 1]] : 0;
+      const nextX = c < clusters.length - 1 ? rawCenters[clusters[c + 1][0]] : W;
+
+      const availableSpace = Math.max(1, nextX - prevX);
+      const spacing = Math.min(14, availableSpace / (K + 1));
+      const meanX = indices.reduce((sum, idx) => sum + rawCenters[idx], 0) / K;
+      const clusterSpan = (K - 1) * spacing;
+      let startX = meanX - clusterSpan / 2;
+
+      if (startX < prevX + spacing / 2) startX = prevX + spacing / 2;
+      if (startX + clusterSpan > nextX - spacing / 2) startX = nextX - spacing / 2 - clusterSpan;
+
+      for (let k = 0; k < K; k++) {
+        virtualCenters[indices[k]] = startX + k * spacing;
+      }
+    }
+  }
+
+  // Find nearest virtual center to pX
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < N; i++) {
+    const dist = Math.abs(virtualCenters[i] - pX);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
 }
 
 /**
@@ -391,10 +435,9 @@ export default function ArticleTimelineSparkline({
     const rect = track.getBoundingClientRect();
     cachedRectRef.current = { left: rect.left, width: rect.width };
 
-    const index = resolveScrubIndex(e.clientX, cachedRectRef.current, markers);
-    if (index === null) return;
-
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      const index = resolveScrubIndex(e.clientX, cachedRectRef.current, markers);
+      if (index === null) return;
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -402,7 +445,11 @@ export default function ArticleTimelineSparkline({
       }
       dispatch({ type: 'SCRUB_START', index });
     } else {
-      dispatch({ type: 'HOVER_ENTER', index });
+      // Desktop mouse click: resolve nearest physical marker
+      const index = resolveNearestMarkerIndex(e.clientX, cachedRectRef.current, markers);
+      if (index !== null) {
+        dispatch({ type: 'HOVER_ENTER', index });
+      }
     }
   };
 
@@ -429,7 +476,8 @@ export default function ArticleTimelineSparkline({
       }
       const rect = trackRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const index = resolveScrubIndex(e.clientX, rect, markers);
+      // On desktop, find physically closest marker to the cursor along the rail
+      const index = resolveNearestMarkerIndex(e.clientX, rect, markers);
       if (index !== null) {
         dispatch({ type: 'HOVER_ENTER', index });
       }
@@ -591,6 +639,8 @@ export default function ArticleTimelineSparkline({
                   e.stopPropagation();
                   if (state.mode === 'latched' && state.activeIndex === index) {
                     handleArticleNavigate(marker.article);
+                  } else if (state.mode === 'hovering' || e.nativeEvent instanceof MouseEvent) {
+                    handleArticleNavigate(marker.article);
                   } else {
                     dispatch({ type: 'SCRUB_START', index });
                     dispatch({ type: 'SCRUB_END' });
@@ -598,11 +648,20 @@ export default function ArticleTimelineSparkline({
                 }}
                 onPointerEnter={(e) => {
                   if (e.pointerType === 'mouse') {
+                    e.stopPropagation();
                     if (leaveTimeoutRef.current) {
                       clearTimeout(leaveTimeoutRef.current);
                       leaveTimeoutRef.current = null;
                     }
                     dispatch({ type: 'HOVER_ENTER', index });
+                  }
+                }}
+                onPointerMove={(e) => {
+                  if (e.pointerType === 'mouse') {
+                    e.stopPropagation();
+                    if (state.activeIndex !== index && state.mode !== 'latched') {
+                      dispatch({ type: 'HOVER_ENTER', index });
+                    }
                   }
                 }}
                 aria-label={`${marker.article.title || 'Article'} (${formatRelativeTime(marker.time)})`}

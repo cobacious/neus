@@ -1,5 +1,6 @@
 import {
   buildTimelineMarkers,
+  resolveNearestMarkerIndex,
   resolveScrubIndex,
   buildArticleDeepLinkUrl,
   sparklineStateReducer,
@@ -79,6 +80,61 @@ describe('ArticleTimelineSparkline buildTimelineMarkers', () => {
     expect(layout?.markers).toHaveLength(1);
     expect(layout?.firstSeenLabel).not.toBe('N/A');
     expect(layout?.firstSeenLabel).not.toContain('Invalid');
+  });
+});
+
+describe('ArticleTimelineSparkline resolveNearestMarkerIndex (Desktop Mouse Hover)', () => {
+  const dummyArticle: TimelineArticle = { id: 'art-1', title: 'Test article' };
+  const createMarker = (id: string, pct: number): TimelineMarker => ({
+    id,
+    pct,
+    color: '#4F6D7A',
+    threadStyle: DEFAULT_THREAD_COLOR,
+    time: Date.now(),
+    article: { ...dummyArticle, id },
+  });
+
+  it('returns null on empty markers array', () => {
+    expect(resolveNearestMarkerIndex(100, { left: 0, width: 300 }, [])).toBeNull();
+  });
+
+  it('returns 0 for a single marker regardless of mouse clientX', () => {
+    const markers = [createMarker('solo', 50)];
+    expect(resolveNearestMarkerIndex(10, { left: 0, width: 300 }, markers)).toBe(0);
+    expect(resolveNearestMarkerIndex(150, { left: 0, width: 300 }, markers)).toBe(0);
+    expect(resolveNearestMarkerIndex(290, { left: 0, width: 300 }, markers)).toBe(0);
+  });
+
+  it('always activates the exact marker under the mouse cursor with zero displacement', () => {
+    // Timeline with multiple spaced markers across the rail
+    const markers = [
+      createMarker('0', 0),
+      createMarker('1', 10),
+      createMarker('2', 25),
+      createMarker('3', 40),
+      createMarker('4', 60),
+      createMarker('5', 85),
+      createMarker('6', 100),
+    ];
+    const rect = { left: 50, width: 300 };
+
+    // Hover directly over each marker dot: must activate that exact marker with zero errors
+    for (let i = 0; i < markers.length; i++) {
+      const physicalClientX = rect.left + (markers[i].pct / 100) * rect.width;
+      expect(resolveNearestMarkerIndex(physicalClientX, rect, markers)).toBe(i);
+    }
+  });
+
+  it('resolves the physically closest marker when mouse hovers over the rail between dots', () => {
+    const markers = [createMarker('start', 0), createMarker('mid', 50), createMarker('end', 100)];
+    const rect = { left: 0, width: 300 };
+
+    // 20px is closer to 0px (marker 0) than 150px (marker 1)
+    expect(resolveNearestMarkerIndex(20, rect, markers)).toBe(0);
+    // 140px is closer to 150px (marker 1) than 0px (marker 0)
+    expect(resolveNearestMarkerIndex(140, rect, markers)).toBe(1);
+    // 260px is closer to 300px (marker 2) than 150px (marker 1)
+    expect(resolveNearestMarkerIndex(260, rect, markers)).toBe(2);
   });
 });
 
