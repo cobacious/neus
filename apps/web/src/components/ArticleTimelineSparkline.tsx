@@ -835,17 +835,6 @@ export default function ArticleTimelineSparkline({
               ›
             </span>
           </div>
-
-          {/* Latched Hint Footer */}
-          {state.mode === 'latched' && (
-            <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-gray-400">
-              <span className="font-sans">Click or tap card to jump to article</span>
-              <span className="text-slate-300 font-semibold flex items-center gap-0.5">
-                <span>Open</span>
-                <span aria-hidden="true">↗</span>
-              </span>
-            </div>
-          )}
         </div>
       )}
     </div>
