@@ -3,6 +3,7 @@ import {
   resolveNearestMarkerIndex,
   resolveScrubIndex,
   buildArticleDeepLinkUrl,
+  calculateClampedTooltipLeft,
   sparklineStateReducer,
   TimelineMarker,
   TimelineArticle,
@@ -346,5 +347,78 @@ describe('ArticleTimelineSparkline sparklineStateReducer', () => {
       mode: 'idle',
       activeIndex: null,
     });
+  });
+});
+
+describe('ArticleTimelineSparkline calculateClampedTooltipLeft', () => {
+  const containerWidth = 320;
+  const trackLeft = 45;
+  const trackWidth = 230;
+  const tooltipWidth = 256;
+  const padding = 8;
+
+  it('clamps left edge when marker is at 0%', () => {
+    const left = calculateClampedTooltipLeft({
+      containerWidth,
+      trackLeft,
+      trackWidth,
+      markerPct: 0,
+      tooltipWidth,
+      padding,
+    });
+    // Left boundary must be at least padding (8) and must not be negative
+    expect(left).toBe(padding);
+    expect(left + tooltipWidth).toBeLessThanOrEqual(containerWidth);
+  });
+
+  it('clamps right edge when marker is at 100%', () => {
+    const left = calculateClampedTooltipLeft({
+      containerWidth,
+      trackLeft,
+      trackWidth,
+      markerPct: 100,
+      tooltipWidth,
+      padding,
+    });
+    // Right boundary must not exceed containerWidth - padding
+    expect(left + tooltipWidth).toBeLessThanOrEqual(containerWidth - padding);
+    expect(left).toBe(containerWidth - tooltipWidth - padding);
+  });
+
+  it('centers tooltip directly over marker when marker is in middle', () => {
+    const left = calculateClampedTooltipLeft({
+      containerWidth,
+      trackLeft,
+      trackWidth,
+      markerPct: 50,
+      tooltipWidth,
+      padding,
+    });
+    // markerX = 45 + 115 = 160. Tooltip center = left + 128 = 160 -> left = 32
+    expect(left).toBe(32);
+    expect(left + tooltipWidth / 2).toBe(160);
+  });
+
+  it('safely handles narrow mobile containers smaller than default tooltip width', () => {
+    const narrowWidth = 240;
+    const left = calculateClampedTooltipLeft({
+      containerWidth: narrowWidth,
+      trackLeft: 20,
+      trackWidth: 200,
+      markerPct: 50,
+      tooltipWidth: 256,
+      padding: 8,
+    });
+    expect(left).toBe(8);
+  });
+
+  it('returns padding fallback for zero or negative container width', () => {
+    const left = calculateClampedTooltipLeft({
+      containerWidth: 0,
+      trackLeft: 0,
+      trackWidth: 0,
+      markerPct: 50,
+    });
+    expect(left).toBe(8);
   });
 });

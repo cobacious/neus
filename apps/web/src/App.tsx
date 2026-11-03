@@ -9,7 +9,7 @@ import Footer from './components/Footer';
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen flex flex-col bg-gray-100">
+      <div className="min-h-screen flex flex-col bg-gray-100 overflow-x-clip">
         <Header />
         <main className="flex-1 max-w-3xl w-full mx-auto px-4 pt-6 pb-12">
           <Routes>

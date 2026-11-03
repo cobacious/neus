@@ -227,6 +227,38 @@ export function buildArticleDeepLinkUrl(storySlug: string, article: TimelineArti
 }
 
 /**
+ * Calculates a clamped horizontal pixel offset for the floating tooltip relative to
+ * the sparkline container so the tooltip always remains fully within container bounds
+ * with safety padding. This eliminates horizontal document overflow and prevents
+ * scrollbar flickering on mobile.
+ */
+export function calculateClampedTooltipLeft({
+  containerWidth,
+  trackLeft,
+  trackWidth,
+  markerPct,
+  tooltipWidth = 256,
+  padding = 8,
+}: {
+  containerWidth: number;
+  trackLeft: number;
+  trackWidth: number;
+  markerPct: number;
+  tooltipWidth?: number;
+  padding?: number;
+}): number {
+  if (containerWidth <= 0) return padding;
+
+  const markerX = trackLeft + (markerPct / 100) * trackWidth;
+  const effectiveTooltipWidth = Math.min(tooltipWidth, Math.max(0, containerWidth - padding * 2));
+  const idealLeft = markerX - effectiveTooltipWidth / 2;
+  const minLeft = padding;
+  const maxLeft = Math.max(minLeft, containerWidth - effectiveTooltipWidth - padding);
+
+  return Math.max(minLeft, Math.min(idealLeft, maxLeft));
+}
+
+/**
  * Computes timeline markers along a clean, flat single horizontal rail.
  * - Every article has its own individual dot on the rail.
  * - Every dot strictly displays its thread palette color.
@@ -396,6 +428,16 @@ export default function ArticleTimelineSparkline({
     };
   }, []);
 
+  // Re-render listener when window resizes so latched tooltips update layout bounds
+  const [, setResizeTick] = useState(0);
+  useEffect(() => {
+    const handleResize = () => {
+      setResizeTick((t) => t + 1);
+    };
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   if (!layout) {
     return null;
   }
@@ -543,6 +585,20 @@ export default function ArticleTimelineSparkline({
   const isElevated = state.mode === 'scrubbing' || state.mode === 'latched';
   const showTooltip = Boolean(activeMarker && state.mode !== 'idle');
 
+  let tooltipLeft = 8;
+  if (activeMarker && containerRef.current && trackRef.current) {
+    const cRect = containerRef.current.getBoundingClientRect();
+    const tRect = trackRef.current.getBoundingClientRect();
+    if (cRect.width > 0) {
+      tooltipLeft = calculateClampedTooltipLeft({
+        containerWidth: cRect.width,
+        trackLeft: tRect.left - cRect.left,
+        trackWidth: tRect.width,
+        markerPct: activeMarker.pct,
+      });
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -562,10 +618,11 @@ export default function ArticleTimelineSparkline({
         {/* Central rail track hit envelope (44px vertical touch target) */}
         <div
           ref={trackRef}
-          className="relative flex-1 min-h-[44px] flex items-center select-none touch-pan-y cursor-pointer mx-1 focus:outline-none focus:ring-1 focus:ring-slate-400 rounded-sm"
+          className="relative flex-1 min-h-[44px] flex items-center select-none touch-none cursor-pointer mx-1 focus:outline-none focus:ring-1 focus:ring-slate-400 rounded-sm"
           style={{
             WebkitUserSelect: 'none',
             userSelect: 'none',
+            touchAction: 'none',
           }}
           tabIndex={0}
           role="slider"
@@ -693,19 +750,12 @@ export default function ArticleTimelineSparkline({
       {/* Floating Actionable Tooltip */}
       {showTooltip && activeMarker && (
         <div
-          className={`absolute z-30 bg-slate-900 text-white rounded-md p-3 text-xs shadow-xl w-64 max-w-[calc(100vw-32px)] border border-slate-800 cursor-pointer group select-none transition-all duration-150 ${
-            activeMarker.pct < 20
-              ? 'left-0 translate-x-0'
-              : activeMarker.pct > 80
-              ? 'left-full -translate-x-full'
-              : '-translate-x-1/2'
+          className={`absolute z-30 bg-slate-900 text-white rounded-md p-3 text-xs shadow-xl w-64 max-w-[calc(100%-16px)] border border-slate-800 cursor-pointer group select-none ${
+            state.mode === 'scrubbing' ? 'transition-none' : 'transition-all duration-150'
           }`}
           style={{
             bottom: isElevated ? 'calc(100% + 16px)' : 'calc(100% + 8px)',
-            left:
-              activeMarker.pct >= 20 && activeMarker.pct <= 80
-                ? `${activeMarker.pct}%`
-                : undefined,
+            left: `${tooltipLeft}px`,
           }}
           onClick={(e) => {
             e.stopPropagation();
