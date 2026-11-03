@@ -752,58 +752,50 @@ export default function ArticleTimelineSparkline({
 
             {/* Stepper / Counter */}
             {markers.length > 1 && (
-              <div className="flex items-center gap-1 font-mono text-[10px] text-gray-400 shrink-0 ml-auto">
-                {state.mode === 'latched' ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dispatch({ type: 'STEP', delta: -1, maxIndex: markers.length - 1 });
-                        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                          try {
-                            navigator.vibrate(4);
-                          } catch {
-                            // Ignore vibration restriction
-                          }
-                        }
-                      }}
-                      disabled={state.activeIndex === 0}
-                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-800 active:bg-slate-700 disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer text-gray-300"
-                      aria-label="Previous article"
-                      title="Previous article"
-                    >
-                      ‹
-                    </button>
-                    <span className="px-0.5 select-none font-sans">
-                      {(state.activeIndex ?? 0) + 1}/{markers.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dispatch({ type: 'STEP', delta: 1, maxIndex: markers.length - 1 });
-                        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                          try {
-                            navigator.vibrate(4);
-                          } catch {
-                            // Ignore vibration restriction
-                          }
-                        }
-                      }}
-                      disabled={state.activeIndex === markers.length - 1}
-                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-800 active:bg-slate-700 disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer text-gray-300"
-                      aria-label="Next article"
-                      title="Next article"
-                    >
-                      ›
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-[10px] text-gray-400 select-none">
-                    {(state.activeIndex ?? 0) + 1} of {markers.length}
-                  </span>
-                )}
+              <div className="flex items-center gap-1 font-mono text-[10px] text-gray-400 shrink-0 ml-auto h-5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch({ type: 'STEP', delta: -1, maxIndex: markers.length - 1 });
+                    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                      try {
+                        navigator.vibrate(4);
+                      } catch {
+                        // Ignore vibration restriction
+                      }
+                    }
+                  }}
+                  disabled={state.activeIndex === 0}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-800 active:bg-slate-700 disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer text-gray-300"
+                  aria-label="Previous article"
+                  title="Previous article"
+                >
+                  ‹
+                </button>
+                <span className="px-0.5 select-none font-sans">
+                  {(state.activeIndex ?? 0) + 1}/{markers.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch({ type: 'STEP', delta: 1, maxIndex: markers.length - 1 });
+                    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                      try {
+                        navigator.vibrate(4);
+                      } catch {
+                        // Ignore vibration restriction
+                      }
+                    }
+                  }}
+                  disabled={state.activeIndex === markers.length - 1}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-800 active:bg-slate-700 disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer text-gray-300"
+                  aria-label="Next article"
+                  title="Next article"
+                >
+                  ›
+                </button>
               </div>
             )}
           </div>
