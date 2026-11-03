@@ -1,4 +1,4 @@
-import React, { useReducer, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useReducer, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ThreadColorStyle, DEFAULT_THREAD_COLOR } from '../utils/threadColors';
 import { parseDate, formatRelativeTime } from '../utils/dateUtils';
