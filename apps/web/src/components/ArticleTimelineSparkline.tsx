@@ -638,13 +638,14 @@ export default function ArticleTimelineSparkline({
                   transform: `translate(-50%, -50%) ${isActive ? 'scale(1.5)' : 'scale(1)'}`,
                   zIndex: isActive ? 25 : 10,
                 }}
+                onPointerDown={(e) => {
+                  if (e.pointerType === 'mouse') {
+                    e.stopPropagation();
+                  }
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (state.mode === 'latched' && state.activeIndex === index) {
-                    handleArticleNavigate(marker.article);
-                  } else {
-                    dispatch({ type: 'LATCH', index });
-                  }
+                  dispatch({ type: 'LATCH', index });
                 }}
                 onPointerEnter={(e) => {
                   if (e.pointerType === 'mouse') {
