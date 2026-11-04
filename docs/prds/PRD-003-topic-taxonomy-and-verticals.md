@@ -29,15 +29,15 @@ Implement a **controlled many-to-many topic tagging model** powered by TypeSafe 
 - Costs remain negligible (~$0.000005 per cluster or ~$0.0002 per pipeline pass) with zero additional prompt tokens.
 - An additive `tags String[] @default([])` column with a PostgreSQL GIN index is added to Neon DB, enabling sub-millisecond `@>` containment filtering.
 - The GraphQL API exposes `tags: [String!]!` and supports filtering via `clusters(tag: String)`.
-- The frontend features a horizontal, swipeable topic bar below the header (`/?topic=politics`) and renders clickable tag chips on story cards.
+- The frontend embraces **Progressive Disclosure**: preserves a calm, single-row header with zero horizontal pill clutter, renders contextual topic badges on cards, provides deliberate topic navigation in the hamburger drawer and surfaces a floating dismissible pill in the mobile thumb zone when a filter is active (`Showing: Politics • 12 stories [✕ Clear]`).
 
 ---
 
 ## 2. User Stories
 
-1. **Focused Domain Browsing**:
+1. **Focused Domain Browsing in Drawer**:
    * *As a* reader focused on international developments,
-   * *I want to* select the "World" topic tab on the home feed,
+   * *I want to* select the "World" topic from the navigation drawer,
    * *So that* I can read coverage of global diplomacy, elections and conflicts without domestic entertainment or sports briefs.
 
 2. **Crossover Story Discovery**:
@@ -156,16 +156,27 @@ model Story {
   Add `tag: String` argument to `clusters(limit, offset, tag)`.
 
 ### 3.5 Frontend UI (`apps/web`)
-- **`<TopicFilterBar>`**:
-  - Horizontal scrolling pill bar rendered directly below the header:
-    `[All] [UK] [World] [Politics] [Business] [Tech & Science] [Environment] [Society] [Sport] [Culture]`
-  - Highlights active pill with Blue Slate (`#4F6D7A`) background and white text.
-  - Updates URL parameter via `useSearchParams`: `?topic=uk`.
-  - Hides native scrollbar while supporting fluid touch drag on iOS and Android.
-- **Card Badges**:
-  - Displays up to 2 compact chips on card headers:
-    e.g. `<span className="text-[10px] uppercase font-semibold text-gray-500 tracking-wider">Politics</span>`
-  - Clicking a badge navigates to `/?topic=<slug>`.
+
+The frontend follows an opinionated **Progressive Disclosure** pattern that eliminates screen clutter and respects mobile thumb ergonomics:
+
+1. **Clean Default State**:
+   - The homepage header remains exactly as it is today: clean, left-aligned, zero extra rows.
+   - Eliminates the noisy horizontal pill bar, saving 48px of critical mobile screen real estate and preventing horizontal swipe scroll-jacking.
+
+2. **Contextual Story Card Badges**:
+   - Displays up to 2 discreet topic chips in the card header metadata row (e.g. `[UK]`, `[Politics]`).
+   - Uses muted editorial styling from the Neus palette (`#4F6D7A` Blue Slate / Charcoal text with subtle neutral backgrounds).
+   - Clicking a badge instantly filters the feed to that topic and synchronizes the URL: `/?topic=<slug>`.
+
+3. **Floating Thumb-Zone Active Filter Pill (`<ActiveTopicFilterPill>`)**:
+   - When a filter is active (`location.search` has `?topic=<slug>`), a compact, floating pill animates into the bottom-center of the viewport (in Steven Hoober's natural mobile thumb reach zone).
+   - Layout: `Showing: Politics (12 stories)  [✕ Clear]`
+   - Tapping `[✕ Clear]` instantly resets the feed back to `/` with zero page reload.
+
+4. **Deliberate Topic Browsing in Drawer (`<HeaderDrawerTopics>`)**:
+   - Inside the existing slide-over hamburger drawer ([`apps/web/src/components/Header.tsx`](file:///Users/jwalton/Code/cobacious/neus/apps/web/src/components/Header.tsx)), add a dedicated "Topics" section directly beneath "Navigation".
+   - Lists all 9 controlled topics with clean icon affordances.
+   - Selecting a topic navigates to `/?topic=<slug>` and automatically closes the drawer.
 
 ---
 
@@ -187,8 +198,8 @@ model Story {
 - [ ] **GIVEN** a cluster is summarized in the pipeline, **WHEN** tag classification runs, **THEN** it receives 1 to 3 valid tags from the 9 controlled options based on $p \ge 0.25$.
 - [ ] **GIVEN** a crossover story (such as a political trade dispute), **THEN** it receives multiple relevant tags (such as `['politics', 'business']`).
 - [ ] **GIVEN** a database query for `getRankedClusters(10, 0, 'politics')`, **THEN** it returns only clusters where `tags` contains `'politics'` ordered by score descending.
-- [ ] **GIVEN** a user taps a topic pill on the frontend, **WHEN** selected, **THEN** the feed instantly filters to that tag and the browser URL updates to `?topic=<slug>`.
-- [ ] **GIVEN** a user taps a topic badge on a cluster card, **THEN** the feed switches to that topic stream.
+- [ ] **GIVEN** a user selects a topic in the navigation drawer or taps a card badge, **WHEN** selected, **THEN** the feed filters to that topic, the URL updates to `?topic=<slug>` and the floating dismissible pill appears in the thumb zone.
+- [ ] **GIVEN** a user taps `[✕ Clear]` on the floating filter pill, **WHEN** tapped, **THEN** the filter is dismissed and the feed returns to the unpartitioned view.
 - [ ] **GIVEN** `pnpm test` and `pnpm build` run across all packages, **THEN** all tests pass green.
 
 ---
@@ -201,5 +212,5 @@ model Story {
 2. **Backfill Utility**:
    - Provide `apps/engine/scripts/backfillClusterTags.ts` to tag all existing active clusters in a single pass (< $0.02 total cost).
 3. **Frontend Verification**:
-   - Verify smooth horizontal scrolling on mobile viewports (375px).
+   - Verify floating filter pill renders cleanly in thumb reach zone on mobile viewports (375px) without obstructing card text.
    - Verify zero layout shift and instant cached filtering.
