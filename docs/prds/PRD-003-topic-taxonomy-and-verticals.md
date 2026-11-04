@@ -64,15 +64,15 @@ Neus standardizes on 9 controlled, high-coverage topic tags:
 
 | Tag Key | Display Label | Scope & Criteria | Typical Examples |
 | :--- | :--- | :--- | :--- |
-| `politics` | Politics | Westminster, parliaments, legislation, elections, party politics and government policy | Burnham Brexit reset, US Midterms, cabinet revolts |
+| `uk` | UK | Domestic UK news, national events, courts, criminal trials, policing, devolution and British public life | Russell Brand trial, Stonehaven inquiry, royal tours, drug death trends |
 | `world` | World | International affairs, foreign elections, global diplomacy, treaties and overseas disasters | US Midterms, Ukraine war, Spanish train crash |
+| `politics` | Politics | Westminster, parliaments, legislation, elections, party politics and government policy | Burnham Brexit reset, US Midterms, cabinet revolts |
 | `business` | Business | Macroeconomics, financial markets, inflation, corporate earnings, retail and trade | Poundland administration, US stock market rally |
 | `tech_science` | Tech & Science | Artificial intelligence, cybersecurity, digital policy, space and medical research | European blood bank cyberattacks, NHS cancer test |
 | `environment` | Environment | Climate policy, renewable energy, conservation, extreme weather and wildlife | COP summits, net zero policy, grizzly bear incident |
-| `justice` | Justice & Law | Courts, criminal trials, policing, legal rulings, civil liberties and inquiries | Russell Brand trial, Stonehaven derailment findings |
-| `society` | Society & Life | Public health, education, transport, housing, demographics and social trends | Drug fatality statistics, prison conditions, school leaks |
+| `society` | Society & Life | Public health, education, transport, housing, demographics and social trends | Prison conditions, school dark web leaks, health statistics |
 | `sport` | Sport | Tournaments, leagues, football transfers, athletes and sports governance | Tenerife player tribute, Nadal Real Madrid board role |
-| `culture` | Culture & Arts | Arts, entertainment, film, television, books, celebrity and royalty | King Charles Caribbean tour, Edinburgh Zoo capybaras |
+| `culture` | Culture & Arts | Arts, entertainment, film, television, books, celebrity and royalty | Celebrity profiles, Edinburgh Zoo capybaras, arts exhibitions |
 
 ### 3.2 Pipeline Classification Engine (`apps/engine`)
 - **Integration Point**: In [`apps/engine/core/pipeline/summariseClusters.ts`](file:///Users/jwalton/Code/cobacious/neus/apps/engine/core/pipeline/summariseClusters.ts), executed in parallel with summary generation.
@@ -81,12 +81,12 @@ Neus standardizes on 9 controlled, high-coverage topic tags:
   import { typesafe } from '../../lib/typesafeClient';
 
   export const CONTROLLED_TOPIC_TAGS = [
-    'politics',
+    'uk',
     'world',
+    'politics',
     'business',
     'tech_science',
     'environment',
-    'justice',
     'society',
     'sport',
     'culture',
@@ -158,9 +158,9 @@ model Story {
 ### 3.5 Frontend UI (`apps/web`)
 - **`<TopicFilterBar>`**:
   - Horizontal scrolling pill bar rendered directly below the header:
-    `[All] [Politics] [World] [Business] [Tech & Science] [Justice] [Society] [Sport] [Culture] [Environment]`
+    `[All] [UK] [World] [Politics] [Business] [Tech & Science] [Environment] [Society] [Sport] [Culture]`
   - Highlights active pill with Blue Slate (`#4F6D7A`) background and white text.
-  - Updates URL parameter via `useSearchParams`: `?topic=politics`.
+  - Updates URL parameter via `useSearchParams`: `?topic=uk`.
   - Hides native scrollbar while supporting fluid touch drag on iOS and Android.
 - **Card Badges**:
   - Displays up to 2 compact chips on card headers:

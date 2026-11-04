@@ -95,7 +95,7 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **iOS & Mobile Meta Integration**: Add apple-touch-icon, mobile web app viewport meta tags and install affordance in drawer navigation.
 
 ### Track 9: Topic Taxonomy & Categorisation (`apps/engine`, `packages/db`, `apps/api`, `apps/web`)
-- [ ] **TypeSafe Jev Multi-Tag Classification** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Multi-probability calibrated `Choice` judgment on clusters during summarization across 9 controlled tags (Politics, World, Business, Tech & Science, Environment, Justice & Law, Society & Life, Sport and Culture & Arts) at ~$0.000005 per cluster.
+- [ ] **TypeSafe Jev Multi-Tag Classification** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Multi-probability calibrated `Choice` judgment on clusters during summarization across 9 controlled tags (UK, World, Politics, Business, Tech & Science, Environment, Society & Life, Sport and Culture & Arts) at ~$0.000005 per cluster.
 - [ ] **PostgreSQL GIN Array Schema & API Exposure** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Add additive `tags String[] @default([])` field to `Cluster` and `Story` in `@neus/db` with GIN indexing and expose in GraphQL `feed(tag: String)`.
 - [ ] **Frontend Topic Navigation & Badges** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Horizontal topic filter tabs on homepage feed, URL routing (`/?topic=<slug>`) and clickable topic badge chips on cards.
 
