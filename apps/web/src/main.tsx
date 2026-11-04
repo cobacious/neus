@@ -15,7 +15,6 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/graphql';
 const client = createClient({
   url: apiUrl,
   exchanges: [cacheExchange, fetchExchange],
-  preferGetMethod: true,
 });
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

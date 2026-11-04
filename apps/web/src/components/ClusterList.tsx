@@ -71,8 +71,28 @@ const CLUSTERS_QUERY = `
 
 const CLUSTERS_PER_PAGE = 15;
 
+const getCacheKey = (tag?: string) => `neus_feed_cache_${tag || 'all'}`;
+
+const loadCachedClusters = (tag?: string): any[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(getCacheKey(tag));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCachedClusters = (clusters: any[], tag?: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(getCacheKey(tag), JSON.stringify(clusters));
+  } catch {
+    // Gracefully handle localStorage quota or private browsing exceptions
+  }
+};
+
 export default function ClusterList() {
-  const [displayedClusters, setDisplayedClusters] = useState<any[]>([]);
   const [offset, setOffset] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTopic = searchParams.get('topic');
@@ -80,6 +100,10 @@ export default function ClusterList() {
 
   const activeTag =
     currentTopic && currentTopic.trim().length > 0 ? currentTopic.trim().toLowerCase() : undefined;
+
+  const [displayedClusters, setDisplayedClusters] = useState<any[]>(() =>
+    loadCachedClusters(activeTag)
+  );
 
   const [result, reexecuteQuery] = useQuery({
     query: CLUSTERS_QUERY,
@@ -100,6 +124,7 @@ export default function ClusterList() {
 
       if (res.data?.clusters) {
         setDisplayedClusters(res.data.clusters);
+        saveCachedClusters(res.data.clusters, activeTag);
         return true;
       }
       return !res.error;
@@ -129,10 +154,10 @@ export default function ClusterList() {
     staleDurationMs: 5 * 60 * 1000,
   });
 
-  // Reset pagination when topic filter changes
+  // Reset pagination and hydrate topic cache when topic filter changes
   useEffect(() => {
     setOffset(0);
-    setDisplayedClusters([]);
+    setDisplayedClusters(loadCachedClusters(activeTag));
   }, [activeTag]);
 
   useEffect(() => {
@@ -151,6 +176,9 @@ export default function ClusterList() {
       if (offset === 0) {
         // Initial load or refresh
         setDisplayedClusters(rawClusters);
+        if (rawClusters.length > 0) {
+          saveCachedClusters(rawClusters, activeTag);
+        }
       } else if (rawClusters.length > 0) {
         // Loading more - append new clusters avoiding duplicate IDs across pages
         setDisplayedClusters((prev) => {
@@ -160,7 +188,7 @@ export default function ClusterList() {
         });
       }
     }
-  }, [result.data, result.fetching, offset, markFresh]);
+  }, [result.data, result.fetching, offset, markFresh, activeTag]);
 
   const handleLoadMore = () => {
     setOffset(displayedClusters.length);
