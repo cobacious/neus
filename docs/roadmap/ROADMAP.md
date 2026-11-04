@@ -27,7 +27,7 @@ Items are ranked in execution order based on reader trust impact, mobile usabili
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **P1** | `PRD-001` | **Pipeline Freshness & Last Updated Metadata** | `apps/api`, `apps/web` | Small (~1h) | Completed | [`PRD-001-pipeline-freshness-metadata.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-001-pipeline-freshness-metadata.md) |
 | **P2** | `PRD-002` | **Sparkline Touch Scrubber & Latched Tooltip Deep Linking** | `apps/web` | Medium (~3-4h) | Completed | [`PRD-002-sparkline-touch-scrubber.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-scrubber.md) |
-| **P3** | `PRD-003` | **Topic Taxonomy & Verticals (TypeSafe Jev)** | `apps/engine`, `packages/db`, `apps/web` | Medium | In Discovery | [`PRD-003-topic-taxonomy-and-verticals.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md) |
+| **P3** | `PRD-003` | **Topic Taxonomy & Multi-Tagging (TypeSafe Jev)** | `apps/engine`, `packages/db`, `apps/api`, `apps/web` | Medium | Specification Ready | [`PRD-003-topic-taxonomy-and-verticals.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md) |
 | **P4** | `PRD-004` | **Faceted Story View Filtering (Outlet, Date & Topic)** | `apps/web` | Medium | Backlog | [`PRD-004-story-view-faceted-filtering.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-004-story-view-faceted-filtering.md) |
 | **P5** | `PRD-005` | **Native PostgreSQL Full-Text Search** | `packages/db`, `apps/api`, `apps/web` | Medium | Backlog | [`PRD-005-postgresql-full-text-search.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-005-postgresql-full-text-search.md) |
 | **P6** | `PRD-006` | **Editorial Dark Theme System** | `apps/web` | Medium | Backlog | [`PRD-006-dark-theme-system.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-006-dark-theme-system.md) |
@@ -94,10 +94,10 @@ When starting a session or subagent, select from these decoupled tracks:
 - [x] **Service Worker & Offline Fallback**: Pre-cache static assets and establish offline reading caching strategy for previously loaded stories.
 - [x] **iOS & Mobile Meta Integration**: Add apple-touch-icon, mobile web app viewport meta tags and install affordance in drawer navigation.
 
-### Track 9: Topic Taxonomy & Categorisation (`apps/engine`, `packages/db`, `apps/web`)
-- [ ] **TypeSafe Jev Topic Classification** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Calibrated `Choice` judgment on clusters during summarization across core verticals (UK Politics, World, Economy, Tech & Science, Environment, Culture & Society and Sport) at ~$0.000005 per cluster.
-- [ ] **Topic Schema & API Exposure** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Add additive `topic` field to `Cluster` and `Story` in `@neus/db` with `@@index([topic, score])` and expose in GraphQL `feed(topic: String)`.
-- [ ] **Frontend Topic Navigation** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Horizontal topic filter tabs on homepage feed, URL routing (`/?topic=<slug>`) and topic badges on cards.
+### Track 9: Topic Taxonomy & Categorisation (`apps/engine`, `packages/db`, `apps/api`, `apps/web`)
+- [ ] **TypeSafe Jev Multi-Tag Classification** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Multi-probability calibrated `Choice` judgment on clusters during summarization across 9 controlled tags (Politics, World, Business, Tech & Science, Environment, Justice & Law, Society & Life, Sport and Culture & Arts) at ~$0.000005 per cluster.
+- [ ] **PostgreSQL GIN Array Schema & API Exposure** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Add additive `tags String[] @default([])` field to `Cluster` and `Story` in `@neus/db` with GIN indexing and expose in GraphQL `feed(tag: String)`.
+- [ ] **Frontend Topic Navigation & Badges** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Horizontal topic filter tabs on homepage feed, URL routing (`/?topic=<slug>`) and clickable topic badge chips on cards.
 
 ### Track 10: Search & Information Retrieval (`packages/db`, `apps/api`, `apps/web`)
 - [ ] **PostgreSQL Full-Text Search** ([`PRD-005`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-005-postgresql-full-text-search.md)): Native GIN `tsvector` index across stories and clusters in Neon DB with zero external infrastructure cost.
