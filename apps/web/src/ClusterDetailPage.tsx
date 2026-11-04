@@ -16,6 +16,7 @@ import {
 } from './utils/dateUtils';
 import { isPaywalled } from './utils/paywallUtils';
 import SourceFavicon from './components/SourceFavicon';
+import { getTopicLabel } from './utils/topics';
 
 const CLUSTER_QUERY = `
   query Cluster($slug: String!) {
@@ -24,6 +25,7 @@ const CLUSTER_QUERY = `
       headline
       slug
       summary
+      tags
       createdAt
       lastUpdatedAt
       origin
@@ -36,6 +38,7 @@ const CLUSTER_QUERY = `
         slug
         overview
         status
+        tags
         clusters {
           id
           headline
@@ -478,6 +481,29 @@ export default function ClusterDetailPage() {
           <p className="text-sm text-yellow-700">
             This story cluster has been archived and is no longer active.
           </p>
+        </div>
+      )}
+
+      {/* Topic Eyebrow Overline */}
+      {((isMultiThreadStory && story?.tags && story.tags.length > 0 ? story.tags : cluster.tags) || []).length > 0 && (
+        <div className="flex items-center gap-1.5 mt-3 mb-1 text-xs font-semibold tracking-wider text-gray-500 uppercase">
+          {((isMultiThreadStory && story?.tags && story.tags.length > 0 ? story.tags : cluster.tags) || [])
+            .slice(0, 3)
+            .map((tag: string, idx: number, arr: string[]) => (
+              <span key={tag} className="flex items-center gap-1.5">
+                <Link
+                  to={`/?topic=${encodeURIComponent(tag)}`}
+                  className="hover:text-gray-900 transition-colors"
+                >
+                  {getTopicLabel(tag)}
+                </Link>
+                {idx < arr.length - 1 && (
+                  <span className="text-gray-300 font-normal select-none" aria-hidden="true">
+                    ·
+                  </span>
+                )}
+              </span>
+            ))}
         </div>
       )}
 

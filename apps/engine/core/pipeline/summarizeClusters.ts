@@ -6,7 +6,13 @@ import {
   PipelineStep,
 } from '../../lib/pipelineLogger';
 import { generateStructuredJson } from '../../lib/aiClient';
+import { classifyClusterTags } from '../../lib/typesafeClient';
 import { mapConcurrent } from './utils';
+
+export interface SummarizeClustersDependencies {
+  generateClusterSummary?: (prompt: string) => Promise<{ headline: string; summary: string }>;
+  classifyClusterTags?: (params: { headline: string; summary?: string | null }) => Promise<string[]>;
+}
 
 export async function generateClusterSummary(prompt: string): Promise<{ headline: string; summary: string }> {
   return generateStructuredJson<{ headline: string; summary: string }>({
@@ -26,7 +32,10 @@ export async function generateClusterSummary(prompt: string): Promise<{ headline
   });
 }
 
-export async function summarizeClusters() {
+export async function summarizeClusters(deps: SummarizeClustersDependencies = {}) {
+  const generateSummaryFn = deps.generateClusterSummary ?? generateClusterSummary;
+  const classifyTagsFn = deps.classifyClusterTags ?? classifyClusterTags;
+
   logPipelineStep(PipelineStep.Summarise, 'Summarizing clusters...');
 
   const clusters = await getClustersToSummarize();
@@ -69,9 +78,24 @@ export async function summarizeClusters() {
       .join('\n')}\n\nRespond in JSON with keys 'headline' and 'summary'.`;
 
     try {
-      const result = await generateClusterSummary(prompt);
-      await updateClusterSummary(cluster.id, result.headline, result.summary);
-      logPipelineSection(PipelineStep.Summarise, `Updated cluster ${cluster.id}`);
+      const result = await generateSummaryFn(prompt);
+      let tags: string[] = [];
+      try {
+        tags = await classifyTagsFn({
+          headline: result.headline,
+          summary: result.summary,
+        });
+      } catch (tagErr: any) {
+        logger.warn(
+          `[${PipelineStep.Summarise}]: Failed classifying tags for cluster ${cluster.id}: ${tagErr.message || tagErr}`
+        );
+      }
+
+      await updateClusterSummary(cluster.id, result.headline, result.summary, tags);
+      logPipelineSection(
+        PipelineStep.Summarise,
+        `Updated cluster ${cluster.id}${tags.length > 0 ? ` (tags: ${tags.join(', ')})` : ''}`
+      );
     } catch (err: any) {
       logger.error(
         `[${PipelineStep.Summarise}]: Error summarizing cluster ${cluster.id}:`,

@@ -4,6 +4,7 @@ import Logo from './Logo';
 import GitHubIcon from './GitHubIcon';
 import BlueskyIcon from './BlueskyIcon';
 import { usePwaInstall, useOnlineStatus } from '../pwa';
+import { CONTROLLED_TOPIC_TAGS, getTopicLabel, TopicIcon } from '../utils/topics';
 
 const BRAND_COLORS = [
   '#4F6D7A', // Blue Slate
@@ -29,10 +30,12 @@ export default function Header() {
     }));
   });
 
-  // Close drawer on route navigation
+  const currentTopic = new URLSearchParams(location.search).get('topic');
+
+  // Close drawer on route or topic navigation
   useEffect(() => {
     setIsMenuOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Handle subtle elevation shadow on scroll
   useEffect(() => {
@@ -235,6 +238,37 @@ export default function Header() {
                     <span>Install App</span>
                   </button>
                 )}
+              </div>
+
+              {/* Topics Section */}
+              <div className="border-t border-gray-100 pt-5 space-y-1">
+                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Topics
+                </p>
+                {CONTROLLED_TOPIC_TAGS.map((tag) => {
+                  const isActive = location.pathname === '/' && currentTopic === tag;
+                  return (
+                    <Link
+                      key={tag}
+                      to={`/?topic=${encodeURIComponent(tag)}`}
+                      onClick={closeMenu}
+                      className={`
+                        flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                        ${
+                          isActive
+                            ? 'bg-[#4F6D7A]/10 text-[#4F6D7A] font-semibold'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        }
+                      `}
+                    >
+                      <TopicIcon
+                        topic={tag}
+                        className={`h-4 w-4 ${isActive ? 'text-[#4F6D7A]' : 'text-gray-400'}`}
+                      />
+                      <span>{getTopicLabel(tag)}</span>
+                    </Link>
+                  );
+                })}
               </div>
 
               <div className="border-t border-gray-100 pt-5 space-y-1">

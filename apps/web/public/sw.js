@@ -1,6 +1,5 @@
 // Service Worker for Neus PWA
-const CACHE_STATIC = 'neus-static-v1';
-const CACHE_DATA = 'neus-data-v1';
+const CACHE_STATIC = 'neus-static-v2';
 
 const STATIC_SHELL = [
   '/',
@@ -30,7 +29,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== CACHE_STATIC && key !== CACHE_DATA)
+            .filter((key) => key !== CACHE_STATIC)
             .map((key) => caches.delete(key))
         )
       )
@@ -60,34 +59,6 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match('/index.html');
         return cached || (await cache.match('/'));
       })
-    );
-    return;
-  }
-
-  // Handle GraphQL / API data requests
-  if (url.pathname.includes('/graphql')) {
-    event.respondWith(
-      fetch(req)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_DATA).then((cache) => cache.put(req, clone));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(req);
-          if (cached) return cached;
-          return new Response(
-            JSON.stringify({
-              data: null,
-              errors: [{ message: 'You are offline. Unable to reach Neus server.' }],
-            }),
-            {
-              headers: { 'Content-Type': 'application/json' },
-            }
-          );
-        })
     );
     return;
   }

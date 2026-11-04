@@ -50,4 +50,15 @@ describe('getRankedClusters', () => {
     expect(findMany).not.toHaveBeenCalled();
     expect(result).toEqual([]);
   });
+
+  it('filters by topic tag using containment query when tag is provided', async () => {
+    ($queryRaw as any).mockResolvedValue([{ id: 'c1' }]);
+    (findMany as any).mockResolvedValue([{ id: 'c1', score: 20, tags: ['politics'] }]);
+
+    const result = await getRankedClusters(10, 0, 'politics');
+
+    expect($queryRaw).toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('c1');
+  });
 });

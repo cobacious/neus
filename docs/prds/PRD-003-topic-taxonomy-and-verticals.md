@@ -2,7 +2,7 @@
 
 - **Identifier**: `PRD-003`
 - **Priority**: P3 (Core Capability)
-- **Status**: Specification Ready
+- **Status**: Completed
 - **Target Packages**: `apps/engine`, `packages/db`, `apps/api`, `apps/web`
 - **Target Personas**: General News Consumer, Specialist Reader (e.g. Politics or Tech Enthusiast)
 - **Estimated Effort**: Medium (~3 to 5 hours)
@@ -195,12 +195,12 @@ The frontend follows an opinionated **Progressive Disclosure** pattern that elim
 
 ## 5. Acceptance Criteria
 
-- [ ] **GIVEN** a cluster is summarized in the pipeline, **WHEN** tag classification runs, **THEN** it receives 1 to 3 valid tags from the 9 controlled options based on $p \ge 0.25$.
-- [ ] **GIVEN** a crossover story (such as a political trade dispute), **THEN** it receives multiple relevant tags (such as `['politics', 'business']`).
-- [ ] **GIVEN** a database query for `getRankedClusters(10, 0, 'politics')`, **THEN** it returns only clusters where `tags` contains `'politics'` ordered by score descending.
-- [ ] **GIVEN** a user selects a topic in the navigation drawer or taps a card badge, **WHEN** selected, **THEN** the feed filters to that topic, the URL updates to `?topic=<slug>` and the floating dismissible pill appears in the thumb zone.
-- [ ] **GIVEN** a user taps `[✕ Clear]` on the floating filter pill, **WHEN** tapped, **THEN** the filter is dismissed and the feed returns to the unpartitioned view.
-- [ ] **GIVEN** `pnpm test` and `pnpm build` run across all packages, **THEN** all tests pass green.
+- [x] **GIVEN** a cluster is summarized in the pipeline, **WHEN** tag classification runs, **THEN** it receives 1 to 3 valid tags from the 9 controlled options based on $p \ge 0.25$.
+- [x] **GIVEN** a crossover story (such as a political trade dispute), **THEN** it receives multiple relevant tags (such as `['politics', 'business']`).
+- [x] **GIVEN** a database query for `getRankedClusters(10, 0, 'politics')`, **THEN** it returns only clusters where `tags` contains `'politics'` ordered by score descending.
+- [x] **GIVEN** a user selects a topic in the navigation drawer or taps a card badge, **WHEN** selected, **THEN** the feed filters to that topic, the URL updates to `?topic=<slug>` and the floating dismissible pill appears in the thumb zone.
+- [x] **GIVEN** a user taps `[✕ Clear]` on the floating filter pill, **WHEN** tapped, **THEN** the filter is dismissed and the feed returns to the unpartitioned view.
+- [x] **GIVEN** `pnpm test` and `pnpm build` run across all packages, **THEN** all tests pass green.
 
 ---
 
