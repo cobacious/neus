@@ -25,6 +25,7 @@ export async function getClustersForScoring() {
     },
     select: {
       id: true,
+      storyId: true,
       story: {
         select: {
           clusters: {

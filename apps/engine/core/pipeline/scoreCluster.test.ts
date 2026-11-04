@@ -252,5 +252,140 @@ describe('scoreCluster', () => {
     // In trailingStory, the 3rd source is 24h old (recency decays past 4h window).
     expect(scoreCluster(activeStory, now)).toBeGreaterThan(scoreCluster(trailingStory, now));
   });
+
+  it('rolls up story breadth and volume so multi-angle macro-stories outrank standalone stories', () => {
+    const now = Date.now();
+
+    // Standalone cluster with 7 sources and 8 articles
+    const standaloneStory = {
+      articleAssignments: Array.from({ length: 7 }, (_, i) => ({
+        article: {
+          publishedAt: new Date(now),
+          sourceId: `source_${i}`,
+          sourceRel: { trustScore: 0.8 },
+        },
+      })),
+    } as any;
+
+    // Multi-angle story with 10 total unique sources across 3 constituent angles
+    // Angle 1 alone has only 5 sources, but the story collectively has 10 sources and 40 articles
+    const angle1 = {
+      articleAssignments: Array.from({ length: 20 }, (_, i) => ({
+        article: {
+          publishedAt: new Date(now),
+          sourceId: `source_${i % 5}`,
+          sourceRel: { trustScore: 0.8 },
+        },
+      })),
+    } as any;
+
+    const angle2 = {
+      articleAssignments: Array.from({ length: 12 }, (_, i) => ({
+        article: {
+          publishedAt: new Date(now),
+          sourceId: `source_${(i % 4) + 4}`,
+          sourceRel: { trustScore: 0.8 },
+        },
+      })),
+    } as any;
+
+    const angle3 = {
+      articleAssignments: Array.from({ length: 8 }, (_, i) => ({
+        article: {
+          publishedAt: new Date(now),
+          sourceId: `source_${(i % 4) + 6}`,
+          sourceRel: { trustScore: 0.8 },
+        },
+      })),
+    } as any;
+
+    const storyClusters = [angle1, angle2, angle3];
+
+    // Primary angle receives rolled-up story breadth and volume
+    const angle1Score = scoreCluster(angle1, now, storyClusters);
+    const standaloneScore = scoreCluster(standaloneStory, now);
+
+    expect(angle1Score).toBeGreaterThan(standaloneScore);
+  });
+
+  it('proportionally weights primary and secondary angles within a multi-angle story', () => {
+    const now = Date.now();
+
+    const primaryAngle = {
+      articleAssignments: Array.from({ length: 30 }, (_, i) => ({
+        article: {
+          publishedAt: new Date(now),
+          sourceId: `source_${i % 6}`,
+          sourceRel: { trustScore: 0.8 },
+        },
+      })),
+    } as any;
+
+    const secondaryAngle = {
+      articleAssignments: Array.from({ length: 10 }, (_, i) => ({
+        article: {
+          publishedAt: new Date(now),
+          sourceId: `source_${(i % 4) + 4}`,
+          sourceRel: { trustScore: 0.8 },
+        },
+      })),
+    } as any;
+
+    const tertiaryAngle = {
+      articleAssignments: [
+        {
+          article: {
+            publishedAt: new Date(now),
+            sourceId: 'source_8',
+            sourceRel: { trustScore: 0.8 },
+          },
+        },
+      ],
+    } as any;
+
+    const storyClusters = [primaryAngle, secondaryAngle, tertiaryAngle];
+
+    const primaryScore = scoreCluster(primaryAngle, now, storyClusters);
+    const secondaryScore = scoreCluster(secondaryAngle, now, storyClusters);
+    const tertiaryScore = scoreCluster(tertiaryAngle, now, storyClusters);
+
+    // Primary angle receives maximum weight (1.0)
+    // Secondary angle receives proportional weight: 0.85 + 0.15 * (10 / 30) = 0.90
+    // Tertiary angle receives proportional weight: 0.85 + 0.15 * (1 / 30) = 0.855
+    expect(primaryScore).toBeGreaterThan(secondaryScore);
+    expect(secondaryScore).toBeGreaterThan(tertiaryScore);
+    expect(secondaryScore / primaryScore).toBeCloseTo(0.90, 2);
+    expect(tertiaryScore / primaryScore).toBeCloseTo(0.855, 2);
+  });
+
+  it('falls back to story consensus recency when a constituent angle has only a single source', () => {
+    const now = Date.now();
+    const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+
+    // Angle 1 has multiple sources published recently
+    const broadFreshAngle = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now), sourceId: 'src_1', sourceRel: { trustScore: 0.8 } } },
+        { article: { publishedAt: new Date(now), sourceId: 'src_2', sourceRel: { trustScore: 0.8 } } },
+      ],
+    } as any;
+
+    // Angle 2 has only a single source from 2 days ago
+    const singleSourceOldAngle = {
+      articleAssignments: [
+        { article: { publishedAt: new Date(now - TWO_DAYS_MS), sourceId: 'src_3', sourceRel: { trustScore: 0.8 } } },
+      ],
+    } as any;
+
+    const storyClusters = [broadFreshAngle, singleSourceOldAngle];
+
+    // Evaluated with story roll-up, singleSourceOldAngle inherits the story's consensus recency
+    const scoreWithStory = scoreCluster(singleSourceOldAngle, now, storyClusters);
+
+    // Evaluated as standalone, singleSourceOldAngle decays with its 2-day old timestamp
+    const scoreStandalone = scoreCluster(singleSourceOldAngle, now);
+
+    expect(scoreWithStory).toBeGreaterThan(scoreStandalone);
+  });
 });
 
