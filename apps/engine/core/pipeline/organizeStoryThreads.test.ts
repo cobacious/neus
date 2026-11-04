@@ -133,6 +133,7 @@ describe('organizeStoryThreads', () => {
       status: 'developing',
       overview: 'Macro overview of the event.',
       embedding: [1, 0],
+      tags: [],
       threads: [
         { clusterId: 'c1', thread: 'Botched Execution Attempt' },
         { clusterId: 'c3', thread: 'Hospital Awakening' },
@@ -480,6 +481,7 @@ describe('organizeStoryThreads', () => {
       status: 'developing',
       overview: 'Macro overview of the event.',
       embedding: [1, 0],
+      tags: [],
       threads: [
         { clusterId: 'c1', thread: 'Botched Execution Attempt' },
         { clusterId: 'c3', thread: 'Hospital Awakening' },
@@ -577,5 +579,64 @@ describe('organizeStoryThreads', () => {
         ],
       })
     );
+  });
+
+  it('pools member cluster tags into story tags ordered by frequency', async () => {
+    (mockDb.getActiveClustersForStories as jest.Mock).mockResolvedValue([
+      {
+        id: 'c1',
+        headline: 'Trump and Starmer hold bilateral talks at Chequers',
+        summary: 'Talks cover trade tariffs and NATO support',
+        tags: ['world', 'politics'],
+        embedding: [1, 0],
+        createdAt: new Date(),
+      },
+      {
+        id: 'c2',
+        headline: 'Downing Street releases joint statement on tariff exemptions',
+        summary: 'UK secures targeted exemptions on steel and aluminium',
+        tags: ['politics', 'business', 'uk'],
+        embedding: [1, 0],
+        createdAt: new Date(),
+      },
+    ]);
+
+    const mockDetectDuplicates = jest.fn().mockResolvedValue([]);
+    const mockDetectSagas = jest.fn().mockResolvedValue([
+      {
+        existingStoryId: null,
+        clusterIds: ['c1', 'c2'],
+      },
+    ]);
+    const mockSynthesizeCopy = jest.fn().mockResolvedValue({
+      storyTitle: 'US-UK Bilateral Summit and Trade Talks',
+      overview: 'Leaders hold bilateral talks on trade tariffs and defence.',
+      status: 'developing',
+      threads: [
+        { clusterId: 'c1', thread: 'Chequers Summit Talks' },
+        { clusterId: 'c2', thread: 'Tariff Exemptions Agreement' },
+      ],
+    });
+
+    await organizeStoryThreads(
+      {},
+      {
+        detectDuplicateClusters: mockDetectDuplicates as any,
+        detectStorySagas: mockDetectSagas as any,
+        synthesizeStoryCopy: mockSynthesizeCopy as any,
+      }
+    );
+
+    expect(mockDb.syncStoryWithThreads).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storyTitle: 'US-UK Bilateral Summit and Trade Talks',
+        // 'politics' appears twice; 'world', 'business' and 'uk' appear once
+        tags: expect.arrayContaining(['politics', 'world', 'business', 'uk']),
+      })
+    );
+
+    // Verify 'politics' is first because its frequency count is 2
+    const callArgs = (mockDb.syncStoryWithThreads as jest.Mock).mock.calls[0][0];
+    expect(callArgs.tags[0]).toBe('politics');
   });
 });

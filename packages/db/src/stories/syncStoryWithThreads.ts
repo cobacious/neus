@@ -18,6 +18,7 @@ export type StoryInput = {
   status?: string;
   overview?: string;
   embedding?: number[] | null;
+  tags?: string[];
   threads?: StoryThreadInput[];
   angles?: StoryAngleInput[];
 };
@@ -55,6 +56,9 @@ export async function syncStoryWithThreads(input: StoryInput) {
     if (input.embedding) {
       updateData.embedding = input.embedding;
     }
+    if (input.tags) {
+      updateData.tags = input.tags;
+    }
 
     story = await prisma.story.update({
       where: { id: targetStoryId },
@@ -68,14 +72,21 @@ export async function syncStoryWithThreads(input: StoryInput) {
       slug = `${slug}-${Date.now().toString(36)}`;
     }
 
+    const createData: Record<string, any> = {
+      title: input.storyTitle,
+      slug,
+      overview: input.overview,
+      status: input.status || 'developing',
+    };
+    if (input.embedding) {
+      createData.embedding = input.embedding as any;
+    }
+    if (input.tags) {
+      createData.tags = input.tags;
+    }
+
     story = await prisma.story.create({
-      data: {
-        title: input.storyTitle,
-        slug,
-        overview: input.overview,
-        status: input.status || 'developing',
-        embedding: input.embedding ? (input.embedding as any) : undefined,
-      },
+      data: createData as any,
     });
   }
 

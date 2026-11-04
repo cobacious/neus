@@ -18,6 +18,7 @@
     "print": "tsx lib/printClusters.ts",
     "substack:draft": "tsx lib/generateWeeklyDigest.ts",
     "bluesky:post": "tsx lib/bluesky.ts",
+    "backfill:tags": "tsx scripts/backfillClusterTags.ts",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --config ../../jest.config.ts"
   }
 }

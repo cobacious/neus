@@ -307,6 +307,19 @@ export async function organizeStoryThreads(
           survivingThreads.forEach((t) => assignedClusterIds.add(t.clusterId));
           const storyEmbedding = computeCentroidEmbedding(sagaClusters);
 
+          // Pool member cluster tags, ordered descending by frequency
+          const tagFrequency = new Map<string, number>();
+          for (const c of sagaClusters) {
+            if (Array.isArray(c.tags)) {
+              for (const tag of c.tags) {
+                tagFrequency.set(tag, (tagFrequency.get(tag) || 0) + 1);
+              }
+            }
+          }
+          const storyTags = Array.from(tagFrequency.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([tag]) => tag);
+
           const targetStoryId =
             saga.existingStoryId ||
             sagaClusters.find((c) => c.storyId)?.storyId;
@@ -317,6 +330,7 @@ export async function organizeStoryThreads(
             status: copyResult.status || 'developing',
             overview: copyResult.overview,
             embedding: storyEmbedding,
+            tags: storyTags,
             threads: survivingThreads.map((t) => ({
               clusterId: t.clusterId,
               thread: t.thread,

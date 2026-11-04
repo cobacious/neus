@@ -37,6 +37,9 @@ const Story = objectType({
     t.float('updatedAt', {
       resolve: (story: any) => new Date(story.updatedAt).getTime(),
     });
+    t.list.nonNull.string('tags', {
+      resolve: (story: any) => story.tags ?? [],
+    });
     t.list.field('clusters', {
       type: 'Cluster',
       resolve: (story: any) => story.clusters ?? [],
@@ -79,6 +82,9 @@ const Cluster = objectType({
     });
     t.int('articleCount', {
       resolve: (cluster) => cluster.articleAssignments?.length ?? 0,
+    });
+    t.list.nonNull.string('tags', {
+      resolve: (cluster: any) => cluster.tags ?? [],
     });
     t.list.field('articles', {
       type: 'ArticleSummary',
@@ -134,12 +140,18 @@ const Query = queryType({
       args: {
         limit: intArg(),
         offset: intArg(),
+        tag: stringArg(),
       },
-      resolve: async (_, { limit, offset }) => {
+      resolve: async (_, { limit, offset, tag }) => {
         const l = limit ?? 10;
         const o = offset ?? 0;
-        return getOrSetCache(`clusters:${l}:${o}`, () =>
-          getRankedClusters(limit ?? undefined, offset ?? undefined)
+        const tg = tag ? tag.trim().toLowerCase() : 'all';
+        return getOrSetCache(`clusters:${l}:${o}:${tg}`, () =>
+          getRankedClusters(
+            limit ?? undefined,
+            offset ?? undefined,
+            tag && tag.trim().length > 0 ? tag.trim().toLowerCase() : undefined
+          )
         );
       },
     });
