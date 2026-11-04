@@ -2,7 +2,7 @@
 
 - **Identifier**: `PRD-002`
 - **Priority**: P2 (Immediate Delivery)
-- **Status**: Ready for Development
+- **Status**: Completed
 - **Target Packages**: `apps/web`
 - **Target Personas**: Mobile PWA Reader, Tablet & Desktop Explorer
 - **Estimated Effort**: Medium (~3 to 4 hours)
@@ -138,14 +138,14 @@ Update the dark popover card (`bg-slate-900 text-white`):
 
 ## 5. Acceptance Criteria
 
-- [ ] **GIVEN** a mobile viewport, **WHEN** inspecting the sparkline track container, **THEN** the interactive scrub track has a vertical touch height of at least 44px and sets `touch-action: pan-y` so vertical page scrolling remains unobstructed.
-- [ ] **GIVEN** a dense cluster of 6+ overlapping markers, **WHEN** a touch user drags their thumb horizontally across the cluster, **THEN** each individual marker in chronological order can be isolated and previewed in the tooltip without being swallowed by adjacent markers.
-- [ ] **GIVEN** a touch user scrubs or taps the timeline and lifts their finger (`pointerup`), **WHEN** the gesture ends, **THEN** the active marker remains visually highlighted and the tooltip remains **latched** (visible) on screen.
-- [ ] **GIVEN** a latched tooltip on a feed card, **WHEN** the user taps the tooltip card, **THEN** the browser navigates to `/story/${storySlug}?thread=${threadId}#article-${articleId}` without triggering the parent card's default click handler.
-- [ ] **GIVEN** a latched tooltip on the story detail page, **WHEN** the user taps the tooltip card, **THEN** the page smoothly scrolls to `#article-${articleId}`, applies `.highlight-pulse` for 2 seconds and dismisses the tooltip.
-- [ ] **GIVEN** a latched tooltip, **WHEN** the user taps outside the component or scrolls the page, **THEN** the tooltip unlatches and closes cleanly.
-- [ ] **GIVEN** keyboard navigation (`Tab` / `ArrowLeft` / `ArrowRight`), **WHEN** focusing the timeline, **THEN** users can cycle through markers with arrow keys and press `Enter` or `Space` to trigger navigation.
-- [ ] **GIVEN** existing unit/component test suites, **WHEN** `pnpm test ArticleTimelineSparkline` runs, **THEN** all tests pass including new pointer scrub, latch, outside-click dismissal and deep-link dispatch assertions.
+- [x] **GIVEN** a mobile viewport, **WHEN** inspecting the sparkline track container, **THEN** the interactive scrub track has a vertical touch height of at least 44px and sets `touch-action: pan-y` so vertical page scrolling remains unobstructed.
+- [x] **GIVEN** a dense cluster of 6+ overlapping markers, **WHEN** a touch user drags their thumb horizontally across the cluster, **THEN** each individual marker in chronological order can be isolated and previewed in the tooltip without being swallowed by adjacent markers.
+- [x] **GIVEN** a touch user scrubs or taps the timeline and lifts their finger (`pointerup`), **WHEN** the gesture ends, **THEN** the active marker remains visually highlighted and the tooltip remains **latched** (visible) on screen.
+- [x] **GIVEN** a latched tooltip on a feed card, **WHEN** the user taps the tooltip card, **THEN** the browser navigates to `/story/${storySlug}?thread=${threadId}#article-${articleId}` without triggering the parent card's default click handler.
+- [x] **GIVEN** a latched tooltip on the story detail page, **WHEN** the user taps the tooltip card, **THEN** the page smoothly scrolls to `#article-${articleId}`, applies `.highlight-pulse` for 2 seconds and dismisses the tooltip.
+- [x] **GIVEN** a latched tooltip, **WHEN** the user taps outside the component or scrolls the page, **THEN** the tooltip unlatches and closes cleanly.
+- [x] **GIVEN** keyboard navigation (`Tab` / `ArrowLeft` / `ArrowRight`), **WHEN** focusing the timeline, **THEN** users can cycle through markers with arrow keys and press `Enter` or `Space` to trigger navigation.
+- [x] **GIVEN** existing unit/component test suites, **WHEN** `pnpm test ArticleTimelineSparkline` runs, **THEN** all tests pass including new pointer scrub, latch, outside-click dismissal and deep-link dispatch assertions.
 
 ---
 

@@ -186,13 +186,13 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
       )}
 
       {/* Timeline Sparkline replacing old text */}
-      <div className="relative z-10 mb-3 pt-1 border-t border-gray-100 pointer-events-none">
+      <div className="relative z-10 mb-3 pt-1 border-t border-gray-100">
         <ArticleTimelineSparkline
           articles={timelineArticles}
           colorMap={colorMap}
           fallbackFirstSeen={cluster.createdAt}
           fallbackLastUpdated={cluster.lastUpdatedAt}
-          className="[&_button]:pointer-events-auto"
+          storySlug={cluster.slug || cluster.id}
         />
       </div>
 
