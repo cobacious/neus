@@ -8,12 +8,30 @@ import { registerServiceWorker } from './pwa';
 
 registerServiceWorker();
 
-// Vite exposes environment variables prefixed with `VITE_` via `import.meta.env`.
-// Allow the GraphQL endpoint to be configured at build time with `VITE_API_URL`.
-const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/graphql';
+// Resolve GraphQL endpoint, automatically matching LAN hostname when testing on mobile devices
+const resolveApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    try {
+      const parsed = new URL(envUrl, window.location.href);
+      if (
+        (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1'
+      ) {
+        parsed.hostname = window.location.hostname;
+        return parsed.toString();
+      }
+      return parsed.toString();
+    } catch {
+      return envUrl;
+    }
+  }
+  return `http://${window.location.hostname || 'localhost'}:4000/graphql`;
+};
 
 const client = createClient({
-  url: apiUrl,
+  url: resolveApiUrl(),
   exchanges: [cacheExchange, fetchExchange],
 });
 
