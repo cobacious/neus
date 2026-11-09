@@ -6,7 +6,6 @@ import { createThreadColorMap } from '../utils/threadColors';
 import { parseDate } from '../utils/dateUtils';
 import { isPaywalled } from '../utils/paywallUtils';
 import SourceFavicon from './SourceFavicon';
-import { getTopicLabel } from '../utils/topics';
 
 interface Source {
   id: string;
@@ -146,9 +145,6 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
   const statusConfig = status ? STATUS_CONFIG[status] : null;
   const storyUrl = `/${cluster.slug || cluster.id}`;
 
-  const rawTags = (isMultiThreadStory && story?.tags && story.tags.length > 0 ? story.tags : cluster.tags) || [];
-  const visibleTags = rawTags.slice(0, 3);
-
   return (
     <article
       className="relative block bg-white border border-gray-200 shadow-xs hover:shadow-md p-5 rounded-lg hover:border-gray-300 transition-all duration-200"
@@ -160,28 +156,6 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
       {status && (
         <div className="absolute right-4 top-0 -translate-y-1/2 z-10 pointer-events-none">
           <StatusBadge status={status} size="sm" />
-        </div>
-      )}
-
-      {/* Topic Eyebrow Overline */}
-      {visibleTags.length > 0 && (
-        <div className="relative z-10 flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-          {visibleTags.map((tag, idx) => (
-            <span key={tag} className="flex items-center gap-1.5">
-              <Link
-                to={`/?topic=${encodeURIComponent(tag)}`}
-                className="hover:text-gray-900 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {getTopicLabel(tag)}
-              </Link>
-              {idx < visibleTags.length - 1 && (
-                <span className="text-gray-300 font-normal select-none" aria-hidden="true">
-                  ·
-                </span>
-              )}
-            </span>
-          ))}
         </div>
       )}
 

@@ -5,7 +5,6 @@ import ClusterCard from './ClusterCard';
 import ClusterCardSkeleton from './ClusterCardSkeleton';
 import Loading from './Loading';
 import PullToRefreshIndicator from './PullToRefreshIndicator';
-import ActiveTopicFilterPill from './ActiveTopicFilterPill';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useStaleRefresh } from '../hooks/useStaleRefresh';
 import { isStandalonePwa } from '../pwa';
@@ -77,7 +76,32 @@ const loadCachedClusters = (tag?: string): any[] => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(getCacheKey(tag));
-    return raw ? JSON.parse(raw) : [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+
+    // Fallback: If tag-specific cache is empty, instantly derive matching clusters
+    // from the main 'all' feed cache so the user sees relevant stories in 0ms
+    if (tag) {
+      const allRaw = localStorage.getItem(getCacheKey());
+      if (allRaw) {
+        const allClusters = JSON.parse(allRaw);
+        if (Array.isArray(allClusters)) {
+          const derived = allClusters.filter(
+            (c: any) =>
+              (c.tags && c.tags.includes(tag)) ||
+              (c.story?.tags && c.story.tags.includes(tag))
+          );
+          if (derived.length > 0) {
+            return derived;
+          }
+        }
+      }
+    }
+    return [];
   } catch {
     return [];
   }
@@ -157,8 +181,44 @@ export default function ClusterList() {
   // Reset pagination and hydrate topic cache when topic filter changes
   useEffect(() => {
     setOffset(0);
+    window.scrollTo({ top: 0, behavior: 'instant' });
     setDisplayedClusters(loadCachedClusters(activeTag));
   }, [activeTag]);
+
+  // Idle background prefetch for primary topics
+  useEffect(() => {
+    // Only schedule prefetch on main feed after initial mount
+    if (activeTag) return;
+
+    const PRIMARY_PREFETCH_TOPICS = ['uk', 'world', 'politics', 'business'];
+    const timer = setTimeout(() => {
+      PRIMARY_PREFETCH_TOPICS.forEach((tag) => {
+        // Skip if already cached
+        try {
+          if (localStorage.getItem(getCacheKey(tag))) return;
+        } catch {
+          return;
+        }
+
+        // Prefetch quietly in background
+        client
+          .query(
+            CLUSTERS_QUERY,
+            { limit: CLUSTERS_PER_PAGE, offset: 0, tag },
+            { requestPolicy: 'network-only' }
+          )
+          .toPromise()
+          .then((res) => {
+            if (res.data?.clusters && res.data.clusters.length > 0) {
+              saveCachedClusters(res.data.clusters, tag);
+            }
+          })
+          .catch(() => {});
+      });
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [client, activeTag]);
 
   useEffect(() => {
     if (activeTag) {
@@ -261,11 +321,6 @@ export default function ClusterList() {
             </button>
           </div>
         </div>
-        <ActiveTopicFilterPill
-          topic={activeTag}
-          storyCount={0}
-          onClear={() => setSearchParams({})}
-        />
       </div>
     );
   }
@@ -301,14 +356,6 @@ export default function ClusterList() {
           </div>
         )}
       </div>
-
-      {activeTag && (
-        <ActiveTopicFilterPill
-          topic={activeTag}
-          storyCount={displayedClusters.length}
-          onClear={() => setSearchParams({})}
-        />
-      )}
     </div>
   );
 }
