@@ -613,7 +613,7 @@ describe('typesafeClient', () => {
       expect(tags).toEqual([]);
     });
 
-    it('extracts tags with probability >= 0.25 sorted descending and capped at 3', async () => {
+    it('extracts tags with probability >= 0.35 sorted descending and capped at 2', async () => {
       process.env.TYPESAFE_API_KEY = 'mock_key';
 
       const mockFetch = jest.fn().mockResolvedValue({
@@ -628,8 +628,8 @@ describe('typesafeClient', () => {
               confidence: 0.62,
               probabilities: {
                 politics: 0.58,
-                business: 0.32,
-                uk: 0.27,
+                business: 0.38,
+                uk: 0.36,
                 world: 0.08,
                 sport: 0.02,
               },
@@ -644,10 +644,10 @@ describe('typesafeClient', () => {
         summary: 'Mayor Burnham meets Chancellor Reeves to discuss funding models.',
       });
 
-      expect(tags).toEqual(['politics', 'business', 'uk']);
+      expect(tags).toEqual(['politics', 'business']);
     });
 
-    it('falls back to argmax choice when no tag meets the 0.25 probability threshold', async () => {
+    it('falls back to argmax choice when no tag meets the 0.35 probability threshold', async () => {
       process.env.TYPESAFE_API_KEY = 'mock_key';
 
       const mockFetch = jest.fn().mockResolvedValue({

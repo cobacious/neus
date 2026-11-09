@@ -818,8 +818,8 @@ export async function detectStorySagas(
 }
 
 /**
- * Classifies a news cluster into 1 to 3 controlled topic tags using TypeSafe System One
- * calibrated probabilities (threshold p >= 0.25).
+ * Classifies a news cluster into 1 to 2 controlled topic tags using TypeSafe System One
+ * calibrated probabilities (threshold p >= 0.35).
  */
 export async function classifyClusterTags(params: {
   headline: string;
@@ -831,8 +831,8 @@ export async function classifyClusterTags(params: {
   const {
     headline,
     summary,
-    minProbability = 0.25,
-    maxTags = 3,
+    minProbability = 0.35,
+    maxTags = 2,
     step = PipelineStep.Summarise,
   } = params;
 
@@ -856,7 +856,7 @@ export async function classifyClusterTags(params: {
           topic: {
             type: 'choice',
             instructions:
-              'Select the primary editorial topic tags that accurately describe this news cluster headline and summary.',
+              'Which editorial desk at a major news outlet like the BBC or The Guardian leads coverage of this story? Base your decision strictly on the primary news event, not secondary entities or background people mentioned.',
             criteria,
           },
         },
@@ -870,6 +870,7 @@ export async function classifyClusterTags(params: {
     }
 
     const probabilities = answer.probabilities || {};
+    const primaryChoice = answer.choice;
 
     // Select all valid tags with calibrated probability >= minProbability, sorted descending
     const qualifiedTags = Object.entries(probabilities)
@@ -877,13 +878,17 @@ export async function classifyClusterTags(params: {
       .sort((a, b) => b[1] - a[1])
       .map(([tag]) => tag as TopicTag);
 
+    // Ensure the top primary choice leads the list
+    if (isValidTopicTag(primaryChoice) && !qualifiedTags.includes(primaryChoice)) {
+      qualifiedTags.unshift(primaryChoice);
+    }
+
     if (qualifiedTags.length > 0) {
       return qualifiedTags.slice(0, maxTags);
     }
 
-    // Fallback: ensure at least argmax top choice is included if valid
-    if (isValidTopicTag(answer.choice)) {
-      return [answer.choice];
+    if (isValidTopicTag(primaryChoice)) {
+      return [primaryChoice];
     }
 
     return [];
