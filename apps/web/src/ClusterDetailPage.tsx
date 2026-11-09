@@ -24,6 +24,7 @@ const CLUSTER_QUERY = `
       headline
       slug
       summary
+      tags
       createdAt
       lastUpdatedAt
       origin
@@ -36,6 +37,7 @@ const CLUSTER_QUERY = `
         slug
         overview
         status
+        tags
         clusters {
           id
           headline

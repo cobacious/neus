@@ -187,4 +187,31 @@ describe('syncStoryWithThreads', () => {
       },
     });
   });
+
+  it('persists tags when creating and updating a story', async () => {
+    (mockPrisma.cluster.findMany as jest.Mock).mockResolvedValue([]);
+    (mockPrisma.story.findUnique as jest.Mock).mockResolvedValue(null);
+    (mockPrisma.story.create as jest.Mock).mockResolvedValue({
+      id: 'story-tagged',
+      title: 'Tagged Story',
+      slug: 'tagged-story',
+      tags: ['politics', 'uk'],
+    } as any);
+
+    await syncStoryWithThreads({
+      storyTitle: 'Tagged Story',
+      tags: ['politics', 'uk'],
+      threads: [{ clusterId: 'c1', thread: 'Thread 1' }],
+    });
+
+    expect(mockPrisma.story.create).toHaveBeenCalledWith({
+      data: {
+        title: 'Tagged Story',
+        slug: 'tagged-story',
+        overview: undefined,
+        status: 'developing',
+        tags: ['politics', 'uk'],
+      },
+    });
+  });
 });

@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../client';
 
-export async function getRankedClusters(limit?: number, offset?: number) {
+export async function getRankedClusters(limit?: number, offset?: number, tag?: string) {
   // Query distinct feed representatives: for clusters belonging to a story, select
   // the highest-scoring cluster in that story; for standalone clusters (storyId is null),
   // each cluster represents itself. Order all representatives by score desc.
@@ -9,6 +9,17 @@ export async function getRankedClusters(limit?: number, offset?: number) {
     limit !== undefined && limit !== null ? Prisma.sql`LIMIT ${limit}` : Prisma.empty;
   const offsetClause =
     offset !== undefined && offset !== null ? Prisma.sql`OFFSET ${offset}` : Prisma.empty;
+  const tagClause =
+    tag && tag.trim().length > 0
+      ? Prisma.sql`AND (
+          "Cluster"."tags" @> ARRAY[${tag.trim()}]::text[]
+          OR EXISTS (
+            SELECT 1 FROM "Story" "s"
+            WHERE "s"."id" = "Cluster"."storyId"
+              AND "s"."tags" @> ARRAY[${tag.trim()}]::text[]
+          )
+        )`
+      : Prisma.empty;
 
   const rankedIdsResult = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
     SELECT id FROM (
@@ -22,6 +33,7 @@ export async function getRankedClusters(limit?: number, offset?: number) {
         AND "summary" IS NOT NULL
         AND "summary" != ''
         AND "archived" = false
+        ${tagClause}
       ORDER BY COALESCE("storyId", "id"), score DESC NULLS LAST, "createdAt" DESC
     ) sub
     ORDER BY score DESC NULLS LAST, "createdAt" DESC

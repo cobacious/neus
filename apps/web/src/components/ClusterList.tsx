@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useClient } from 'urql';
 import ClusterCard from './ClusterCard';
 import ClusterCardSkeleton from './ClusterCardSkeleton';
@@ -7,14 +8,16 @@ import PullToRefreshIndicator from './PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useStaleRefresh } from '../hooks/useStaleRefresh';
 import { isStandalonePwa } from '../pwa';
+import { getTopicLabel } from '../utils/topics';
 
 const CLUSTERS_QUERY = `
-  query GetClusters($limit: Int, $offset: Int) {
-    clusters(limit: $limit, offset: $offset) {
+  query GetClusters($limit: Int, $offset: Int, $tag: String) {
+    clusters(limit: $limit, offset: $offset, tag: $tag) {
       id
       headline
       slug
       summary
+      tags
       createdAt
       lastUpdatedAt
       origin
@@ -26,6 +29,7 @@ const CLUSTERS_QUERY = `
         slug
         overview
         status
+        tags
         clusters {
           id
           headline
@@ -66,14 +70,68 @@ const CLUSTERS_QUERY = `
 
 const CLUSTERS_PER_PAGE = 15;
 
+const getCacheKey = (tag?: string) => `neus_feed_cache_${tag || 'all'}`;
+
+const loadCachedClusters = (tag?: string): any[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(getCacheKey(tag));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+
+    // Fallback: If tag-specific cache is empty, instantly derive matching clusters
+    // from the main 'all' feed cache so the user sees relevant stories in 0ms
+    if (tag) {
+      const allRaw = localStorage.getItem(getCacheKey());
+      if (allRaw) {
+        const allClusters = JSON.parse(allRaw);
+        if (Array.isArray(allClusters)) {
+          const derived = allClusters.filter(
+            (c: any) =>
+              (c.tags && c.tags.includes(tag)) ||
+              (c.story?.tags && c.story.tags.includes(tag))
+          );
+          if (derived.length > 0) {
+            return derived;
+          }
+        }
+      }
+    }
+    return [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCachedClusters = (clusters: any[], tag?: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(getCacheKey(tag), JSON.stringify(clusters));
+  } catch {
+    // Gracefully handle localStorage quota or private browsing exceptions
+  }
+};
+
 export default function ClusterList() {
-  const [displayedClusters, setDisplayedClusters] = useState<any[]>([]);
   const [offset, setOffset] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTopic = searchParams.get('topic');
   const client = useClient();
+
+  const activeTag =
+    currentTopic && currentTopic.trim().length > 0 ? currentTopic.trim().toLowerCase() : undefined;
+
+  const [displayedClusters, setDisplayedClusters] = useState<any[]>(() =>
+    loadCachedClusters(activeTag)
+  );
 
   const [result, reexecuteQuery] = useQuery({
     query: CLUSTERS_QUERY,
-    variables: { limit: CLUSTERS_PER_PAGE, offset },
+    variables: { limit: CLUSTERS_PER_PAGE, offset, tag: activeTag },
     requestPolicy: 'cache-and-network',
   });
 
@@ -81,18 +139,23 @@ export default function ClusterList() {
     setOffset(0);
     try {
       const res = await client
-        .query(CLUSTERS_QUERY, { limit: CLUSTERS_PER_PAGE, offset: 0 }, { requestPolicy: 'network-only' })
+        .query(
+          CLUSTERS_QUERY,
+          { limit: CLUSTERS_PER_PAGE, offset: 0, tag: activeTag },
+          { requestPolicy: 'network-only' }
+        )
         .toPromise();
 
       if (res.data?.clusters) {
         setDisplayedClusters(res.data.clusters);
+        saveCachedClusters(res.data.clusters, activeTag);
         return true;
       }
       return !res.error;
     } catch (_) {
       return false;
     }
-  }, [client]);
+  }, [client, activeTag]);
 
   const isStandalone = isStandalonePwa();
 
@@ -115,9 +178,55 @@ export default function ClusterList() {
     staleDurationMs: 5 * 60 * 1000,
   });
 
+  // Reset pagination and hydrate topic cache when topic filter changes
   useEffect(() => {
-    document.title = 'Neus - Neutral News';
-  }, []);
+    setOffset(0);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    setDisplayedClusters(loadCachedClusters(activeTag));
+  }, [activeTag]);
+
+  // Idle background prefetch for primary topics
+  useEffect(() => {
+    // Only schedule prefetch on main feed after initial mount
+    if (activeTag) return;
+
+    const PRIMARY_PREFETCH_TOPICS = ['uk', 'world', 'politics', 'business'];
+    const timer = setTimeout(() => {
+      PRIMARY_PREFETCH_TOPICS.forEach((tag) => {
+        // Skip if already cached
+        try {
+          if (localStorage.getItem(getCacheKey(tag))) return;
+        } catch {
+          return;
+        }
+
+        // Prefetch quietly in background
+        client
+          .query(
+            CLUSTERS_QUERY,
+            { limit: CLUSTERS_PER_PAGE, offset: 0, tag },
+            { requestPolicy: 'network-only' }
+          )
+          .toPromise()
+          .then((res) => {
+            if (res.data?.clusters && res.data.clusters.length > 0) {
+              saveCachedClusters(res.data.clusters, tag);
+            }
+          })
+          .catch(() => {});
+      });
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [client, activeTag]);
+
+  useEffect(() => {
+    if (activeTag) {
+      document.title = `${getTopicLabel(activeTag)} News - Neus`;
+    } else {
+      document.title = 'Neus - Neutral News';
+    }
+  }, [activeTag]);
 
   // Update displayed clusters when new data arrives
   useEffect(() => {
@@ -127,6 +236,9 @@ export default function ClusterList() {
       if (offset === 0) {
         // Initial load or refresh
         setDisplayedClusters(rawClusters);
+        if (rawClusters.length > 0) {
+          saveCachedClusters(rawClusters, activeTag);
+        }
       } else if (rawClusters.length > 0) {
         // Loading more - append new clusters avoiding duplicate IDs across pages
         setDisplayedClusters((prev) => {
@@ -136,7 +248,7 @@ export default function ClusterList() {
         });
       }
     }
-  }, [result.data, result.fetching, offset, markFresh]);
+  }, [result.data, result.fetching, offset, markFresh, activeTag]);
 
   const handleLoadMore = () => {
     setOffset(displayedClusters.length);
@@ -177,6 +289,37 @@ export default function ClusterList() {
             </svg>
             Retry Connection
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state for filtered topic with 0 stories
+  if (!result.fetching && displayedClusters.length === 0 && activeTag) {
+    return (
+      <div className="relative">
+        <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-slate-50 text-[#4F6D7A] flex items-center justify-center mx-auto ring-8 ring-slate-50/60">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+              No Stories Found in {getTopicLabel(activeTag)}
+            </h2>
+            <p className="text-sm text-gray-600 max-w-md mx-auto leading-normal">
+              There are currently no active stories classified under this topic.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              onClick={() => setSearchParams({})}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors text-xs"
+            >
+              Show All News
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -12,6 +12,11 @@ jest.unstable_mockModule('../../lib/aiClient', () => ({
   generateStructuredJson: mockGenerateStructuredJson,
 }));
 
+const mockClassifyClusterTags = jest.fn();
+jest.unstable_mockModule('../../lib/typesafeClient', () => ({
+  classifyClusterTags: mockClassifyClusterTags,
+}));
+
 let summarizeClusters: typeof import('./summarizeClusters').summarizeClusters;
 
 beforeAll(async () => {
@@ -23,7 +28,7 @@ describe('summarizeClusters', () => {
     jest.resetAllMocks();
   });
 
-  it('calls generateStructuredJson and updates cluster summary', async () => {
+  it('calls generateStructuredJson, classifies tags and updates cluster summary', async () => {
     (mockDb.getClustersToSummarize as jest.Mock).mockResolvedValue([
       { id: 'c1', articleAssignments: [{ article: { title: 't1', snippet: 's1' } }] },
     ]);
@@ -31,10 +36,15 @@ describe('summarizeClusters', () => {
       headline: 'H',
       summary: 'S',
     });
+    mockClassifyClusterTags.mockResolvedValue(['politics', 'uk']);
 
     await summarizeClusters();
 
     expect(mockGenerateStructuredJson).toHaveBeenCalled();
-    expect(mockDb.updateClusterSummary).toHaveBeenCalledWith('c1', 'H', 'S');
+    expect(mockClassifyClusterTags).toHaveBeenCalledWith({
+      headline: 'H',
+      summary: 'S',
+    });
+    expect(mockDb.updateClusterSummary).toHaveBeenCalledWith('c1', 'H', 'S', ['politics', 'uk']);
   });
 });

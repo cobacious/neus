@@ -8,6 +8,7 @@ import {
   verifySagaRelationship,
   verifyStoryMembership,
   detectStorySagas,
+  classifyClusterTags,
 } from './typesafeClient';
 import { getAiUsageTotals, resetAiUsage } from './aiUsage';
 
@@ -600,6 +601,94 @@ describe('typesafeClient', () => {
         existingStoryId: 'story-pike',
         clusterIds: ['c1', 'c2'],
       });
+    });
+  });
+
+  describe('classifyClusterTags', () => {
+    it('returns empty array when TYPESAFE_API_KEY is not set', async () => {
+      delete process.env.TYPESAFE_API_KEY;
+      const tags = await classifyClusterTags({
+        headline: 'Chancellor announces autumn budget update',
+      });
+      expect(tags).toEqual([]);
+    });
+
+    it('extracts tags with probability >= 0.35 sorted descending and capped at 2', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            topic: {
+              type: 'choice',
+              choice: 'politics',
+              confidence: 0.62,
+              probabilities: {
+                politics: 0.58,
+                business: 0.38,
+                uk: 0.36,
+                world: 0.08,
+                sport: 0.02,
+              },
+            },
+          },
+        }),
+      });
+      global.fetch = mockFetch as any;
+
+      const tags = await classifyClusterTags({
+        headline: 'Andy Burnham reset talks with Treasury over regional transport funding',
+        summary: 'Mayor Burnham meets Chancellor Reeves to discuss funding models.',
+      });
+
+      expect(tags).toEqual(['politics', 'business']);
+    });
+
+    it('falls back to argmax choice when no tag meets the 0.35 probability threshold', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            topic: {
+              type: 'choice',
+              choice: 'culture',
+              confidence: 0.22,
+              probabilities: {
+                culture: 0.22,
+                society: 0.20,
+                tech_science: 0.18,
+              },
+            },
+          },
+        }),
+      });
+      global.fetch = mockFetch as any;
+
+      const tags = await classifyClusterTags({
+        headline: 'Edinburgh Zoo announces new capybara exhibit',
+      });
+
+      expect(tags).toEqual(['culture']);
+    });
+
+    it('handles API errors gracefully and returns empty array', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockRejectedValue(new Error('Network error'));
+      global.fetch = mockFetch as any;
+
+      const tags = await classifyClusterTags({
+        headline: 'Some headline',
+      });
+
+      expect(tags).toEqual([]);
     });
   });
 });

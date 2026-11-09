@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import GitHubIcon from './GitHubIcon';
 import BlueskyIcon from './BlueskyIcon';
 import { usePwaInstall, useOnlineStatus } from '../pwa';
+import { CONTROLLED_TOPIC_TAGS, getTopicLabel } from '../utils/topics';
 
 const BRAND_COLORS = [
   '#4F6D7A', // Blue Slate
@@ -16,7 +17,9 @@ const BRAND_COLORS = [
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const lastScrollY = useRef(0);
   const location = useLocation();
   const isOnline = useOnlineStatus();
   const { isInstallable, isInstalled, promptInstall } = usePwaInstall();
@@ -29,18 +32,40 @@ export default function Header() {
     }));
   });
 
-  // Close drawer on route navigation
+  const currentTopic = new URLSearchParams(location.search).get('topic');
+
+  // Close drawer on route or topic navigation
   useEffect(() => {
     setIsMenuOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
-  // Handle subtle elevation shadow on scroll
+  // Handle directional auto-hide on scroll and elevation shadow
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      const currentScrollY = window.scrollY;
+      setIsScrolled(currentScrollY > 10);
+
+      // Always keep header visible at the very top of the page
+      if (currentScrollY < 20) {
+        setIsHeaderVisible(true);
+        lastScrollY.current = currentScrollY;
+        return;
+      }
+
+      const diff = currentScrollY - lastScrollY.current;
+
+      // Scrolling down past 10px threshold: hide header for full-screen feed reading
+      if (diff > 10) {
+        setIsHeaderVisible(false);
+        lastScrollY.current = currentScrollY;
+      }
+      // Scrolling up past 5px threshold: immediately reveal header
+      else if (diff < -5) {
+        setIsHeaderVisible(true);
+        lastScrollY.current = currentScrollY;
+      }
     };
 
-    handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -77,13 +102,19 @@ export default function Header() {
   const toggleMenu = () => setIsMenuOpen((prev) => !prev);
   const closeMenu = () => setIsMenuOpen(false);
 
+  const handleTopicClick = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const shouldShowHeader = isHeaderVisible || isMenuOpen;
+
   return (
     <>
-      {/* Modern Left-Aligned Sticky Navbar */}
+      {/* Modern Directional Auto-Hiding Sticky Navbar */}
       <header
-        className={`sticky top-0 z-40 bg-white border-b border-gray-200 transition-shadow duration-200 ${
-          isScrolled ? 'shadow-sm' : ''
-        }`}
+        className={`sticky top-0 z-40 bg-white border-b border-gray-200 transition-transform duration-200 ease-out ${
+          shouldShowHeader ? 'translate-y-0' : '-translate-y-full'
+        } ${isScrolled ? 'shadow-sm' : ''}`}
       >
         {/* Subtle Brand Editorial Stripe (Randomized segment widths on load) */}
         <div className="flex h-1 w-full overflow-hidden" aria-hidden="true">
@@ -158,6 +189,45 @@ export default function Header() {
                 )}
               </svg>
             </button>
+          </div>
+        </div>
+
+        {/* Horizontal Text-Only Topic Rail */}
+        <div className="border-t border-gray-100 bg-white">
+          <div className="max-w-3xl mx-auto px-4">
+            <nav
+              className="flex items-center gap-1.5 py-2 overflow-x-auto no-scrollbar scroll-smooth -mx-4 px-4 sm:mx-0 sm:px-0"
+              aria-label="Topics"
+            >
+              <Link
+                to="/"
+                onClick={handleTopicClick}
+                className={`shrink-0 px-3.5 py-1 text-xs rounded-full transition-colors ${
+                  !currentTopic && location.pathname === '/'
+                    ? 'bg-gray-900 text-white font-semibold shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                All
+              </Link>
+              {CONTROLLED_TOPIC_TAGS.map((tag) => {
+                const isActive = location.pathname === '/' && currentTopic === tag;
+                return (
+                  <Link
+                    key={tag}
+                    to={`/?topic=${encodeURIComponent(tag)}`}
+                    onClick={handleTopicClick}
+                    className={`shrink-0 px-3.5 py-1 text-xs rounded-full transition-colors ${
+                      isActive
+                        ? 'bg-gray-900 text-white font-semibold shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 font-medium'
+                    }`}
+                  >
+                    {getTopicLabel(tag)}
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
         </div>
       </header>

@@ -38,6 +38,7 @@ interface Story {
   slug?: string | null;
   overview?: string | null;
   status?: string | null;
+  tags?: string[];
   clusters?: SiblingCluster[];
 }
 
@@ -46,6 +47,7 @@ export interface Cluster {
   headline: string;
   summary: string;
   slug?: string | null;
+  tags?: string[];
   articleCount?: number;
   uniqueSources?: number;
   consensusRatio?: number;

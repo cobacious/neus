@@ -39,11 +39,13 @@ model Story {
   embedding         Json?
   postedToBlueskyAt DateTime?
   blueskyUri        String?
+  tags              String[]  @default([])
   createdAt         DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   clusters  Cluster[]
 
   @@index([status])
+  @@index([tags], type: Gin)
 }
 
 model Cluster {
@@ -59,6 +61,7 @@ model Cluster {
   archived           Boolean                    @default(false)
   storyId            String?
   storyAngle         String?
+  tags               String[]                   @default([])
   story              Story?                     @relation(fields: [storyId], references: [id], onDelete: SetNull)
   articleAssignments ArticleClusterAssignment[]
 
@@ -67,6 +70,7 @@ model Cluster {
   @@index([summary])
   @@index([archived])
   @@index([storyId])
+  @@index([tags], type: Gin)
 }
 
 model Source {

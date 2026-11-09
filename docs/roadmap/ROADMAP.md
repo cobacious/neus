@@ -2,8 +2,8 @@
 
 This document serves as the canonical, living roadmap for Neus. It tracks the prioritized delivery sequence, functional workstream tracks and links to detailed Product Requirement Documents (PRDs) stored in [`docs/prds/`](file:///Users/jwalton/Code/cobacious/neus/docs/prds).
 
-- **Last Updated**: 2 November 2026
-- **Current Active Focus**: [`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md) (Topic Taxonomy & Verticals)
+- **Last Updated**: 4 November 2026
+- **Current Active Focus**: [`PRD-004`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-004-story-view-faceted-filtering.md) (Faceted Story View Filtering)
 
 ---
 
@@ -27,7 +27,7 @@ Items are ranked in execution order based on reader trust impact, mobile usabili
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **P1** | `PRD-001` | **Pipeline Freshness & Last Updated Metadata** | `apps/api`, `apps/web` | Small (~1h) | Completed | [`PRD-001-pipeline-freshness-metadata.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-001-pipeline-freshness-metadata.md) |
 | **P2** | `PRD-002` | **Sparkline Touch Scrubber & Latched Tooltip Deep Linking** | `apps/web` | Medium (~3-4h) | Completed | [`PRD-002-sparkline-touch-scrubber.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-002-sparkline-touch-scrubber.md) |
-| **P3** | `PRD-003` | **Topic Taxonomy & Multi-Tagging (TypeSafe Jev)** | `apps/engine`, `packages/db`, `apps/api`, `apps/web` | Medium | Specification Ready | [`PRD-003-topic-taxonomy-and-verticals.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md) |
+| **P3** | `PRD-003` | **Topic Taxonomy & Multi-Tagging (TypeSafe Jev)** | `apps/engine`, `packages/db`, `apps/api`, `apps/web` | Medium | Completed | [`PRD-003-topic-taxonomy-and-verticals.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md) |
 | **P4** | `PRD-004` | **Faceted Story View Filtering (Outlet, Date & Topic)** | `apps/web` | Medium | Backlog | [`PRD-004-story-view-faceted-filtering.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-004-story-view-faceted-filtering.md) |
 | **P5** | `PRD-005` | **Native PostgreSQL Full-Text Search** | `packages/db`, `apps/api`, `apps/web` | Medium | Backlog | [`PRD-005-postgresql-full-text-search.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-005-postgresql-full-text-search.md) |
 | **P6** | `PRD-006` | **Editorial Dark Theme System** | `apps/web` | Medium | Backlog | [`PRD-006-dark-theme-system.md`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-006-dark-theme-system.md) |
@@ -63,6 +63,7 @@ When starting a session or subagent, select from these decoupled tracks:
 
 ### Track 3: Ranking & Taxonomy Analysis (`apps/engine`, `packages/db`)
 - [x] **Feed ranking & sorting**: Implemented consensus recency to defeat single-source recency hijacking, enforced multi-source cluster gating (`uniqueSources >= 2`), activated canonical source trust scores, archived 292 legacy single-source/deactivated spam clusters and re-scored all active clusters with zero LLM API cost. (See [`docs/handoffs/ranking-algorithm-review.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/ranking-algorithm-review.md)).
+- [x] **Topic taxonomy & multi-tagging (TypeSafe Jev)** ([`PRD-003`](file:///Users/jwalton/Code/cobacious/neus/docs/prds/PRD-003-topic-taxonomy-and-verticals.md)): Implemented 9 controlled topic tags (`uk`, `world`, `politics`, `business`, `tech_science`, `environment`, `society`, `sport` and `culture`) using TypeSafe Jev calibrated choice distributions ($p \ge 0.25$), GIN indexed array containment, GraphQL tag filtering, card overline topic eyebrows, mobile thumb-zone dismissible filter pill and slide-over drawer navigation.
 - [ ] **French Protests angle alignment** ([`PRD-008`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/french-protests-angle-grouping.md)): Investigate article-to-angle assignments for the French education protests story. (See handoff in [`docs/handoffs/french-protests-angle-grouping.md`](file:///Users/jwalton/Code/cobacious/neus/docs/handoffs/french-protests-angle-grouping.md)).
 
 ### Track 4: Pipeline Performance & Cost Optimization (`apps/engine`, `packages/db`)

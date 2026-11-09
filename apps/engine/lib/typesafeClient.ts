@@ -1,6 +1,7 @@
 import { logger, PipelineStep } from './pipelineLogger';
 import { recordAiUsage } from './aiUsage';
 import { cosineSimilarity } from '../core/pipeline/utils';
+import { isValidTopicTag, TOPIC_CRITERIA, TopicTag } from './taxonomy';
 
 const TYPESAFE_API_BASE_URL =
   process.env.TYPESAFE_API_BASE_URL || 'https://api.typesafe.ai';
@@ -815,3 +816,87 @@ export async function detectStorySagas(
 
   return decisions;
 }
+
+/**
+ * Classifies a news cluster into 1 to 2 controlled topic tags using TypeSafe System One
+ * calibrated probabilities (threshold p >= 0.35).
+ */
+export async function classifyClusterTags(params: {
+  headline: string;
+  summary?: string | null;
+  minProbability?: number;
+  maxTags?: number;
+  step?: PipelineStep;
+}): Promise<TopicTag[]> {
+  const {
+    headline,
+    summary,
+    minProbability = 0.35,
+    maxTags = 2,
+    step = PipelineStep.Summarise,
+  } = params;
+
+  if (!process.env.TYPESAFE_API_KEY) {
+    logger.warn(`[${step}] TYPESAFE_API_KEY is not configured; skipping topic classification.`);
+    return [];
+  }
+
+  const state: Record<string, any> = {
+    clusterHeadline: headline,
+    clusterSummary: summary || undefined,
+  };
+
+  const criteria: Record<string, string> = { ...TOPIC_CRITERIA };
+
+  try {
+    const response = await callSystemOne(
+      {
+        state,
+        questions: {
+          topic: {
+            type: 'choice',
+            instructions:
+              'Which editorial desk at a major news outlet like the BBC or The Guardian leads coverage of this story? Base your decision strictly on the primary news event, not secondary entities or background people mentioned.',
+            criteria,
+          },
+        },
+      },
+      { step }
+    );
+
+    const answer = response.answers['topic'] as ChoiceAnswer;
+    if (!answer || answer.type !== 'choice') {
+      throw new Error('TypeSafe response did not contain expected choice answer for topic');
+    }
+
+    const probabilities = answer.probabilities || {};
+    const primaryChoice = answer.choice;
+
+    // Select all valid tags with calibrated probability >= minProbability, sorted descending
+    const qualifiedTags = Object.entries(probabilities)
+      .filter(([tag, prob]) => isValidTopicTag(tag) && prob >= minProbability)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag]) => tag as TopicTag);
+
+    // Ensure the top primary choice leads the list
+    if (isValidTopicTag(primaryChoice) && !qualifiedTags.includes(primaryChoice)) {
+      qualifiedTags.unshift(primaryChoice);
+    }
+
+    if (qualifiedTags.length > 0) {
+      return qualifiedTags.slice(0, maxTags);
+    }
+
+    if (isValidTopicTag(primaryChoice)) {
+      return [primaryChoice];
+    }
+
+    return [];
+  } catch (err: any) {
+    logger.warn(
+      `[${step}] Failed classifying topic tags for cluster "${headline}": ${err.message || err}`
+    );
+    return [];
+  }
+}
+
