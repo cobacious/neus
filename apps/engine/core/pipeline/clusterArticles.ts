@@ -284,5 +284,3 @@ export async function clusterRecentArticles() {
     `Clustering complete. ${createdClusters} clusters created. ${skippedDuplicates} duplicates skipped, ${skippedSingleSource} single-source skipped, ${skippedEmpty} empty filtered.`
   );
 }
-
-export const clusterArticles = clusterRecentArticles;
