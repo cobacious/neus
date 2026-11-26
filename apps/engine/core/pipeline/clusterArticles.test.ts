@@ -91,4 +91,23 @@ describe('clusterRecentArticles', () => {
     expect(mockDb.createArticleAssignments).not.toHaveBeenCalled();
     expect(mockDb.updateClusterEmbedding).not.toHaveBeenCalled();
   });
+
+  it('assigns articles to existing clusters by semantic similarity regardless of temporal gap', async () => {
+    const oldDate = new Date('2026-11-10T10:00:00Z');
+    const newDate = new Date('2026-11-15T10:00:00Z'); // 5 days later
+
+    mockDb.getUnclusteredArticles.mockResolvedValue([
+      { id: 'a_new1', sourceId: 's1', publishedAt: newDate, embedding: [1, 0] },
+    ]);
+    mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([
+      { id: 'c_existing', embedding: [1, 0], createdAt: oldDate },
+    ]);
+
+    await clusterRecentArticles();
+
+    expect(mockDb.createCluster).not.toHaveBeenCalled();
+    expect(mockDb.createArticleAssignments).toHaveBeenCalledWith([
+      expect.objectContaining({ articleId: 'a_new1', clusterId: 'c_existing' }),
+    ]);
+  });
 });

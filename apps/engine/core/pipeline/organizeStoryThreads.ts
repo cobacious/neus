@@ -7,7 +7,8 @@ import {
   getStoryArticlesForRealignment,
   realignStoryArticles,
   dissociateClusters,
-  disbandUnderpopulatedStories,
+  cleanEmptyStories,
+  ensureClusterStory,
 } from '@neus/db';
 import {
   logger,
@@ -61,7 +62,7 @@ export async function organizeStoryThreads(
     logger.info(
       `[${PipelineStep.Organize}] Fewer than 2 active clusters found (${activeClusters.length}). Skipping story thread organization.`
     );
-    await disbandUnderpopulatedStories();
+    await cleanEmptyStories();
     await markDormantStories(7);
     return;
   }
@@ -83,7 +84,7 @@ export async function organizeStoryThreads(
     logger.info(
       `[${PipelineStep.Organize}] No cluster neighborhoods detected above threshold. All clusters are standalone.`
     );
-    await disbandUnderpopulatedStories();
+    await cleanEmptyStories();
     const dormantCount = await markDormantStories(7);
     if (dormantCount > 0) {
       logger.info(
@@ -243,6 +244,9 @@ export async function organizeStoryThreads(
 
       const sagaDecisions = await detectSagasFn(candidatesForSaga, candidateStories, {
         step: PipelineStep.Organize,
+        minSagaProbability: process.env.MIN_SAGA_PROBABILITY
+          ? parseFloat(process.env.MIN_SAGA_PROBABILITY)
+          : 0.75,
       });
 
       if (sagaDecisions.length === 0) {
@@ -253,11 +257,30 @@ export async function organizeStoryThreads(
 
       // 3. For each confirmed saga (>= 2 clusters), invoke Gemini strictly for copywriting
       for (const saga of sagaDecisions) {
-        const sagaClusters = survivingNeighborhood.filter((c) => saga.clusterIds.includes(c.id));
+        const targetStoryId =
+          saga.existingStoryId ||
+          survivingNeighborhood.find((c) => saga.clusterIds.includes(c.id) && c.storyId)?.storyId;
+
+        // Fetch any existing member clusters of this story across active clusters
+        const existingMemberClusters = targetStoryId
+          ? activeClusters.filter((c) => c.storyId === targetStoryId && !mergedSourceIds.has(c.id))
+          : [];
+
+        // Pool together existing clusters of this story and newly joined clusters from this saga
+        const combinedClusterMap = new Map<string, ClusterWithEmbedding>();
+        for (const c of existingMemberClusters) {
+          combinedClusterMap.set(c.id, c);
+        }
+        for (const c of survivingNeighborhood) {
+          if (saga.clusterIds.includes(c.id)) {
+            combinedClusterMap.set(c.id, c);
+          }
+        }
+        const sagaClusters = Array.from(combinedClusterMap.values());
         if (sagaClusters.length < 2) continue;
 
-        const existingStory = saga.existingStoryId
-          ? existingStories.find((s) => s.id === saga.existingStoryId)
+        const existingStory = targetStoryId
+          ? existingStories.find((s) => s.id === targetStoryId)
           : null;
 
         // Skip expensive LLM copywriting if this is an established story whose cluster composition has not changed
@@ -286,6 +309,7 @@ export async function organizeStoryThreads(
             headline: c.headline ?? null,
             summary: c.summary ?? null,
             date: new Date(c.createdAt).toISOString().split('T')[0],
+            createdAt: new Date(c.createdAt).getTime(),
             articleCount: c._count?.articleAssignments ?? 0,
           }));
 
@@ -300,7 +324,7 @@ export async function organizeStoryThreads(
         }
 
         const survivingThreads = copyResult.threads.filter(
-          (t) => !mergedSourceIds.has(t.clusterId) && neighborhoodClusterIds.has(t.clusterId)
+          (t) => !mergedSourceIds.has(t.clusterId)
         );
 
         if (survivingThreads.length >= 2) {
@@ -408,25 +432,54 @@ export async function organizeStoryThreads(
         }
       }
 
-    // 3. Dissociate any clusters in this neighborhood that had a storyId but were NOT assigned to any story
+    // 3. Handle any clusters in this neighborhood that had a storyId but were NOT assigned to any multi-cluster saga
     const unassignedNeighborhoodClusters = neighborhood.filter(
       (c) => c.storyId && !mergedSourceIds.has(c.id) && !assignedClusterIds.has(c.id)
     );
 
     if (unassignedNeighborhoodClusters.length > 0) {
-      const clusterIdsToDissociate = unassignedNeighborhoodClusters.map((c) => c.id);
-      await dissociateClusters(clusterIdsToDissociate);
-      logger.info(
-        `[${PipelineStep.Organize}] Dissociated ${clusterIdsToDissociate.length} cluster(s) from story (evaluated as standalone): ${clusterIdsToDissociate.join(', ')}`
-      );
+      const clustersToSplitFromMultiClusterStory: ClusterWithEmbedding[] = [];
+
+      for (const c of unassignedNeighborhoodClusters) {
+        const clusterStory = existingStories.find((s) => s.id === c.storyId);
+        const countInNeighborhood = neighborhood.filter((x) => x.storyId === c.storyId).length;
+        const totalClustersInStory =
+          activeStoryClusterCounts.get(c.storyId) ?? clusterStory?._count?.clusters ?? countInNeighborhood;
+        const wasInMultiClusterStory = totalClustersInStory >= 2;
+        const isEntireStoryInNeighborhood =
+          countInNeighborhood >= totalClustersInStory && countInNeighborhood >= 2;
+
+        if (wasInMultiClusterStory && isEntireStoryInNeighborhood) {
+          clustersToSplitFromMultiClusterStory.push(c);
+        }
+        // If it was already in its own 1:1 story, or if its parent story has other clusters elsewhere, leave it untouched!
+      }
+
+      if (clustersToSplitFromMultiClusterStory.length > 0) {
+        const clusterIdsToDissociate = clustersToSplitFromMultiClusterStory.map((c) => c.id);
+        await dissociateClusters(clusterIdsToDissociate);
+        for (const c of clustersToSplitFromMultiClusterStory) {
+          if (c.headline) {
+            await ensureClusterStory(
+              c.id,
+              c.headline,
+              c.summary,
+              Array.isArray(c.embedding) ? (c.embedding as number[]) : null
+            );
+          }
+        }
+        logger.info(
+          `[${PipelineStep.Organize}] Split ${clusterIdsToDissociate.length} cluster(s) into independent 1:1 stories (separated from multi-thread story): ${clusterIdsToDissociate.join(', ')}`
+        );
+      }
     }
   }
 
-  // 4. Disband underpopulated stories (< 2 active clusters)
-  const { disbandedStoriesCount, dissociatedClustersCount } = await disbandUnderpopulatedStories();
-  if (disbandedStoriesCount > 0) {
+  // 4. Clean up any empty stories (0 active clusters) left behind after merges
+  const { deletedStoriesCount } = await cleanEmptyStories();
+  if (deletedStoriesCount > 0) {
     logger.info(
-      `[${PipelineStep.Organize}] Disbanded ${disbandedStoriesCount} underpopulated story/stories (dissociated ${dissociatedClustersCount} single cluster(s))`
+      `[${PipelineStep.Organize}] Cleaned up ${deletedStoriesCount} empty story/stories left behind after cluster merges`
     );
   }
 
@@ -440,7 +493,7 @@ export async function organizeStoryThreads(
 
   logPipelineSection(
     PipelineStep.Organize,
-    `Story organization complete in ${Math.round((Date.now() - organizeStart) / 1000)}s. Evaluated ${totalEvaluated} neighborhoods, deferred ${totalDeferred} to next run (time budget ${Math.round(timeBudgetMs / 1000)}s). Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-thread stories, skipped ${totalSkippedSettled} settled stories, ${disbandedStoriesCount} disbanded, ${dormantCount} stories dormant.`
+    `Story organization complete in ${Math.round((Date.now() - organizeStart) / 1000)}s. Evaluated ${totalEvaluated} neighborhoods, deferred ${totalDeferred} to next run (time budget ${Math.round(timeBudgetMs / 1000)}s). Merged ${totalMerged} duplicate clusters, synchronized ${totalStoriesSynced} multi-thread stories, skipped ${totalSkippedSettled} settled stories, ${deletedStoriesCount} empty stories cleaned up, ${dormantCount} stories dormant.`
   );
 }
 

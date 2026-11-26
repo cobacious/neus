@@ -1,4 +1,4 @@
-import { getClustersToSummarize, updateClusterSummary } from '@neus/db';
+import { getClustersToSummarize, updateClusterSummary, ensureClusterStory } from '@neus/db';
 import {
   logger,
   logPipelineStep,
@@ -26,10 +26,20 @@ export async function generateClusterSummary(prompt: string): Promise<{ headline
   });
 }
 
-export async function summarizeClusters() {
+export interface SummarizeClustersDependencies {
+  generateClusterSummary?: (prompt: string) => Promise<{ headline: string; summary: string }>;
+  getClustersToSummarize?: () => Promise<any[]>;
+}
+
+export async function summarizeClusters(
+  deps: SummarizeClustersDependencies = {}
+) {
+  const generateSummaryFn = deps.generateClusterSummary ?? generateClusterSummary;
   logPipelineStep(PipelineStep.Summarise, 'Summarizing clusters...');
 
-  const clusters = await getClustersToSummarize();
+  const clusters = deps.getClustersToSummarize
+    ? await deps.getClustersToSummarize()
+    : await getClustersToSummarize();
 
   if (clusters.length === 0) {
     logPipelineSection(
@@ -39,25 +49,22 @@ export async function summarizeClusters() {
     return;
   }
 
-  const MAX_SUMMARIES_PER_RUN = process.env.MAX_SUMMARIES
-    ? parseInt(process.env.MAX_SUMMARIES, 10)
-    : 0;
-
-  const clustersToSummarize =
-    MAX_SUMMARIES_PER_RUN > 0 ? clusters.slice(0, MAX_SUMMARIES_PER_RUN) : clusters;
-
   logPipelineSection(
     PipelineStep.Summarise,
-    `Summarizing ${clustersToSummarize.length} clusters`
+    `Found ${clusters.length} cluster(s) needing summarization.`
   );
 
-  const CONCURRENCY = process.env.SUMMARIZE_CONCURRENCY
-    ? parseInt(process.env.SUMMARIZE_CONCURRENCY, 10)
-    : 3;
+  await mapConcurrent(clusters, 5, async (cluster) => {
+    const articles = cluster.articleAssignments
+      .map((a) => a.article)
+      .filter((a): a is NonNullable<typeof a> => Boolean(a));
 
-  await mapConcurrent(clustersToSummarize, CONCURRENCY, async (cluster) => {
-    const articles = cluster.articleAssignments.map((a) => a.article);
-    if (articles.length === 0) return;
+    if (articles.length === 0) {
+      logger.warn(
+        `[${PipelineStep.Summarise}]: Cluster ${cluster.id} has no valid articles. Skipping.`
+      );
+      return;
+    }
 
     logPipelineSection(
       PipelineStep.Summarise,
@@ -69,8 +76,15 @@ export async function summarizeClusters() {
       .join('\n')}\n\nRespond in JSON with keys 'headline' and 'summary'.`;
 
     try {
-      const result = await generateClusterSummary(prompt);
+      const result = await generateSummaryFn(prompt);
       await updateClusterSummary(cluster.id, result.headline, result.summary);
+      try {
+        await ensureClusterStory(cluster.id, result.headline, result.summary);
+      } catch (storyErr: any) {
+        logger.warn(
+          `[${PipelineStep.Summarise}]: Failed ensuring story for cluster ${cluster.id}: ${storyErr.message || storyErr}`
+        );
+      }
       logPipelineSection(PipelineStep.Summarise, `Updated cluster ${cluster.id}`);
     } catch (err: any) {
       logger.error(

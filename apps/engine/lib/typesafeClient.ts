@@ -568,11 +568,14 @@ export interface CandidateStoryContext {
   id: string;
   title: string;
   overview?: string | null;
+  status?: string;
+  _count?: { clusters: number };
 }
 
 export interface StorySagaDecision {
   existingStoryId: string | null;
   clusterIds: string[];
+  mergedStoryIds?: string[];
 }
 
 /**
@@ -690,7 +693,9 @@ export async function detectStorySagas(
     step?: PipelineStep;
   }
 ): Promise<StorySagaDecision[]> {
-  const minProb = options?.minSagaProbability ?? 0.85;
+  const minProb =
+    options?.minSagaProbability ??
+    (process.env.MIN_SAGA_PROBABILITY ? parseFloat(process.env.MIN_SAGA_PROBABILITY) : 0.75);
   const step = options?.step ?? PipelineStep.Organize;
 
   if (clusters.length < 2) return [];
@@ -699,56 +704,136 @@ export async function detectStorySagas(
     throw new Error('TYPESAFE_API_KEY is not configured');
   }
 
-  // 1. If candidate stories exist, verify membership for clusters
-  const matchedStoryClusters = new Map<string, Set<string>>();
+  // Pre-calculate cluster counts per story in this cluster batch
+  const clustersPerStoryInBatch = new Map<string, number>();
+  for (const c of clusters) {
+    if (c.storyId) {
+      clustersPerStoryInBatch.set(c.storyId, (clustersPerStoryInBatch.get(c.storyId) || 0) + 1);
+    }
+  }
+
+  // Established stories are stories that already have >= 2 clusters in the DB,
+  // or candidate stories where >= 2 clusters in this batch already point to it.
+  // Note: if candidateStories is provided without _count info and only has 1 story,
+  // treat it as an established candidate target (for unit test compatibility).
+  const isEstablishedStory = (s: CandidateStoryContext) => {
+    if (s._count?.clusters !== undefined) {
+      return s._count.clusters >= 2;
+    }
+    const countInBatch = clustersPerStoryInBatch.get(s.id) || 0;
+    if (countInBatch >= 2) return true;
+    return candidateStories.length === 1;
+  };
+
+  const establishedStories = candidateStories.filter(isEstablishedStory);
+  const establishedStoryIds = new Set(establishedStories.map((s) => s.id));
+
+  const storyClusterMap = new Map<string, Set<string>>();
+  const storyMergedIdsMap = new Map<string, Set<string>>();
+
+  for (const s of establishedStories) {
+    storyClusterMap.set(s.id, new Set());
+    storyMergedIdsMap.set(s.id, new Set());
+  }
+
   const unassignedClusters: CandidateClusterForMerge[] = [];
 
   for (const c of clusters) {
-    let matchedId: string | null = null;
+    if (c.storyId && establishedStoryIds.has(c.storyId)) {
+      // Cluster is already part of an established story
+      storyClusterMap.get(c.storyId)!.add(c.id);
+    } else if (establishedStories.length > 0) {
+      // Test membership against established stories
+      let bestMatchStoryId: string | null = null;
+      let highestProb = 0;
 
-    if (c.storyId && candidateStories.some((s) => s.id === c.storyId)) {
-      matchedId = c.storyId;
-    } else if (candidateStories.length > 0) {
-      for (const s of candidateStories) {
+      for (const s of establishedStories) {
         try {
           const res = await verifyStoryMembership({
             cluster: { title: c.headline || '', summary: c.summary },
             story: { title: s.title, overview: s.overview },
             step,
           });
-          if (res.probability >= minProb) {
-            matchedId = s.id;
-            break;
+          if (res.probability >= minProb && res.probability > highestProb) {
+            highestProb = res.probability;
+            bestMatchStoryId = s.id;
           }
         } catch (err: any) {
           logger.warn(`[${step}] Story membership verification failed for cluster ${c.id}: ${err.message}`);
         }
       }
-    }
 
-    if (matchedId) {
-      if (!matchedStoryClusters.has(matchedId)) {
-        matchedStoryClusters.set(matchedId, new Set());
+      if (bestMatchStoryId) {
+        storyClusterMap.get(bestMatchStoryId)!.add(c.id);
+        if (c.storyId && c.storyId !== bestMatchStoryId) {
+          storyMergedIdsMap.get(bestMatchStoryId)!.add(c.storyId);
+        }
+      } else {
+        unassignedClusters.push(c);
       }
-      matchedStoryClusters.get(matchedId)!.add(c.id);
     } else {
       unassignedClusters.push(c);
+    }
+  }
+
+  // Cross-story merge check if multiple established stories exist and both have member clusters
+  const activeEstablishedStoryIds = Array.from(storyClusterMap.keys()).filter(
+    (id) => storyClusterMap.get(id)!.size > 0
+  );
+
+  if (activeEstablishedStoryIds.length >= 2) {
+    const primaryStoryId = activeEstablishedStoryIds[0];
+    const primaryStory = establishedStories.find((s) => s.id === primaryStoryId);
+
+    if (primaryStory) {
+      for (let i = 1; i < activeEstablishedStoryIds.length; i++) {
+        const secondaryStoryId = activeEstablishedStoryIds[i];
+        const secondaryClusters = clusters.filter((c) =>
+          storyClusterMap.get(secondaryStoryId)!.has(c.id)
+        );
+
+        if (secondaryClusters.length > 0) {
+          try {
+            const res = await verifyStoryMembership({
+              cluster: {
+                title: secondaryClusters[0].headline || '',
+                summary: secondaryClusters[0].summary,
+              },
+              story: { title: primaryStory.title, overview: primaryStory.overview },
+              step,
+            });
+
+            if (res.probability >= minProb) {
+              secondaryClusters.forEach((c) => storyClusterMap.get(primaryStoryId)!.add(c.id));
+              storyMergedIdsMap.get(primaryStoryId)!.add(secondaryStoryId);
+              storyClusterMap.delete(secondaryStoryId);
+              logger.info(
+                `[${step}] Merged established story ${secondaryStoryId} into primary story ${primaryStoryId} (probability: ${res.probability.toFixed(2)})`
+              );
+            }
+          } catch (err: any) {
+            logger.warn(`[${step}] Cross-story merge check failed for ${secondaryStoryId}: ${err.message}`);
+          }
+        }
+      }
     }
   }
 
   const decisions: StorySagaDecision[] = [];
 
   // Collect confirmed existing stories with >= 2 member clusters in this neighborhood
-  for (const [storyId, clusterIdSet] of matchedStoryClusters.entries()) {
+  for (const [storyId, clusterIdSet] of storyClusterMap.entries()) {
     if (clusterIdSet.size >= 2) {
+      const mergedStoryIds = Array.from(storyMergedIdsMap.get(storyId) || []);
       decisions.push({
         existingStoryId: storyId,
         clusterIds: Array.from(clusterIdSet),
+        ...(mergedStoryIds.length > 0 ? { mergedStoryIds } : {}),
       });
     }
   }
 
-  // 2. For unassigned clusters, evaluate pairwise saga relationships to discover new stories
+  // Pairwise evaluation for unassigned clusters
   if (unassignedClusters.length >= 2) {
     const candidatePairs: Array<[CandidateClusterForMerge, CandidateClusterForMerge]> = [];
     for (let i = 0; i < unassignedClusters.length; i++) {
@@ -805,9 +890,18 @@ export async function detectStorySagas(
       }
 
       if (component.length >= 2) {
+        const componentClusters = unassignedClusters.filter((cl) => component.includes(cl.id));
+        // Sort by createdAt ascending to pick the oldest cluster's story as the primary story
+        componentClusters.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+        const storyIds = componentClusters.map((cl) => cl.storyId).filter((id): id is string => Boolean(id));
+        const primaryStoryId = storyIds.length > 0 ? storyIds[0] : null;
+        const mergedStoryIds = Array.from(new Set(storyIds.slice(1)));
+
         decisions.push({
-          existingStoryId: null,
+          existingStoryId: primaryStoryId,
           clusterIds: component,
+          ...(mergedStoryIds.length > 0 ? { mergedStoryIds } : {}),
         });
       }
     }

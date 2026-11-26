@@ -37,6 +37,8 @@ export * from './sources/markPaywalledArticlesResolved';
 export * from './clusters/disbandSingleArticleClusters';
 export * from './stories/syncStoryWithThreads';
 export type { StoryInput, StoryThreadInput, StoryAngleInput } from './stories/syncStoryWithThreads';
+export * from './stories/ensureClusterStory';
+export * from './stories/cleanEmptyStories';
 export * from './stories/getStoryWithClusters';
 export * from './stories/getActiveClustersForStories';
 export * from './stories/markDormantStories';
