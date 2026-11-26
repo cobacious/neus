@@ -43,6 +43,8 @@ describeWithFixture('Pipeline Offline Simulation (Real Production Topology)', ()
       realignStoryArticles: jest.fn().mockResolvedValue({ updatedCount: 0, affectedClusters: [] } as any),
       dissociateClusters: jest.fn().mockResolvedValue(undefined as any),
       disbandUnderpopulatedStories: jest.fn().mockResolvedValue({ disbandedStoriesCount: 0, dissociatedClustersCount: 0 } as any),
+      cleanEmptyStories: jest.fn().mockResolvedValue({ deletedStoriesCount: 0 } as any),
+      ensureClusterStory: jest.fn().mockResolvedValue({ id: 'mock-ensured-story' } as any),
     };
 
     jest.unstable_mockModule('@neus/db', () => mockDb);

@@ -24,15 +24,32 @@ export async function synthesizeStoryCopy(
     summary: string | null;
     date: string;
     articleCount?: number;
+    createdAt?: number;
   }>,
   existingStory?: CandidateStory | null,
   step: PipelineStep = PipelineStep.Organize
 ): Promise<StoryCopyResult> {
+  const sortedClusters = [...clusters].sort((a, b) => {
+    if (a.createdAt !== undefined && b.createdAt !== undefined) {
+      return a.createdAt - b.createdAt;
+    }
+    return a.date.localeCompare(b.date);
+  });
+
+  const formattedClusters = sortedClusters.map((c, idx) => ({
+    id: c.id,
+    headline: c.headline,
+    summary: c.summary,
+    date: c.date,
+    articleCount: c.articleCount,
+    isLatestAngle: idx === sortedClusters.length - 1,
+  }));
+
   const prompt = `
 You are an expert news copywriter and editor.
 
 The following ${clusters.length} news clusters have been confirmed as distinct member threads of the exact same overarching news story:
-${JSON.stringify(clusters, null, 2)}
+${JSON.stringify(formattedClusters, null, 2)}
 ${
   existingStory
     ? `\nPRE-EXISTING STORY IN DATABASE:\nTitle: "${existingStory.title}"\nOverview: "${existingStory.overview || ''}"\n`
@@ -40,18 +57,19 @@ ${
 }
 TASK:
 Write the editorial presentation for this story:
-1. "storyTitle": An objective, neutral overarching news headline synthesizing what happened across the story (must have an active verb describing the event or development, not an abstract topic label).
-2. "overview": A neutral 2-sentence macro-summary synthesizing the entire saga across all member threads.
-3. "status": One of "breaking" (first 12-24h of newly emerging news where details are still arriving) or "developing" (multi-thread saga actively expanding in scope with related spin-offs/fallout).
+1. "storyTitle": An objective, neutral overarching news headline synthesizing what happened across the story. It must lead with or reflect the latest development and current reality from the newest active angle (marked isLatestAngle: true), rather than remaining anchored to opening events. It must feature an active verb describing the event or development, not an abstract topic label.
+2. "overview": A neutral 2-sentence macro-summary synthesizing the entire saga across all member threads, placing the latest developments into context with the opening events.
+3. "status": One of "breaking" (first 12-24h of newly emerging news where details are still arriving) or "developing" (multi-thread saga actively expanding in scope with related spin-offs or fallout).
 4. "threads": Array of member clusters with:
    - "clusterId": The cluster id
    - "thread": A 2-5 word description of this cluster's specific reporting thread (e.g. "Hospital Awakening", "Warden Resignation", "Legal Inquiry").
 
 CRITICAL TITLING & OVERVIEW RULES:
+- The "storyTitle" MUST lead with the current status and latest development from the newest active angle (marked isLatestAngle: true), rather than staying anchored to day-1 opening events (e.g. write "Jensen Huang Reinstated as Nvidia CEO Following White House Intervention" instead of "Nvidia Opens Investigation Into CEO").
 - The "storyTitle" MUST read like a real, neutral news headline with an active verb describing the overarching event or development (e.g. "Clashes Erupt Across France Over Student Protests and Rising Living Costs", "Vatican Confirms Pope Leo Diagnosed with Lung Cancer Following Surgery").
 - DO NOT format "storyTitle" as an abstract topic label, Wikipedia category or list of nouns ending in "... and Fallout", "...: Speeches, Debates and Reactions" or "...: Court Proceedings and Witness Testimony". It must read like a real, neutral news headline.
 - NEVER narrow the "storyTitle" to a single minor sub-thread or individual pledge (e.g. DO NOT name a party conference story after one specific tax pledge like "Badenoch Pledges to Scrap Inheritance Tax"; instead write "Conservative Party Opens Annual Conference Amid Debates Over Economic Strategy and Leadership").
-- The "overview" must synthesize the entire overarching saga or event across all member threads.
+- The "overview" must synthesize the entire overarching saga across all member threads.
 
 Return JSON with this exact schema:
 {

@@ -11,6 +11,8 @@ const mockDb = {
   realignStoryArticles: jest.fn(),
   dissociateClusters: jest.fn(),
   disbandUnderpopulatedStories: jest.fn(),
+  cleanEmptyStories: jest.fn(),
+  ensureClusterStory: jest.fn(),
 };
 
 jest.unstable_mockModule('@neus/db', () => mockDb);
@@ -40,6 +42,8 @@ describe('organizeStoryThreads', () => {
       disbandedStoriesCount: 0,
       dissociatedClustersCount: 0,
     });
+    (mockDb.cleanEmptyStories as jest.Mock).mockResolvedValue({ deletedStoriesCount: 0 });
+    (mockDb.ensureClusterStory as jest.Mock).mockResolvedValue({ id: 'mock-story' });
   });
 
   it('skips processing if fewer than 2 active clusters are found', async () => {
@@ -252,9 +256,8 @@ describe('organizeStoryThreads', () => {
     ]);
 
     (mockDb.dissociateClusters as jest.Mock).mockResolvedValue({ count: 2 });
-    (mockDb.disbandUnderpopulatedStories as jest.Mock).mockResolvedValue({
-      disbandedStoriesCount: 1,
-      dissociatedClustersCount: 0,
+    (mockDb.cleanEmptyStories as jest.Mock).mockResolvedValue({
+      deletedStoriesCount: 1,
     });
 
     await organizeStoryThreads(
@@ -265,13 +268,14 @@ describe('organizeStoryThreads', () => {
       }
     );
 
-    // Both clusters should be dissociated since they had storyIds but were not included in any story threads
+    // Both clusters should be dissociated and receive their own 1:1 stories
     expect(mockDb.dissociateClusters).toHaveBeenCalledWith([
       'c-badenoch-scrutiny',
       'c-badenoch-tax',
     ]);
+    expect(mockDb.ensureClusterStory).toHaveBeenCalledTimes(2);
     expect(mockDb.syncStoryWithThreads).not.toHaveBeenCalled();
-    expect(mockDb.disbandUnderpopulatedStories).toHaveBeenCalled();
+    expect(mockDb.cleanEmptyStories).toHaveBeenCalled();
   });
 
   it('defers evaluations and still runs the dormancy sweep when the time budget is spent', async () => {

@@ -601,5 +601,84 @@ describe('typesafeClient', () => {
         clusterIds: ['c1', 'c2'],
       });
     });
+
+    it('merges single-cluster stories into the oldest cluster story ID', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockImplementation(async (url: any, opts: any) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            is_same_saga: {
+              type: 'noul',
+              noul: 0.92,
+            },
+          },
+        }),
+      }));
+      global.fetch = mockFetch as any;
+
+      const date1 = new Date('2026-11-08T10:00:00Z');
+      const date2 = new Date('2026-11-12T10:00:00Z');
+
+      const clusters = [
+        { id: 'c1', storyId: 'story-1', headline: 'Jensen Huang under probe', createdAt: date1 },
+        { id: 'c2', storyId: 'story-2', headline: 'Jensen Huang resigns', createdAt: date2 },
+      ];
+
+      const candidateStories = [
+        { id: 'story-1', title: 'Jensen Huang probe', _count: { clusters: 1 } },
+        { id: 'story-2', title: 'Jensen Huang resigns', _count: { clusters: 1 } },
+      ];
+
+      const sagas = await detectStorySagas(clusters, candidateStories);
+
+      expect(sagas).toHaveLength(1);
+      expect(sagas[0]).toEqual({
+        existingStoryId: 'story-1',
+        clusterIds: ['c1', 'c2'],
+        mergedStoryIds: ['story-2'],
+      });
+    });
+
+    it('merges two established stories when cross-story check confirms saga membership', async () => {
+      process.env.TYPESAFE_API_KEY = 'mock_key';
+
+      const mockFetch = jest.fn().mockImplementation(async (url: any, opts: any) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'jev-1.14.0',
+          answers: {
+            is_member: {
+              type: 'noul',
+              noul: 0.88,
+            },
+          },
+        }),
+      }));
+      global.fetch = mockFetch as any;
+
+      const clusters = [
+        { id: 'c1', storyId: 'story-primary', headline: 'Probe begins', createdAt: new Date('2026-11-08') },
+        { id: 'c2', storyId: 'story-primary', headline: 'Resignation', createdAt: new Date('2026-11-12') },
+        { id: 'c3', storyId: 'story-secondary', headline: 'Earnings hit', createdAt: new Date('2026-11-18') },
+        { id: 'c4', storyId: 'story-secondary', headline: 'Trump intervention', createdAt: new Date('2026-11-24') },
+      ];
+
+      const candidateStories = [
+        { id: 'story-primary', title: 'Nvidia CEO Probe', overview: 'Probe overview', _count: { clusters: 2 } },
+        { id: 'story-secondary', title: 'Nvidia CEO Reinstatement', overview: 'Reinstatement overview', _count: { clusters: 2 } },
+      ];
+
+      const sagas = await detectStorySagas(clusters, candidateStories);
+
+      expect(sagas).toHaveLength(1);
+      expect(sagas[0].existingStoryId).toBe('story-primary');
+      expect(sagas[0].clusterIds).toEqual(expect.arrayContaining(['c1', 'c2', 'c3', 'c4']));
+      expect(sagas[0].mergedStoryIds).toContain('story-secondary');
+    });
   });
 });

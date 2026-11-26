@@ -91,4 +91,30 @@ describe('clusterRecentArticles', () => {
     expect(mockDb.createArticleAssignments).not.toHaveBeenCalled();
     expect(mockDb.updateClusterEmbedding).not.toHaveBeenCalled();
   });
+
+  it('does not assign articles to existing clusters when the temporal gap exceeds the burst window', async () => {
+    const oldDate = new Date('2026-11-10T10:00:00Z');
+    const newDate = new Date('2026-11-15T10:00:00Z'); // 5 days later (> 48h)
+
+    mockDb.getUnclusteredArticles.mockResolvedValue([
+      { id: 'a_new1', sourceId: 's1', publishedAt: newDate, embedding: [1, 0] },
+      { id: 'a_new2', sourceId: 's2', publishedAt: newDate, embedding: [1, 0] },
+    ]);
+    mockDb.getRecentClustersWithEmbeddings.mockResolvedValue([
+      { id: 'c_old', embedding: [1, 0], latestArticleAt: oldDate, createdAt: oldDate },
+    ]);
+    mockDb.createCluster.mockResolvedValue({ id: 'c_new' });
+
+    await clusterRecentArticles();
+
+    // Must NOT assign to c_old; must form new cluster c_new
+    expect(mockDb.createCluster).toHaveBeenCalledWith('embedding', null);
+    const assignments = mockDb.createArticleAssignments.mock.calls[0][0];
+    expect(assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ articleId: 'a_new1', clusterId: 'c_new' }),
+        expect.objectContaining({ articleId: 'a_new2', clusterId: 'c_new' }),
+      ])
+    );
+  });
 });

@@ -51,6 +51,7 @@ describe('getUnclusteredArticles', () => {
       id: true,
       embedding: true,
       createdAt: true,
+      publishedAt: true,
       sourceId: true,
       source: true,
     });

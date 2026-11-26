@@ -17,6 +17,9 @@ import {
 const SIMILARITY_THRESHOLD = process.env.CLUSTER_SIMILARITY_THRESHOLD
   ? parseFloat(process.env.CLUSTER_SIMILARITY_THRESHOLD)
   : 0.87;
+export const CLUSTER_BURST_WINDOW_HOURS = process.env.CLUSTER_BURST_WINDOW_HOURS
+  ? parseFloat(process.env.CLUSTER_BURST_WINDOW_HOURS)
+  : 48;
 const ALLOW_SINGLE_ARTICLE_CLUSTERS = false; // Set to false to skip single article clusters
 
 type UnclusteredArticle = Awaited<ReturnType<typeof getUnclusteredArticles>>[number];
@@ -37,6 +40,18 @@ async function assignToExistingClusters(
 
     for (const cluster of existingClusters) {
       if (!Array.isArray(cluster.embedding)) continue;
+
+      // Temporal burst guardrail: an article cannot join an existing cluster if the gap exceeds the burst window
+      const clusterWithActivity = cluster as { latestArticleAt?: Date; createdAt?: Date };
+      if (clusterWithActivity.latestArticleAt || clusterWithActivity.createdAt) {
+        const latestTime = new Date(clusterWithActivity.latestArticleAt || clusterWithActivity.createdAt!).getTime();
+        const articleWithDate = article as { publishedAt?: Date; createdAt?: Date };
+        const articleTime = new Date(articleWithDate.publishedAt || articleWithDate.createdAt || Date.now()).getTime();
+        const gapHours = Math.abs(articleTime - latestTime) / (1000 * 60 * 60);
+        if (gapHours > CLUSTER_BURST_WINDOW_HOURS) {
+          continue;
+        }
+      }
 
       const similarity = cosineSimilarity(
         article.embedding as number[],
@@ -243,10 +258,13 @@ async function createNewClusters(
   return createdClusters;
 }
 
-export async function clusterRecentArticles() {
+export async function clusterRecentArticles(options?: {
+  articles?: UnclusteredArticle[];
+  daysBack?: number;
+}) {
   logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
 
-  const articles = await getUnclusteredArticles();
+  const articles = options?.articles ?? (await getUnclusteredArticles(options?.daysBack));
   const existingClusters = await getRecentClustersWithEmbeddings();
 
   logPipelineSection(
@@ -284,3 +302,5 @@ export async function clusterRecentArticles() {
     `Clustering complete. ${createdClusters} clusters created. ${skippedDuplicates} duplicates skipped, ${skippedSingleSource} single-source skipped, ${skippedEmpty} empty filtered.`
   );
 }
+
+export const clusterArticles = clusterRecentArticles;
