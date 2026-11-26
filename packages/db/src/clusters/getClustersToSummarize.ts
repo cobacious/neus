@@ -10,23 +10,17 @@ import { prisma } from '../client';
  *
  * Performance: ~90% less data transfer compared to fetching full article data.
  */
-export async function getClustersToSummarize(clusterIds?: string[]) {
-  const where: any = {
-    archived: false,
-    OR: [
-      { headline: { equals: null } },
-      { summary: { equals: null } },
-      { headline: { equals: '' } },
-      { summary: { equals: '' } },
-    ],
-  };
-
-  if (clusterIds && clusterIds.length > 0) {
-    where.id = { in: clusterIds };
-  }
-
+export async function getClustersToSummarize() {
   const clusters = await prisma.cluster.findMany({
-    where,
+    where: {
+      archived: false,
+      OR: [
+        { headline: { equals: null } },
+        { summary: { equals: null } },
+        { headline: { equals: '' } },
+        { summary: { equals: '' } },
+      ],
+    },
     select: {
       id: true,
       articleAssignments: {

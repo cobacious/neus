@@ -243,13 +243,10 @@ async function createNewClusters(
   return createdClusters;
 }
 
-export async function clusterRecentArticles(options?: {
-  articles?: UnclusteredArticle[];
-  daysBack?: number;
-}) {
+export async function clusterRecentArticles() {
   logPipelineStep(PipelineStep.Cluster, 'Clustering recent articles...');
 
-  const articles = options?.articles ?? (await getUnclusteredArticles(options?.daysBack));
+  const articles = await getUnclusteredArticles();
   const existingClusters = await getRecentClustersWithEmbeddings();
 
   logPipelineSection(

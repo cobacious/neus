@@ -32,15 +32,14 @@ export interface SummarizeClustersDependencies {
 }
 
 export async function summarizeClusters(
-  deps: SummarizeClustersDependencies = {},
-  options?: { clusterIds?: string[] }
+  deps: SummarizeClustersDependencies = {}
 ) {
   const generateSummaryFn = deps.generateClusterSummary ?? generateClusterSummary;
   logPipelineStep(PipelineStep.Summarise, 'Summarizing clusters...');
 
   const clusters = deps.getClustersToSummarize
     ? await deps.getClustersToSummarize()
-    : await getClustersToSummarize(options?.clusterIds);
+    : await getClustersToSummarize();
 
   if (clusters.length === 0) {
     logPipelineSection(

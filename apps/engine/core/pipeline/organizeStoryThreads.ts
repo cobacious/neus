@@ -43,10 +43,7 @@ export interface OrganizeStoryThreadsDependencies {
 }
 
 export async function organizeStoryThreads(
-  options: {
-    timeBudgetMs?: number;
-    clusterIds?: string[];
-  } = {},
+  options: { timeBudgetMs?: number } = {},
   deps: OrganizeStoryThreadsDependencies = {}
 ) {
   const detectDuplicatesFn = deps.detectDuplicateClusters ?? detectDuplicateClusters;
@@ -76,15 +73,11 @@ export async function organizeStoryThreads(
     ? parseFloat(process.env.STORY_SIMILARITY_THRESHOLD)
     : 0.78;
 
-  const allNeighborhoods = buildNeighborhoods(activeClusters, similarityThreshold);
-  const neighborhoods =
-    options.clusterIds && options.clusterIds.length > 0
-      ? allNeighborhoods.filter((n) => n.some((c) => options.clusterIds!.includes(c.id)))
-      : allNeighborhoods;
+  const neighborhoods = buildNeighborhoods(activeClusters, similarityThreshold);
 
   logPipelineSection(
     PipelineStep.Organize,
-    `Evaluated ${activeClusters.length} clusters: found ${allNeighborhoods.length} total neighborhoods (${neighborhoods.length} targeted, threshold >= ${similarityThreshold})`
+    `Evaluated ${activeClusters.length} clusters: found ${neighborhoods.length} candidate neighborhoods (threshold >= ${similarityThreshold})`
   );
 
   if (neighborhoods.length === 0) {
