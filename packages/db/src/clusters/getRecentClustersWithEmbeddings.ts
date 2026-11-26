@@ -12,7 +12,7 @@ export async function getRecentClustersWithEmbeddings(daysBack: number = 7) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysBack);
 
-  const clusters = await prisma.cluster.findMany({
+  return prisma.cluster.findMany({
     where: {
       createdAt: {
         gte: cutoffDate,
@@ -26,27 +26,9 @@ export async function getRecentClustersWithEmbeddings(daysBack: number = 7) {
       id: true,
       embedding: true,
       createdAt: true,
-      articleAssignments: {
-        select: {
-          article: {
-            select: { publishedAt: true },
-          },
-        },
-        orderBy: {
-          article: { publishedAt: 'desc' },
-        },
-        take: 1,
-      },
     },
     orderBy: {
       createdAt: 'desc',
     },
   });
-
-  return clusters.map((c) => ({
-    id: c.id,
-    embedding: c.embedding,
-    createdAt: c.createdAt,
-    latestArticleAt: c.articleAssignments[0]?.article?.publishedAt ?? c.createdAt,
-  }));
 }
