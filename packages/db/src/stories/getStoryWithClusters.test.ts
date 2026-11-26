@@ -26,7 +26,7 @@ describe('getStoryWithClusters', () => {
     jest.resetAllMocks();
   });
 
-  it('fetches story by id with chronological clusters', async () => {
+  it('fetches story by id with reverse-chronological clusters', async () => {
     (mockPrisma.story.findUnique as jest.Mock).mockResolvedValue({
       id: 's1',
       title: 'Story 1',
@@ -38,7 +38,7 @@ describe('getStoryWithClusters', () => {
     const expectedInclude = {
       clusters: {
         where: { archived: false },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
         include: {
           articleAssignments: {
             select: {
@@ -85,7 +85,7 @@ describe('getStoryWithClusters', () => {
       include: {
         clusters: {
           where: { archived: false },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
           include: {
             articleAssignments: {
               select: {
@@ -133,7 +133,7 @@ describe('getStoryWithClusters', () => {
           include: {
             clusters: {
               where: { archived: false },
-              orderBy: { createdAt: 'asc' },
+              orderBy: { createdAt: 'desc' },
               include: {
                 articleAssignments: {
                   select: {

@@ -43,7 +43,7 @@ export async function getRankedClusters(limit?: number, offset?: number) {
         include: {
           clusters: {
             where: { archived: false },
-            orderBy: { createdAt: 'asc' },
+            orderBy: { createdAt: 'desc' },
             include: {
               articleAssignments: {
                 select: {

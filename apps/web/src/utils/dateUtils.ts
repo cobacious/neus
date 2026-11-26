@@ -91,3 +91,33 @@ export function sortArticlesNewestFirst<
     return dateB - dateA;
   });
 }
+
+/**
+ * Sorts an array of clusters (threads) in reverse chronological order (newest first).
+ * Uses the latest article publishedAt date if available, or cluster.createdAt as fallback.
+ */
+export function sortClustersNewestFirst<
+  T extends {
+    createdAt?: number | string | Date | null;
+    articles?: Array<{ publishedAt?: number | string | Date | null }> | null;
+  }
+>(clusters: T[]): T[] {
+  return [...clusters].sort((a, b) => {
+    const getLatestTime = (c: T): number => {
+      let maxTime = parseDate(c.createdAt)?.getTime() ?? 0;
+      if (Array.isArray(c.articles)) {
+        for (const article of c.articles) {
+          const t = parseDate(article?.publishedAt)?.getTime() ?? 0;
+          if (t > maxTime) {
+            maxTime = t;
+          }
+        }
+      }
+      return maxTime;
+    };
+
+    const timeA = getLatestTime(a);
+    const timeB = getLatestTime(b);
+    return timeB - timeA;
+  });
+}

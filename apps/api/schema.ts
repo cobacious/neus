@@ -82,8 +82,15 @@ const Cluster = objectType({
     });
     t.list.field('articles', {
       type: 'ArticleSummary',
-      resolve: (cluster: any) =>
-        cluster.articleAssignments?.map((assignment: any) => assignment.article) ?? [],
+      resolve: (cluster: any) => {
+        const articles =
+          cluster.articleAssignments?.map((assignment: any) => assignment.article) ?? [];
+        return articles.slice().sort((a: any, b: any) => {
+          const timeA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+          const timeB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+          return timeB - timeA;
+        });
+      },
     });
   },
 });

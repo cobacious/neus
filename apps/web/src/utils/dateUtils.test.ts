@@ -3,6 +3,7 @@ import {
   formatRelativeTime,
   formatDateHeader,
   sortArticlesNewestFirst,
+  sortClustersNewestFirst,
 } from './dateUtils';
 
 describe('dateUtils', () => {
@@ -140,6 +141,52 @@ describe('dateUtils', () => {
       const sorted = sortArticlesNewestFirst(articles);
       expect(sorted).not.toBe(articles);
       expect(articles[0].id).toBe('1');
+    });
+  });
+
+  describe('sortClustersNewestFirst', () => {
+    it('sorts clusters by latest article publication date in descending order', () => {
+      const clusters = [
+        {
+          id: 'c1',
+          createdAt: '2026-10-10T00:00:00.000Z',
+          articles: [{ publishedAt: '2026-10-11T10:00:00.000Z' }],
+        },
+        {
+          id: 'c2',
+          createdAt: '2026-10-09T00:00:00.000Z',
+          articles: [{ publishedAt: '2026-10-15T12:00:00.000Z' }],
+        },
+        {
+          id: 'c3',
+          createdAt: '2026-10-08T00:00:00.000Z',
+          articles: [{ publishedAt: '2026-10-12T08:00:00.000Z' }],
+        },
+      ];
+
+      const sorted = sortClustersNewestFirst(clusters);
+      expect(sorted.map((c) => c.id)).toEqual(['c2', 'c3', 'c1']);
+    });
+
+    it('falls back to cluster createdAt when articles are empty or missing', () => {
+      const clusters = [
+        { id: 'c1', createdAt: '2026-10-10T00:00:00.000Z', articles: [] },
+        { id: 'c2', createdAt: '2026-10-20T00:00:00.000Z', articles: [] },
+        { id: 'c3', createdAt: '2026-10-15T00:00:00.000Z' },
+      ];
+
+      const sorted = sortClustersNewestFirst(clusters);
+      expect(sorted.map((c) => c.id)).toEqual(['c2', 'c3', 'c1']);
+    });
+
+    it('returns a new array without mutating input', () => {
+      const clusters = [
+        { id: 'c1', createdAt: '2026-10-10T00:00:00.000Z' },
+        { id: 'c2', createdAt: '2026-10-20T00:00:00.000Z' },
+      ];
+      const sorted = sortClustersNewestFirst(clusters);
+      expect(sorted).not.toBe(clusters);
+      expect(clusters[0].id).toBe('c1');
     });
   });
 });

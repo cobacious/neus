@@ -3,7 +3,7 @@ import { prisma } from '../client';
 const storyClusterInclude = {
   clusters: {
     where: { archived: false },
-    orderBy: { createdAt: 'asc' as const },
+    orderBy: { createdAt: 'desc' as const },
     include: {
       articleAssignments: {
         select: {

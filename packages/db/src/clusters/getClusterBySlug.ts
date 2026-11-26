@@ -18,7 +18,7 @@ export async function getClusterBySlug(slug: string) {
         include: {
           clusters: {
             where: { archived: false },
-            orderBy: { createdAt: 'asc' },
+            orderBy: { createdAt: 'desc' },
             include: {
               articleAssignments: {
                 select: {
