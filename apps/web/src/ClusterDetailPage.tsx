@@ -13,6 +13,7 @@ import {
   formatRelativeTime,
   formatDateHeader,
   sortArticlesNewestFirst,
+  sortClustersNewestFirst,
 } from './utils/dateUtils';
 import { isPaywalled } from './utils/paywallUtils';
 import SourceFavicon from './components/SourceFavicon';
@@ -350,10 +351,13 @@ export default function ClusterDetailPage() {
     isMultiThread: isMultiThreadStory,
   });
 
-  // 1. Gather all threads
+  // 1. Gather all threads sorted in descending date order (newest first)
+  const sortedStoryClusters =
+    isMultiThreadStory && story?.clusters ? sortClustersNewestFirst(story.clusters) : [];
+
   const threads: ThreadItem[] =
-    isMultiThreadStory && story?.clusters
-      ? story.clusters.map((c: any) => ({
+    sortedStoryClusters.length > 0
+      ? sortedStoryClusters.map((c: any) => ({
           id: c.id,
           name: c.storyAngle || c.headline || 'Thread',
           articleCount: c.articles ? c.articles.length : 0,
@@ -537,11 +541,11 @@ export default function ClusterDetailPage() {
           />
         )}
 
-        {isMultiThreadStory && story?.clusters ? (
+        {isMultiThreadStory && sortedStoryClusters.length > 0 ? (
           <div className="space-y-4 sm:space-y-8">
             {(selectedThreadId
-              ? story.clusters.filter((c: any) => c.id === selectedThreadId)
-              : story.clusters
+              ? sortedStoryClusters.filter((c: any) => c.id === selectedThreadId)
+              : sortedStoryClusters
             ).map((c: any) => {
               const threadName = c.storyAngle || c.headline || 'Thread';
               const threadStyle =

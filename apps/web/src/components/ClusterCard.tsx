@@ -3,7 +3,7 @@ import StatusBadge, { resolveStoryStatus, STATUS_CONFIG } from './StatusBadge';
 import StoryThreadPills, { ThreadItem } from './StoryThreadPills';
 import ArticleTimelineSparkline, { TimelineArticle } from './ArticleTimelineSparkline';
 import { createThreadColorMap } from '../utils/threadColors';
-import { parseDate } from '../utils/dateUtils';
+import { parseDate, sortClustersNewestFirst } from '../utils/dateUtils';
 import { isPaywalled } from '../utils/paywallUtils';
 import SourceFavicon from './SourceFavicon';
 
@@ -84,10 +84,13 @@ export default function ClusterCard({ cluster }: { cluster: Cluster }) {
     isMultiThread: isMultiThreadStory,
   });
 
-  // Extract threads
+  // Extract threads sorted descending (newest first)
+  const sortedStoryClusters =
+    isMultiThreadStory && story?.clusters ? sortClustersNewestFirst(story.clusters) : [];
+
   const threads: ThreadItem[] =
-    isMultiThreadStory && story?.clusters
-      ? story.clusters.map((c) => ({
+    sortedStoryClusters.length > 0
+      ? sortedStoryClusters.map((c) => ({
           id: c.id,
           name: c.storyAngle || c.headline || 'Thread',
           articleCount: c.articles ? c.articles.length : undefined,
